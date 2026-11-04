@@ -1,0 +1,13 @@
+id: tin-bronze
+kind: material
+label: Tin bronze
+origin: produced
+is_a: [metal]
+description: An alloy of copper with roughly 10% tin. Harder than copper and easier to cast, because it melts at a lower temperature.
+quantities:
+  hardness_mohs: [3, 4]
+references:
+  - citation: "Mohs scale of mineral hardness: table of common materials. Wikipedia."
+    url: https://en.wikipedia.org/wiki/Mohs_scale
+    supports: Mohs hardness value.
+    status: secondary

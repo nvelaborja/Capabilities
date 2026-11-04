@@ -1,0 +1,8 @@
+id: copper-chisel
+kind: artifact
+label: Copper chisel
+is_a: [chisel]
+description: A cast and hammered copper chisel, the main tool for cutting and dressing limestone in Old and Middle Kingdom Egypt.
+quantities:
+  hardness_mohs: [2.5, 3]
+notes: Hardness is that of copper. Cold-hammering the edge makes it harder; how much is TODO-source.

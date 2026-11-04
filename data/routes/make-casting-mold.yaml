@@ -1,0 +1,18 @@
+id: make-casting-mold
+kind: route
+label: Making a clay casting mold
+achieves: { thing: casting-mold }
+requires:
+  - { role: consumed, thing: clay }
+  - role: effect
+    effect: heat
+    where:
+      - { quantity: temperature_c, op: ">=", value: 600 }
+    notes: Firing clay hard; approximate temperature (TODO-source).
+  - { role: know_how, thing: pottery }
+outputs:
+  - { thing: casting-mold }
+references:
+  - citation: "Tylecote, R. F. (1992). A History of Metallurgy, 2nd ed. Institute of Materials."
+    supports: General description of this process.
+    status: unverified

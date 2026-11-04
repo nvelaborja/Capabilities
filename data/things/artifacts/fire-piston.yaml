@@ -1,0 +1,5 @@
+id: fire-piston
+kind: artifact
+label: Fire piston
+description: A sealed cylinder with a piston. Ramming the piston in compresses the air so fast that it heats enough to ignite tinder.
+notes: Included mainly as a test case. It reaches ignition temperature, but only for an instant and in a tiny volume, so it must not satisfy furnace-scale heat requirements.

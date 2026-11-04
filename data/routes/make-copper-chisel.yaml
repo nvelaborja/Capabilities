@@ -1,0 +1,21 @@
+id: make-copper-chisel
+kind: route
+label: Casting and hammering a copper chisel
+achieves: { thing: copper-chisel }
+requires:
+  - { role: consumed, thing: copper }
+  - { role: tool, thing: crucible }
+  - { role: tool, thing: casting-mold }
+  - role: effect
+    effect: heat
+    where:
+      - { quantity: temperature_c, op: ">=", value: 1085 }
+    notes: Copper must be molten to cast.
+  - { role: know_how, thing: casting }
+  - { role: know_how, thing: cold-hammering }
+outputs:
+  - { thing: copper-chisel }
+references:
+  - citation: "Stocks, D. A. (2003). Experiments in Egyptian Archaeology: Stoneworking Technology in Ancient Egypt. Routledge."
+    supports: Experimental reconstruction of this tool or process.
+    status: unverified

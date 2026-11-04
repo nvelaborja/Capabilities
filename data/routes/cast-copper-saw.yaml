@@ -1,0 +1,22 @@
+id: cast-copper-saw
+kind: route
+label: Casting a copper saw blade
+achieves: { thing: copper-saw }
+requires:
+  - { role: consumed, thing: copper }
+  - { role: tool, thing: crucible }
+  - { role: tool, thing: casting-mold }
+  - role: effect
+    effect: heat
+    where:
+      - { quantity: temperature_c, op: ">=", value: 1085 }
+    notes: Copper must be molten to cast.
+  - { role: know_how, thing: casting }
+  - { role: know_how, thing: cold-hammering, notes: Hammering the cast blade flat and work-hardening it. }
+outputs:
+  - { thing: copper-saw }
+references:
+  - citation: "Stocks, D. A. (1988). Industrial technology at Kahun and Gurob (MA thesis, University of Manchester), as summarized in 'Ancient Egyptian Copper Slabbing Saws', Hall of Ma'at."
+    url: https://www.hallofmaat.com/unforbiddengeology/ancient-egyptian-copper-slabbing-saws/
+    supports: Copper blades about 5 mm thick can be cast in an open mold.
+    status: secondary

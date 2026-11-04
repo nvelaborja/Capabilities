@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:capabilities:schema:job",
+  "title": "Job",
+  "description": "A concrete task to check for feasibility (question 3): a verb applied to a target, with size, precision, time, and crew limits.",
+  "type": "object",
+  "allOf": [{ "$ref": "urn:capabilities:schema:defs#/$defs/common" }],
+  "unevaluatedProperties": false,
+  "required": ["verb", "target", "parameters"],
+  "properties": {
+    "kind": { "const": "job" },
+    "verb": { "$ref": "urn:capabilities:schema:defs#/$defs/id" },
+    "target": { "$ref": "urn:capabilities:schema:defs#/$defs/id" },
+    "parameters": { "$ref": "urn:capabilities:schema:defs#/$defs/quantityMap" },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "precision": { "description": "Required precision band (e.g. P2).", "type": "string" },
+        "max_duration_h": { "type": "number" },
+        "max_crew": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

@@ -1,0 +1,29 @@
+id: move-on-sledge
+kind: route
+label: Hauling on a sledge
+achieves: { verb: move }
+requires:
+  - { role: tool, thing: sledge }
+  - { role: tool, thing: rope }
+  - { role: know_how, thing: hauling }
+envelope:
+  capacity:
+    quantity: mass_kg
+    basis: derived
+    per_unit: { unit: hauler, value: 337 }
+    scaling: linear
+    scaling_cap:
+      notes: Limited by how many haulers fit along the ropes. The Djehutihotep painting shows 172 haulers on four ropes moving one colossus.
+    notes: >-
+      Derived from the Djehutihotep scene: an estimated 58 tonnes moved by 172 haulers, or about 337 kg per hauler. The scene also shows water
+      poured in front of the sledge. Experiments show the right amount of water roughly halves the pulling force on sand, so dry sand would
+      need about twice the crew.
+references:
+  - citation: "Djehutihotep. Wikipedia."
+    url: https://en.wikipedia.org/wiki/Djehutihotep
+    supports: The tomb painting shows 172 haulers moving a colossal statue estimated at about 58 tonnes. The painting was destroyed in 1890 and is known from a photograph taken the year before.
+    status: secondary
+  - citation: "Fall, A. et al. (2014). Sliding Friction on Wet and Dry Sand. Physical Review Letters 112, 175502."
+    doi: 10.1103/PhysRevLett.112.175502
+    supports: Wetting sand to the right moisture can roughly halve the force needed to pull a sledge; too much water increases friction again.
+    status: secondary

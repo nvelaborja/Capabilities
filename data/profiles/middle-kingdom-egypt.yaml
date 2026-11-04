@@ -1,0 +1,37 @@
+id: middle-kingdom-egypt
+kind: profile
+label: Middle Kingdom Egypt
+period: c. 2050–1650 BCE
+region: Nile valley
+description: A starting set of materials, tools, and know-how attested for Middle Kingdom Egypt. A first draft for testing the model; every item still needs its own reference.
+includes:
+  - { id: fire-making }
+  - { id: charcoal-burning }
+  - { id: pottery }
+  - { id: furnace-building }
+  - { id: copper-smelting }
+  - { id: casting }
+  - { id: cold-hammering }
+  - { id: alloying }
+  - { id: stone-dressing }
+  - { id: abrasive-cutting }
+  - { id: flint-knapping }
+  - { id: rope-making }
+  - { id: woodworking }
+  - { id: hauling }
+  - { id: copper }
+  - { id: tin-bronze, notes: Tin was not available locally and must have been imported. }
+  - { id: blowpipe, notes: Metalworking scenes show blowpipes; bellows appear later (TODO-source). }
+  - { id: copper-saw }
+  - { id: copper-tube-drill }
+  - { id: copper-chisel }
+  - { id: bow-drill }
+  - { id: sledge }
+  - { id: dolerite-pounder }
+references:
+  - citation: "Nicholson, P. T. & Shaw, I. (eds.) (2000). Ancient Egyptian Materials and Technology. Cambridge University Press."
+    supports: Materials and technologies of pharaonic Egypt.
+    status: unverified
+  - citation: "Stocks, D. A. (2003). Experiments in Egyptian Archaeology: Stoneworking Technology in Ancient Egypt. Routledge."
+    supports: Egyptian stoneworking tools (saws, tube drills, chisels, pounders).
+    status: unverified

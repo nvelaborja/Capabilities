@@ -1,0 +1,14 @@
+id: heat-open-fire
+kind: route
+label: Open fire
+achieves: { effect: heat }
+requires:
+  - { role: consumed, category: fuel }
+  - { role: know_how, thing: fire-making }
+provides:
+  temperature_c: [600, 900]
+notes: Temperature range is approximate (TODO-source). Enough to fire pottery and work soft metals, not enough to melt copper.
+references:
+  - citation: "Tylecote, R. F. (1992). A History of Metallurgy, 2nd ed. Institute of Materials."
+    supports: General description of this process.
+    status: unverified

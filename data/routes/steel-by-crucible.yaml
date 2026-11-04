@@ -1,0 +1,28 @@
+id: steel-by-crucible
+kind: route
+label: Crucible steel (e.g. wootz)
+achieves: { thing: steel }
+requires:
+  - { role: consumed, thing: bloom-iron }
+  - { role: consumed, category: carbon-source }
+  - { role: tool, thing: crucible }
+  - role: effect
+    effect: heat
+    where:
+      - { quantity: temperature_c, op: ">=", value: 1200 }
+      - { quantity: duration_h, op: ">=", value: 24 }
+    notes: >-
+      Historical firings ran at roughly 1150–1250 °C for about 24 hours. As the iron absorbs carbon its melting point drops, so the charge
+      melts far below the roughly 1500 °C that a 0.8% carbon steel would need. Modern replications often use about 1600 °C.
+  - { role: know_how, thing: crucible-steelmaking }
+outputs:
+  - { thing: steel }
+references:
+  - citation: "Crucible process. Encyclopaedia Britannica."
+    url: https://www.britannica.com/technology/crucible-process
+    supports: General description of crucible steelmaking.
+    status: unverified
+  - citation: "Föll, H. Iron, Steel and Swords (lecture notes), University of Kiel: Confusing the crucible steel issue."
+    url: https://www.tf.uni-kiel.de/matwis/amat/iss/kap_a/illustr/ia_4_1.html
+    supports: A 0.8% carbon steel needs almost 1500 °C to melt; early crucible makers probably did not sustain that.
+    status: secondary

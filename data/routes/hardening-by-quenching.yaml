@@ -1,0 +1,19 @@
+id: hardening-by-quenching
+kind: route
+label: Quench hardening
+achieves: { thing: hardened-steel }
+requires:
+  - { role: consumed, thing: steel }
+  - { role: consumed, thing: water }
+  - role: effect
+    effect: heat
+    where:
+      - { quantity: temperature_c, op: ">=", value: 800 }
+    notes: The steel must be above about 727 °C (practically, glowing red at about 800 °C or more) before it is plunged into water.
+  - { role: know_how, thing: quenching }
+outputs:
+  - { thing: hardened-steel, quantities: { hardness_mohs: [7, 8] } }
+references:
+  - citation: "Verhoeven, J. D. (2007). Steel Metallurgy for the Non-Metallurgist. ASM International."
+    supports: Steel must be heated above about 727 °C (into the austenite range) before quenching or carburizing has any effect.
+    status: unverified

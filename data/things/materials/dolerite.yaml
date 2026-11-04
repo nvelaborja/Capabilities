@@ -1,0 +1,15 @@
+id: dolerite
+kind: material
+label: Dolerite
+origin: natural
+availability: regional
+regions: ["Widespread as dikes and sills; dolerite pounders are found at the Aswan granite quarries"]
+is_a: [stone]
+description: A dark, very tough igneous rock. About as hard as granite, but tougher, so it survives being used to pound granite.
+quantities:
+  hardness_mohs: [5.5, 6.5]
+notes: Hardness value is approximate (TODO-source). Dolerite's usefulness comes from its toughness, which the model does not capture yet.
+references:
+  - citation: "Klein, C. & Dutrow, B. (2007). Manual of Mineral Science, 23rd ed. Wiley."
+    supports: Mohs hardness value.
+    status: unverified

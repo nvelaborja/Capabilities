@@ -1,0 +1,20 @@
+id: tin-from-cassiterite
+kind: route
+label: Smelting tin ore
+achieves: { thing: tin }
+requires:
+  - { role: consumed, category: tin-ore }
+  - { role: consumed, category: carbon-source }
+  - role: effect
+    effect: heat
+    where:
+      - { quantity: temperature_c, op: ">=", value: 1000 }
+    notes: Approximate temperature (TODO-source).
+  - { role: know_how, thing: tin-smelting }
+outputs:
+  - { thing: tin }
+  - { thing: slag, byproduct: true }
+references:
+  - citation: "Tylecote, R. F. (1992). A History of Metallurgy, 2nd ed. Institute of Materials."
+    supports: General description of this process.
+    status: unverified

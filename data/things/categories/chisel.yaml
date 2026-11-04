@@ -1,0 +1,5 @@
+id: chisel
+kind: category
+label: Chisel
+description: An edged tool struck with a mallet to cut or dress stone or wood.
+is_a: [edged-tool]

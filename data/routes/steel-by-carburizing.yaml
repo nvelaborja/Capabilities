@@ -1,0 +1,33 @@
+id: steel-by-carburizing
+kind: route
+label: Carburizing iron (cementation)
+achieves: { thing: steel }
+requires:
+  - { role: consumed, thing: bloom-iron }
+  - { role: consumed, category: carbon-source }
+  - role: effect
+    effect: heat
+    where:
+      - { quantity: temperature_c, op: ">=", value: 900 }
+      - { quantity: duration_h, op: ">=", value: 24 }
+    notes: >-
+      Carbon only diffuses into iron above about 727 °C; practical cementation ran at about 900–1100 °C. In a forge fire only a thin surface
+      layer is carburized; turning whole bars into steel took days.
+  - { role: know_how, thing: carburizing }
+outputs:
+  - { thing: steel }
+notes: >-
+  The best-documented cementation furnaces are early modern (1600s onward). Much ancient steel was probably made directly in the bloomery
+  by controlling the smelt, which is not modeled yet (TODO).
+references:
+  - citation: "Cementation process. Wikipedia."
+    url: https://en.wikipedia.org/wiki/Cementation_process
+    supports: Process description, temperatures, and multi-day firing times.
+    status: secondary
+  - citation: "Föll, H. Iron, Steel and Swords (lecture notes), University of Kiel: Smelting wrought iron, steel and cast iron."
+    url: https://www.tf.uni-kiel.de/matwis/amat/iss/kap_a/backbone/ra_2_3.html
+    supports: Forge-fire carburizing only affects a thin surface layer.
+    status: secondary
+  - citation: "Verhoeven, J. D. (2007). Steel Metallurgy for the Non-Metallurgist. ASM International."
+    supports: Steel must be heated above about 727 °C (into the austenite range) before quenching or carburizing has any effect.
+    status: unverified

@@ -1,0 +1,14 @@
+id: steel
+kind: material
+label: Steel (unhardened)
+origin: produced
+is_a: [metal]
+description: Iron containing roughly 0.2–2% carbon. In this soft state it can be forged; quenching turns it into hardened steel.
+quantities:
+  hardness_mohs: [4, 4.5]
+notes: The hardness is for ordinary (mild) steel.
+references:
+  - citation: "Mohs scale of mineral hardness: table of common materials. Wikipedia."
+    url: https://en.wikipedia.org/wiki/Mohs_scale
+    supports: Mohs hardness value.
+    status: secondary

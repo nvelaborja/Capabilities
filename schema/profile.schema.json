@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:capabilities:schema:profile",
+  "title": "Profile",
+  "description": "A curated preset of things a group of people is known to have had. Users start from it and toggle items on or off.",
+  "type": "object",
+  "allOf": [{ "$ref": "urn:capabilities:schema:defs#/$defs/common" }],
+  "unevaluatedProperties": false,
+  "required": ["includes"],
+  "properties": {
+    "kind": { "const": "profile" },
+    "region": { "description": "Used only for regional-availability warnings.", "type": "string" },
+    "period": { "type": "string" },
+    "includes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "$ref": "urn:capabilities:schema:defs#/$defs/id" },
+          "notes": { "type": "string" },
+          "references": { "$ref": "urn:capabilities:schema:defs#/$defs/references" }
+        }
+      }
+    }
+  }
+}

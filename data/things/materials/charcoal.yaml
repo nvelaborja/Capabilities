@@ -1,0 +1,6 @@
+id: charcoal
+kind: material
+label: Charcoal
+origin: produced
+is_a: [fuel, carbon-source]
+description: Wood heated with little air until mostly carbon is left. Burns hotter and cleaner than wood, and supplies the carbon monoxide that reduces ores to metal.

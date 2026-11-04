@@ -1,0 +1,8 @@
+id: drill
+kind: verb
+label: Drill
+description: Make a round hole in a solid material.
+params:
+  target: { kinds: [material], description: The material being drilled. }
+job_parameters: [volume_cm3]
+notes: For a tube drill, the volume removed is the ring-shaped groove, not the whole hole.

@@ -1,0 +1,5 @@
+id: dolerite-pounder
+kind: artifact
+label: Dolerite pounder
+is_a: [pounder]
+description: A ball of dolerite, used to pound granite away by repeated impact. Many have been found at the Aswan granite quarries.

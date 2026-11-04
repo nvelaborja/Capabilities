@@ -1,0 +1,14 @@
+id: malachite
+kind: material
+label: Malachite
+origin: natural
+availability: regional
+regions: ["Sinai", "Eastern Desert of Egypt", "Timna (southern Levant)"]
+is_a: [copper-ore]
+description: A green copper carbonate mineral, one of the earliest copper ores smelted.
+quantities:
+  hardness_mohs: [3.5, 4]
+references:
+  - citation: "Klein, C. & Dutrow, B. (2007). Manual of Mineral Science, 23rd ed. Wiley."
+    supports: Mohs hardness value.
+    status: unverified

@@ -1,0 +1,19 @@
+id: make-blowpipe
+kind: route
+label: Making a blowpipe
+achieves: { thing: blowpipe }
+requires:
+  - { role: consumed, thing: reed }
+  - { role: consumed, thing: clay, notes: Fired clay tip so the reed does not burn. }
+  - role: effect
+    effect: heat
+    where:
+      - { quantity: temperature_c, op: ">=", value: 600 }
+    notes: Firing clay hard; approximate temperature (TODO-source).
+  - { role: know_how, thing: pottery }
+outputs:
+  - { thing: blowpipe }
+references:
+  - citation: "Nicholson, P. T. & Shaw, I. (eds.) (2000). Ancient Egyptian Materials and Technology. Cambridge University Press."
+    supports: General description of this tool or process in ancient Egypt.
+    status: unverified

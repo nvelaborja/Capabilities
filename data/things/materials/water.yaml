@@ -1,0 +1,6 @@
+id: water
+kind: material
+label: Water
+origin: natural
+availability: ubiquitous
+description: Used for quenching, mixing clay, and wetting sand ahead of sledges.

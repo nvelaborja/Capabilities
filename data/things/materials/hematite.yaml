@@ -1,0 +1,14 @@
+id: hematite
+kind: material
+label: Hematite
+origin: natural
+availability: regional
+regions: ["Widespread"]
+is_a: [iron-ore]
+description: Iron oxide (Fe2O3), a common, rich iron ore.
+quantities:
+  hardness_mohs: [5.5, 6.5]
+references:
+  - citation: "Klein, C. & Dutrow, B. (2007). Manual of Mineral Science, 23rd ed. Wiley."
+    supports: Mohs hardness value.
+    status: unverified

@@ -1,0 +1,5 @@
+id: clay-furnace
+kind: artifact
+label: Clay furnace
+is_a: [furnace]
+description: A simple clay-walled hearth or shaft furnace, used for smelting and melting copper.

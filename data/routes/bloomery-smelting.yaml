@@ -1,0 +1,32 @@
+id: bloomery-smelting
+kind: route
+label: Bloomery smelting
+achieves: { thing: bloom-iron }
+requires:
+  - { role: consumed, category: iron-ore }
+  - { role: consumed, thing: charcoal }
+  - { role: tool, thing: bloomery-furnace }
+  - role: effect
+    effect: heat
+    where:
+      - { quantity: temperature_c, op: ">=", value: 1100 }
+      - { quantity: duration_h, op: ">=", value: 2 }
+    notes: >-
+      Hot enough for the slag to melt and drain (its lowest-melting part melts at about 1070 °C; a typical fayalite slag at about 1178 °C).
+      The iron itself never melts (about 1538 °C). Experimental smelts last about 2–7 hours.
+  - { role: know_how, thing: iron-smelting }
+outputs:
+  - { thing: bloom-iron }
+  - { thing: slag, byproduct: true }
+references:
+  - citation: "Wealden Iron Research Group. Experimental Bloomery 4: The smelt."
+    url: https://www.wealdeniron.org.uk/?p=930
+    supports: Slag melting temperatures (about 1070 °C lowest; about 1178 °C for fayalite) and slag tapping practice.
+    status: secondary
+  - citation: "Experimental ironmaking papers, EXARC euroREA 6 (2009): 'A new look at experimental ironmaking'."
+    url: https://exarc.net/sites/default/files/exarc-eurorea_6_2009-a_new_look_at_experimental_ironmaking.pdf
+    supports: Iron reduction starts around 800 °C; the iron stays solid.
+    status: secondary
+  - citation: "Pleiner, R. (2000). Iron in Archaeology: The European Bloomery Smelters. Archeologický ústav AV ČR."
+    supports: General description of bloomery smelting.
+    status: unverified

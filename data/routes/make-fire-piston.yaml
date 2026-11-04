@@ -1,0 +1,16 @@
+id: make-fire-piston
+kind: route
+label: Making a fire piston
+achieves: { thing: fire-piston }
+requires:
+  - { role: consumed, thing: wood }
+  - { role: tool, category: edged-tool }
+  - { role: know_how, thing: woodworking }
+outputs:
+  - { thing: fire-piston }
+notes: A working fire piston needs a smooth bore and an airtight seal, which this route does not capture yet. Traditional examples come from Southeast Asia, made of wood, horn, or bamboo (TODO-source).
+references:
+  - citation: "Fire piston. Wikipedia."
+    url: https://en.wikipedia.org/wiki/Fire_piston
+    supports: Construction and materials of fire pistons.
+    status: unverified

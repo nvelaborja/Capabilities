@@ -1,0 +1,6 @@
+id: force_kn
+kind: quantity
+label: Force
+unit: kN
+scale: ratio
+description: Pulling, pushing, or lifting force.

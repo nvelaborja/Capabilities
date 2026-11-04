@@ -1,0 +1,23 @@
+id: cut-by-chiseling
+kind: route
+label: Chiseling
+achieves: { verb: cut }
+requires:
+  - role: tool
+    category: chisel
+    where:
+      - { quantity: hardness_mohs, op: ">=", value: target.hardness_mohs }
+    notes: A chisel cuts with its own edge, so it must be at least as hard as the stone. Copper (about 3) can cut limestone (about 3) but not granite (6–7).
+  - { role: know_how, thing: stone-dressing }
+envelope:
+  rate:
+    quantity: removal_rate_cm3_per_h
+    crew: 1
+    basis: unknown
+    notes: Stocks measured copper chisel work on limestone, including how fast the edge wears (TODO-source).
+  precision:
+    basis: unknown
+references:
+  - citation: "Stocks, D. A. (2003). Experiments in Egyptian Archaeology: Stoneworking Technology in Ancient Egypt. Routledge."
+    supports: Experimental reconstruction of this tool or process.
+    status: unverified

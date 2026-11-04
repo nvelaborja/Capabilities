@@ -1,0 +1,13 @@
+id: quartz-sand
+kind: material
+label: Quartz sand
+origin: natural
+availability: ubiquitous
+is_a: [abrasive]
+description: Sand made mostly of quartz grains (Mohs 7). Hard enough to abrade granite when fed under a copper saw or drill.
+quantities:
+  hardness_mohs: 7
+references:
+  - citation: "Klein, C. & Dutrow, B. (2007). Manual of Mineral Science, 23rd ed. Wiley."
+    supports: Mohs hardness value.
+    status: unverified

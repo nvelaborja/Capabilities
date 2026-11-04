@@ -1,0 +1,21 @@
+id: cast-copper-tube-drill
+kind: route
+label: Casting a copper tube drill
+achieves: { thing: copper-tube-drill }
+requires:
+  - { role: consumed, thing: copper }
+  - { role: tool, thing: crucible }
+  - { role: tool, thing: casting-mold }
+  - role: effect
+    effect: heat
+    where:
+      - { quantity: temperature_c, op: ">=", value: 1085 }
+    notes: Copper must be molten to cast.
+  - { role: know_how, thing: casting }
+outputs:
+  - { thing: copper-tube-drill }
+references:
+  - citation: "Stocks, D. A. (1999). Stone sarcophagus manufacture in ancient Egypt. Antiquity 73, 918–922, as summarized in 'Ancient Egyptian Copper Coring Drills', Hall of Ma'at."
+    url: https://www.hallofmaat.com/unforbiddengeology/ancient-egyptian-copper-coring-drills/
+    supports: Copper tubes with 5 mm walls can be cast in sand molds.
+    status: secondary

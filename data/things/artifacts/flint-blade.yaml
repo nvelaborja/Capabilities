@@ -1,0 +1,7 @@
+id: flint-blade
+kind: artifact
+label: Flint blade
+is_a: [edged-tool]
+description: A sharp blade knapped from flint.
+quantities:
+  hardness_mohs: [6.5, 7]

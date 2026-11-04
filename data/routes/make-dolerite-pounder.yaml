@@ -1,0 +1,13 @@
+id: make-dolerite-pounder
+kind: route
+label: Selecting and roughing a dolerite pounder
+achieves: { thing: dolerite-pounder }
+requires:
+  - { role: consumed, thing: dolerite }
+  - { role: tool, category: stone }
+outputs:
+  - { thing: dolerite-pounder }
+references:
+  - citation: "Nicholson, P. T. & Shaw, I. (eds.) (2000). Ancient Egyptian Materials and Technology. Cambridge University Press."
+    supports: General description of this tool or process in ancient Egypt.
+    status: unverified

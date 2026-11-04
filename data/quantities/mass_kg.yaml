@@ -1,0 +1,14 @@
+id: mass_kg
+kind: quantity
+label: Mass
+unit: kg
+scale: ratio
+description: Mass of a load to be moved or lifted. Usually expressed as a ballpark band.
+bands:
+  - { id: under-10kg, label: "Under 10 kg", max: 10, typical: "carried by one person" }
+  - { id: 10-100kg, label: "10–100 kg", min: 10, max: 100 }
+  - { id: 100kg-1t, label: "100 kg–1 t", min: 100, max: 1000 }
+  - { id: 1-10t, label: "1–10 t", min: 1000, max: 10000 }
+  - { id: 10-100t, label: "10–100 t", min: 10000, max: 100000 }
+  - { id: 100-1000t, label: "100–1,000 t", min: 100000, max: 1000000 }
+  - { id: over-1000t, label: "Over 1,000 t", min: 1000000 }

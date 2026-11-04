@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:capabilities:schema:defs",
+  "title": "Shared definitions",
+  "$defs": {
+    "id": {
+      "description": "Kebab-case node id. Unique across all things, verbs, routes, and profiles. Matches the file name.",
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+    },
+    "ids": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/id" },
+      "uniqueItems": true
+    },
+    "quantityId": {
+      "description": "Snake-case quantity id, ending in its unit (e.g. temperature_c).",
+      "type": "string",
+      "pattern": "^[a-z0-9]+(_[a-z0-9]+)*$"
+    },
+    "range": {
+      "description": "Inclusive [low, high] range. Low must not exceed high (checked by the validator).",
+      "type": "array",
+      "prefixItems": [{ "type": "number" }, { "type": "number" }],
+      "items": false,
+      "minItems": 2
+    },
+    "quantityValue": {
+      "description": "A single number or a [low, high] range.",
+      "oneOf": [{ "type": "number" }, { "$ref": "#/$defs/range" }]
+    },
+    "quantityMap": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/quantityId" },
+      "additionalProperties": { "$ref": "#/$defs/quantityValue" }
+    },
+    "basis": {
+      "description": "How a number was obtained. measured = from an experiment or survey; derived = calculated from measured values; estimated = expert or contributor estimate; unknown = no data yet.",
+      "enum": ["measured", "derived", "estimated", "unknown"]
+    },
+    "reference": {
+      "type": "object",
+      "required": ["citation", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "citation": { "type": "string", "minLength": 1 },
+        "url": { "type": "string" },
+        "doi": { "type": "string" },
+        "supports": {
+          "description": "The specific claim in this file that the source supports.",
+          "type": "string"
+        },
+        "status": {
+          "description": "unverified = cited but not checked; secondary = taken from a secondary summary of the source; verified = a reviewer read the source and confirmed the claim.",
+          "enum": ["unverified", "secondary", "verified"]
+        }
+      }
+    },
+    "references": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/reference" }
+    },
+    "condition": {
+      "description": "A constraint on a quantity. The right-hand side is a number, a band id, or a quantity of the verb's target (target.<quantity>).",
+      "type": "object",
+      "required": ["quantity", "op"],
+      "additionalProperties": false,
+      "properties": {
+        "quantity": { "$ref": "#/$defs/quantityId" },
+        "op": { "enum": [">=", ">", "<=", "<", "=="] },
+        "value": {
+          "oneOf": [
+            { "type": "number" },
+            { "type": "string", "pattern": "^target\\.[a-z0-9]+(_[a-z0-9]+)*$" }
+          ]
+        },
+        "band": { "type": "string" }
+      },
+      "oneOf": [{ "required": ["value"] }, { "required": ["band"] }]
+    },
+    "common": {
+      "type": "object",
+      "required": ["id", "kind", "label"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "label": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "notes": { "type": "string" },
+        "references": { "$ref": "#/$defs/references" },
+        "annotations": {
+          "description": "Free-form metadata for future use.",
+          "type": "object"
+        }
+      }
+    }
+  }
+}

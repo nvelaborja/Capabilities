@@ -1,0 +1,14 @@
+id: charcoal-by-clamp
+kind: route
+label: Charcoal burning in a clamp or pit
+achieves: { thing: charcoal }
+requires:
+  - { role: consumed, thing: wood }
+  - { role: know_how, thing: charcoal-burning }
+  - { role: know_how, thing: fire-making }
+outputs:
+  - { thing: charcoal }
+references:
+  - citation: "Tylecote, R. F. (1992). A History of Metallurgy, 2nd ed. Institute of Materials."
+    supports: General description of this process.
+    status: unverified

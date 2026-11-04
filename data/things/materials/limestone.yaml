@@ -1,0 +1,14 @@
+id: limestone
+kind: material
+label: Limestone
+origin: natural
+availability: regional
+regions: ["Giza and Tura (Egypt)", "Widespread"]
+is_a: [stone]
+description: A sedimentary rock made mostly of calcite (Mohs 3). The main building stone of the Egyptian pyramids.
+quantities:
+  hardness_mohs: 3
+references:
+  - citation: "Klein, C. & Dutrow, B. (2007). Manual of Mineral Science, 23rd ed. Wiley."
+    supports: Mohs hardness value.
+    status: unverified

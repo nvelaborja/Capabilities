@@ -1,0 +1,23 @@
+id: copper-from-ore
+kind: route
+label: Smelting copper ore
+achieves: { thing: copper }
+requires:
+  - { role: consumed, category: copper-ore }
+  - { role: consumed, category: carbon-source, notes: Charcoal reduces the ore and fuels the fire. }
+  - role: effect
+    effect: heat
+    where:
+      - { quantity: temperature_c, op: ">=", value: 1085 }
+    notes: Reduction starts at lower temperatures, but collecting the copper as liquid metal needs its melting point (about 1085 °C).
+  - { role: know_how, thing: copper-smelting }
+outputs:
+  - { thing: copper }
+  - { thing: slag, byproduct: true }
+references:
+  - citation: "Tylecote, R. F. (1992). A History of Metallurgy, 2nd ed. Institute of Materials."
+    supports: General description of this process.
+    status: unverified
+  - citation: "Haynes, W. M. (ed.). CRC Handbook of Chemistry and Physics. CRC Press."
+    supports: Melting point of copper, 1084.62 °C.
+    status: unverified

@@ -1,0 +1,6 @@
+id: copper-saw
+kind: artifact
+label: Copper saw
+is_a: [saw]
+description: A long, thin copper blade without teeth. Used with sand abrasive to saw stone, including granite.
+notes: Denys Stocks's replica was 1.8 m long, 15 cm wide, and 6 mm thick, and weighed 14.5 kg.

@@ -1,0 +1,14 @@
+id: granite
+kind: material
+label: Granite
+origin: natural
+availability: regional
+regions: ["Aswan (Egypt)", "Widespread in continental crust"]
+is_a: [stone]
+description: A hard, coarse-grained igneous rock made mostly of quartz (Mohs 7) and feldspar (Mohs 6).
+quantities:
+  hardness_mohs: [6, 7]
+references:
+  - citation: "Klein, C. & Dutrow, B. (2007). Manual of Mineral Science, 23rd ed. Wiley."
+    supports: Mohs hardness value.
+    status: unverified

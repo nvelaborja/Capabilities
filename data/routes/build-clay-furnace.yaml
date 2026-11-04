@@ -1,0 +1,13 @@
+id: build-clay-furnace
+kind: route
+label: Building a clay furnace
+achieves: { thing: clay-furnace }
+requires:
+  - { role: consumed, thing: clay }
+  - { role: know_how, thing: furnace-building }
+outputs:
+  - { thing: clay-furnace }
+references:
+  - citation: "Tylecote, R. F. (1992). A History of Metallurgy, 2nd ed. Institute of Materials."
+    supports: General description of this process.
+    status: unverified

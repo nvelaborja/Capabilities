@@ -1,0 +1,8 @@
+id: cut
+kind: verb
+label: Cut
+description: Cut a slot or separate a piece from a solid material.
+params:
+  target: { kinds: [material], description: The material being cut. }
+job_parameters: [volume_cm3]
+notes: A cutting job is sized by the volume of material removed (the kerf). For a saw cut, that is cut length × depth × kerf width.

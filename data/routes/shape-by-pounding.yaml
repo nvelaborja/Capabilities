@@ -1,0 +1,23 @@
+id: shape-by-pounding
+kind: route
+label: Pounding with stone balls
+achieves: { verb: shape }
+requires:
+  - { role: tool, category: pounder }
+  - { role: know_how, thing: stone-dressing }
+envelope:
+  rate:
+    quantity: removal_rate_cm3_per_h
+    basis: unknown
+    notes: Rates from experiments at Aswan exist (TODO-source).
+  precision:
+    bands: [P0, P0]
+    basis: estimated
+    notes: Pounding roughs out trenches and surfaces; finishing needs other methods.
+notes: >-
+  Dolerite is about as hard as granite, not harder. Pounding works because dolerite is tougher, so it crushes the granite's surface
+  without shattering. This is why the hardness rule alone is not enough; the model needs a toughness quantity (open item).
+references:
+  - citation: "Clarke, S. & Engelbach, R. (1930). Ancient Egyptian Masonry: The Building Craft. Oxford University Press."
+    supports: Dolerite pounders used to quarry granite at Aswan.
+    status: unverified
