@@ -2,6 +2,7 @@ id: make-crucible
 kind: route
 label: Making a crucible
 achieves: { thing: crucible }
+techniques: [pottery]
 requires:
   - { role: consumed, thing: clay }
   - role: effect
@@ -9,7 +10,6 @@ requires:
     where:
       - { quantity: temperature_c, op: ">=", value: 600 }
     notes: Firing clay hard; approximate temperature (TODO-source).
-  - { role: know_how, thing: pottery }
 outputs:
   - { thing: crucible }
 references:

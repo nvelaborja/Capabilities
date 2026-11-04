@@ -2,6 +2,7 @@ id: copper-from-ore
 kind: route
 label: Smelting copper ore
 achieves: { thing: copper }
+techniques: [copper-smelting]
 requires:
   - { role: consumed, category: copper-ore }
   - { role: consumed, category: carbon-source, notes: Charcoal reduces the ore and fuels the fire. }
@@ -10,7 +11,6 @@ requires:
     where:
       - { quantity: temperature_c, op: ">=", value: 1085 }
     notes: Reduction starts at lower temperatures, but collecting the copper as liquid metal needs its melting point (about 1085 °C).
-  - { role: know_how, thing: copper-smelting }
 outputs:
   - { thing: copper }
   - { thing: slag, byproduct: true }

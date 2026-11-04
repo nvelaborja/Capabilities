@@ -2,9 +2,10 @@ id: make-rope
 kind: route
 label: Making rope
 achieves: { thing: rope }
+techniques: [rope-making]
 requires:
   - { role: consumed, thing: plant-fiber }
-  - { role: know_how, thing: rope-making }
+  - { role: action, verb: cut, target: plant-fiber, notes: Harvesting stems and leaves. }
 outputs:
   - { thing: rope }
 references:

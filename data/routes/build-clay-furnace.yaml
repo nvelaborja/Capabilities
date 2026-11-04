@@ -2,9 +2,9 @@ id: build-clay-furnace
 kind: route
 label: Building a clay furnace
 achieves: { thing: clay-furnace }
+techniques: [furnace-building]
 requires:
   - { role: consumed, thing: clay }
-  - { role: know_how, thing: furnace-building }
 outputs:
   - { thing: clay-furnace }
 references:

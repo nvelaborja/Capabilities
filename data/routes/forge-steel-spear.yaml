@@ -2,6 +2,7 @@ id: forge-steel-spear
 kind: route
 label: Forging a steel spear
 achieves: { thing: steel-spear }
+techniques: [smithing, woodworking]
 requires:
   - { role: consumed, thing: steel }
   - { role: consumed, thing: wood, notes: Shaft. }
@@ -10,9 +11,7 @@ requires:
     where:
       - { quantity: temperature_c, op: ">=", value: 800 }
     notes: Forging heat; approximate (TODO-source).
-  - { role: tool, category: edged-tool, notes: Shaping the shaft. }
-  - { role: know_how, thing: smithing }
-  - { role: know_how, thing: woodworking }
+  - { role: action, verb: cut, target: wood }
 outputs:
   - { thing: steel-spear }
 references:

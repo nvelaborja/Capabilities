@@ -1,0 +1,7 @@
+id: toughness_mpa_sqrt_m
+kind: quantity
+label: Fracture toughness
+unit: MPa·√m
+scale: ratio
+description: Resistance to cracks spreading (mode I fracture toughness, K_IC). Hardness says what can scratch what; toughness says what survives impact without shattering. Pounding tools must be tough, not just hard.
+notes: Values depend strongly on the test method, grain size, weathering, and crack direction, so they are always ranges.

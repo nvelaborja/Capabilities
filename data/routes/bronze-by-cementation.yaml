@@ -2,6 +2,7 @@ id: bronze-by-cementation
 kind: route
 label: Alloying copper with tin ore (cementation)
 achieves: { thing: tin-bronze }
+techniques: [alloying]
 requires:
   - { role: consumed, thing: copper }
   - { role: consumed, category: tin-ore }
@@ -11,7 +12,6 @@ requires:
     effect: heat
     where:
       - { quantity: temperature_c, op: ">=", value: 1085 }
-  - { role: know_how, thing: alloying }
 outputs:
   - { thing: tin-bronze }
 notes: Tin ore is reduced directly into molten copper under charcoal, so tin metal is never needed. This is why having bronze does not prove someone could smelt tin.

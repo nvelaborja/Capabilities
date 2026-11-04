@@ -11,3 +11,4 @@ parameters:
 limits:
   precision: P2
   max_crew: 2
+  max_units: 1

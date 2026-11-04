@@ -2,10 +2,10 @@ id: copper-from-native
 kind: route
 label: Cold-hammering native copper
 achieves: { thing: copper }
+techniques: [cold-hammering]
 requires:
   - { role: consumed, thing: native-copper }
   - { role: tool, category: stone, notes: Used as a hammerstone. }
-  - { role: know_how, thing: cold-hammering }
 outputs:
   - { thing: copper }
 references:

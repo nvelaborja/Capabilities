@@ -2,6 +2,7 @@ id: make-casting-mold
 kind: route
 label: Making a clay casting mold
 achieves: { thing: casting-mold }
+techniques: [pottery]
 requires:
   - { role: consumed, thing: clay }
   - role: effect
@@ -9,7 +10,6 @@ requires:
     where:
       - { quantity: temperature_c, op: ">=", value: 600 }
     notes: Firing clay hard; approximate temperature (TODO-source).
-  - { role: know_how, thing: pottery }
 outputs:
   - { thing: casting-mold }
 references:

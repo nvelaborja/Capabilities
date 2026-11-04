@@ -1,4 +1,5 @@
 id: bow-drill
 kind: artifact
 label: Bow drill
-description: A shaft spun by wrapping a bowstring around it and moving the bow back and forth. A capstone presses down on top.
+is_a: [fire-starter]
+description: A shaft spun by wrapping a bowstring around it and moving the bow back and forth. A capstone presses down on top. Used for drilling and, with a wooden spindle and hearth board, for starting fires by friction.

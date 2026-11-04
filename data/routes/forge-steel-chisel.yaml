@@ -2,6 +2,7 @@ id: forge-steel-chisel
 kind: route
 label: Forging and hardening a steel chisel
 achieves: { thing: steel-chisel }
+techniques: [smithing, quenching]
 requires:
   - { role: consumed, thing: steel }
   - { role: consumed, thing: water, notes: For quenching. }
@@ -10,8 +11,6 @@ requires:
     where:
       - { quantity: temperature_c, op: ">=", value: 800 }
     notes: Forging heat; approximate (TODO-source).
-  - { role: know_how, thing: smithing }
-  - { role: know_how, thing: quenching }
 outputs:
   - { thing: steel-chisel, quantities: { hardness_mohs: [7, 8] } }
 notes: The chisel is forged from soft steel and hardened at the end. Hardened steel cannot be forged without losing its hardness.

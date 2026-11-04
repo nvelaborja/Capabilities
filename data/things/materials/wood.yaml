@@ -3,6 +3,6 @@ kind: material
 label: Wood
 origin: natural
 availability: ubiquitous
-is_a: [fuel]
+is_a: [fuel, plant-material]
 description: Timber and brushwood. Burned as fuel, made into charcoal, and worked into tools, frames, and sledges.
 notes: Treated as ubiquitous for now, but large timber was scarce in some regions (Egypt imported cedar from Lebanon). A future version may split timber from firewood.

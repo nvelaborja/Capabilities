@@ -2,10 +2,10 @@ id: move-on-sledge
 kind: route
 label: Hauling on a sledge
 achieves: { verb: move }
+techniques: [hauling]
 requires:
   - { role: tool, thing: sledge }
   - { role: tool, thing: rope }
-  - { role: know_how, thing: hauling }
 envelope:
   capacity:
     quantity: mass_kg

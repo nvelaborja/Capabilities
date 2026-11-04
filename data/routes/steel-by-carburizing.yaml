@@ -2,6 +2,7 @@ id: steel-by-carburizing
 kind: route
 label: Carburizing iron (cementation)
 achieves: { thing: steel }
+techniques: [carburizing]
 requires:
   - { role: consumed, thing: bloom-iron }
   - { role: consumed, category: carbon-source }
@@ -13,7 +14,6 @@ requires:
     notes: >-
       Carbon only diffuses into iron above about 727 °C; practical cementation ran at about 900–1100 °C. In a forge fire only a thin surface
       layer is carburized; turning whole bars into steel took days.
-  - { role: know_how, thing: carburizing }
 outputs:
   - { thing: steel }
 notes: >-

@@ -2,6 +2,7 @@ id: hardening-by-quenching
 kind: route
 label: Quench hardening
 achieves: { thing: hardened-steel }
+techniques: [quenching]
 requires:
   - { role: consumed, thing: steel }
   - { role: consumed, thing: water }
@@ -10,7 +11,6 @@ requires:
     where:
       - { quantity: temperature_c, op: ">=", value: 800 }
     notes: The steel must be above about 727 °C (practically, glowing red at about 800 °C or more) before it is plunged into water.
-  - { role: know_how, thing: quenching }
 outputs:
   - { thing: hardened-steel, quantities: { hardness_mohs: [7, 8] } }
 references:

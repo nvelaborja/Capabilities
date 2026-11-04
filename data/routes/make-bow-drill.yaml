@@ -2,11 +2,11 @@ id: make-bow-drill
 kind: route
 label: Making a bow drill
 achieves: { thing: bow-drill }
+techniques: [woodworking]
 requires:
   - { role: consumed, thing: wood }
   - { role: consumed, thing: rope }
-  - { role: tool, category: edged-tool }
-  - { role: know_how, thing: woodworking }
+  - { role: action, verb: cut, target: wood }
 outputs:
   - { thing: bow-drill }
 references:

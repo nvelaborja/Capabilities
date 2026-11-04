@@ -2,6 +2,7 @@ id: cut-abrasive-saw
 kind: route
 label: Abrasive sawing
 achieves: { verb: cut }
+techniques: [abrasive-cutting]
 requires:
   - { role: tool, category: saw, notes: The blade can be softer than the stone; copper works. }
   - role: consumed
@@ -9,7 +10,6 @@ requires:
     where:
       - { quantity: hardness_mohs, op: ">=", value: target.hardness_mohs }
     notes: The abrasive grains do the cutting, so they must be at least as hard as the stone.
-  - { role: know_how, thing: abrasive-cutting }
 envelope:
   rate:
     quantity: removal_rate_cm3_per_h
@@ -29,6 +29,7 @@ envelope:
     notes: Stocks reports no tolerance. In his test the blade rocked side to side and cut a V-shaped slot. Ancient cut faces need to be measured to fill this in (TODO-source).
 references:
   - citation: "Stocks, D. A. (2001). Testing ancient Egyptian granite-working methods in Aswan, Upper Egypt. Antiquity 75, 89–94."
+    doi: 10.1017/S0003598X00052777
     url: https://www.hallofmaat.com/unforbiddengeology/ancient-egyptian-copper-slabbing-saws/
     supports: "Sawing granite with a copper blade and sand: about 12 cm³/hour, wet or dry, with two workers; Stocks suggested experience could double the rate; the slot came out V-shaped."
     status: secondary

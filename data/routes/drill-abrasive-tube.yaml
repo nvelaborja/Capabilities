@@ -2,6 +2,7 @@ id: drill-abrasive-tube
 kind: route
 label: Abrasive tube drilling
 achieves: { verb: drill }
+techniques: [abrasive-cutting]
 requires:
   - { role: tool, thing: copper-tube-drill }
   - { role: tool, thing: bow-drill }
@@ -9,7 +10,6 @@ requires:
     category: abrasive
     where:
       - { quantity: hardness_mohs, op: ">=", value: target.hardness_mohs }
-  - { role: know_how, thing: abrasive-cutting }
 envelope:
   rate:
     quantity: removal_rate_cm3_per_h
@@ -28,6 +28,7 @@ envelope:
     basis: unknown
 references:
   - citation: "Stocks, D. A. (2001). Testing ancient Egyptian granite-working methods in Aswan, Upper Egypt. Antiquity 75, 89–94."
+    doi: 10.1017/S0003598X00052777
     url: https://www.hallofmaat.com/unforbiddengeology/ancient-egyptian-copper-coring-drills/
     supports: "Tube-drilling granite with dry quartz sand: 5.2 cm³/hour (a 6 cm core in 20 hours) with three workers; experience could double the rate."
     status: secondary

@@ -2,10 +2,10 @@ id: make-wooden-rollers
 kind: route
 label: Cutting wooden rollers
 achieves: { thing: wooden-rollers }
+techniques: [woodworking]
 requires:
   - { role: consumed, thing: wood }
-  - { role: tool, category: edged-tool }
-  - { role: know_how, thing: woodworking }
+  - { role: action, verb: cut, target: wood }
 outputs:
   - { thing: wooden-rollers }
 references:

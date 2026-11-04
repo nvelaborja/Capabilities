@@ -3,4 +3,5 @@ kind: material
 label: Plant fiber
 origin: natural
 availability: ubiquitous
+is_a: [plant-material]
 description: Fibers from plants such as flax, papyrus, palm, and grasses. Twisted into cord and rope.

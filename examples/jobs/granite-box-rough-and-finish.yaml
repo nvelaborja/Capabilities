@@ -1,0 +1,25 @@
+id: granite-box-rough-and-finish
+kind: job
+label: Hollow out and finish a granite box (illustrative)
+description: >-
+  An illustrative two-step job, not a specific artifact. Pound out a 2 m × 1 m × 1 m interior with four workers, then grind the five
+  inner faces (about 8 m²) flat to about 1 mm by removing a 2 mm layer.
+steps:
+  - label: Rough out the interior
+    verb: shape
+    target: granite
+    parameters:
+      volume_cm3: 2000000
+    limits:
+      max_crew: 4
+      max_units: 4
+  - label: Grind the inner faces flat
+    verb: finish
+    target: granite
+    parameters:
+      volume_cm3: 16000
+    limits:
+      max_crew: 4
+      max_units: 4
+limits:
+  precision: P2

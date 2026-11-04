@@ -1,0 +1,11 @@
+id: pound-granite-cubic-metre
+kind: job
+label: Pound away one cubic metre of granite
+description: Remove 1 m³ of granite by pounding, with 20 workers each swinging a pounder at the same time. Roughing only; no precision required.
+verb: shape
+target: granite
+parameters:
+  volume_cm3: 1000000
+limits:
+  max_crew: 20
+  max_units: 20

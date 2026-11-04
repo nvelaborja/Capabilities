@@ -8,7 +8,12 @@ is_a: [stone]
 description: A hard, coarse-grained igneous rock made mostly of quartz (Mohs 7) and feldspar (Mohs 6).
 quantities:
   hardness_mohs: [6, 7]
+  toughness_mpa_sqrt_m: [1.1, 1.9]
 references:
+  - citation: "Nasseri, M. H. B., Mohanty, B. & Young, R. P. (2006). Fracture toughness measurements and acoustic emission activity in brittle rocks. In: Rock Damage and Fluid Transport, Part I (Pageoph Topical Volumes), 917–945. Birkhäuser."
+    doi: 10.1007/3-7643-7712-7_2
+    supports: "Mode I fracture toughness of Barre granite: about 1.1–1.9 MPa·√m, depending on crack direction."
+    status: secondary
   - citation: "Klein, C. & Dutrow, B. (2007). Manual of Mineral Science, 23rd ed. Wiley."
     supports: Mohs hardness value.
     status: unverified

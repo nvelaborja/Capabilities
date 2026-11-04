@@ -2,6 +2,7 @@ id: make-copper-chisel
 kind: route
 label: Casting and hammering a copper chisel
 achieves: { thing: copper-chisel }
+techniques: [casting, cold-hammering]
 requires:
   - { role: consumed, thing: copper }
   - { role: tool, thing: crucible }
@@ -11,8 +12,6 @@ requires:
     where:
       - { quantity: temperature_c, op: ">=", value: 1085 }
     notes: Copper must be molten to cast.
-  - { role: know_how, thing: casting }
-  - { role: know_how, thing: cold-hammering }
 outputs:
   - { thing: copper-chisel }
 references:

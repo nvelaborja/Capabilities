@@ -8,7 +8,12 @@ is_a: [stone]
 description: A sedimentary rock made mostly of calcite (Mohs 3). The main building stone of the Egyptian pyramids.
 quantities:
   hardness_mohs: 3
+  toughness_mpa_sqrt_m: [0.62, 0.68]
 references:
+  - citation: "Experimental evaluation of the fracture toughness on a limestone. Institut Polytechnique de Paris research portal."
+    url: https://researchportal.ip-paris.fr/en/publications/experimental-evaluation-of-the-fracture-toughness-on-a-limestone/
+    supports: "Mode I fracture toughness of an oolitic limestone: 0.62–0.68 MPa·√m."
+    status: secondary
   - citation: "Klein, C. & Dutrow, B. (2007). Manual of Mineral Science, 23rd ed. Wiley."
     supports: Mohs hardness value.
     status: unverified

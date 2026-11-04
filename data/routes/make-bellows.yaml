@@ -2,14 +2,13 @@ id: make-bellows
 kind: route
 label: Making bellows
 achieves: { thing: bellows }
+techniques: [woodworking]
 requires:
   - { role: consumed, thing: hide }
   - { role: consumed, thing: wood }
-  - { role: tool, category: edged-tool }
-  - { role: know_how, thing: woodworking }
+  - { role: action, verb: cut, target: wood }
 outputs:
   - { thing: bellows }
-notes: There is no separate bellows-making know-how yet, so any group with hide, wood, and woodworking can make bellows. That is probably too generous (see the design doc's open items).
 references:
   - citation: "Tylecote, R. F. (1992). A History of Metallurgy, 2nd ed. Institute of Materials."
     supports: General description of this process.

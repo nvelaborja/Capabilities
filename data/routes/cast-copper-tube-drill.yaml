@@ -2,6 +2,7 @@ id: cast-copper-tube-drill
 kind: route
 label: Casting a copper tube drill
 achieves: { thing: copper-tube-drill }
+techniques: [casting]
 requires:
   - { role: consumed, thing: copper }
   - { role: tool, thing: crucible }
@@ -11,7 +12,6 @@ requires:
     where:
       - { quantity: temperature_c, op: ">=", value: 1085 }
     notes: Copper must be molten to cast.
-  - { role: know_how, thing: casting }
 outputs:
   - { thing: copper-tube-drill }
 references:

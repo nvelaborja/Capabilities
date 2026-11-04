@@ -2,10 +2,10 @@ id: knap-flint-blade
 kind: route
 label: Knapping a flint blade
 achieves: { thing: flint-blade }
+techniques: [flint-knapping]
 requires:
   - { role: consumed, thing: flint }
   - { role: tool, category: stone, notes: Used as a hammerstone. }
-  - { role: know_how, thing: flint-knapping }
 outputs:
   - { thing: flint-blade, quantities: { hardness_mohs: [6.5, 7] } }
 references:

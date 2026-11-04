@@ -2,6 +2,7 @@ id: bronze-by-alloying
 kind: route
 label: Alloying copper with tin metal
 achieves: { thing: tin-bronze }
+techniques: [alloying]
 requires:
   - { role: consumed, thing: copper }
   - { role: consumed, thing: tin }
@@ -11,7 +12,6 @@ requires:
     where:
       - { quantity: temperature_c, op: ">=", value: 1085 }
     notes: The copper must be melted. A 10% tin bronze is fully liquid at roughly 1000 °C.
-  - { role: know_how, thing: alloying }
 outputs:
   - { thing: tin-bronze }
 references:

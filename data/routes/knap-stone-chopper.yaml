@@ -1,0 +1,15 @@
+id: knap-stone-chopper
+kind: route
+label: Knapping a stone chopper
+achieves: { thing: stone-chopper }
+techniques: [flint-knapping]
+requires:
+  - { role: consumed, thing: fieldstone, notes: A suitable cobble. }
+  - { role: tool, category: stone, notes: Used as a hammerstone. }
+outputs:
+  - { thing: stone-chopper }
+references:
+  - citation: "Oldowan. Wikipedia."
+    url: https://en.wikipedia.org/wiki/Oldowan
+    supports: The earliest stone tools were choppers made by striking flakes off cobbles.
+    status: unverified

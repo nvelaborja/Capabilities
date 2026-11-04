@@ -2,10 +2,10 @@ id: move-on-rollers
 kind: route
 label: Rolling on wooden rollers
 achieves: { verb: move }
+techniques: [hauling]
 requires:
   - { role: tool, thing: wooden-rollers }
   - { role: tool, thing: rope }
-  - { role: know_how, thing: hauling }
 envelope:
   capacity:
     quantity: mass_kg

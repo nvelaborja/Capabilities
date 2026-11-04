@@ -2,11 +2,11 @@ id: heat-forced-draft-furnace
 kind: route
 label: Charcoal furnace with forced draft
 achieves: { effect: heat }
+techniques: [fire-making]
 requires:
   - { role: consumed, thing: charcoal }
   - { role: tool, category: furnace }
   - { role: tool, category: air-blower }
-  - { role: know_how, thing: fire-making }
 provides:
   temperature_c: [1100, 1250]
   duration_h: 24

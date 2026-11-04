@@ -2,6 +2,7 @@ id: tin-from-cassiterite
 kind: route
 label: Smelting tin ore
 achieves: { thing: tin }
+techniques: [tin-smelting]
 requires:
   - { role: consumed, category: tin-ore }
   - { role: consumed, category: carbon-source }
@@ -10,7 +11,6 @@ requires:
     where:
       - { quantity: temperature_c, op: ">=", value: 1000 }
     notes: Approximate temperature (TODO-source).
-  - { role: know_how, thing: tin-smelting }
 outputs:
   - { thing: tin }
   - { thing: slag, byproduct: true }

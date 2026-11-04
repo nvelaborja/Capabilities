@@ -2,23 +2,128 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:capabilities:schema:job",
   "title": "Job",
-  "description": "A concrete task to check for feasibility (question 3): a verb applied to a target, with size, precision, time, and crew limits.",
+  "description": "A concrete task to check for feasibility (question 3): a verb applied to a target with size and limits, or a sequence of such steps.",
   "type": "object",
-  "allOf": [{ "$ref": "urn:capabilities:schema:defs#/$defs/common" }],
+  "allOf": [
+    {
+      "$ref": "urn:capabilities:schema:defs#/$defs/common"
+    },
+    {
+      "oneOf": [
+        {
+          "required": [
+            "verb",
+            "target",
+            "parameters"
+          ],
+          "not": {
+            "required": [
+              "steps"
+            ]
+          }
+        },
+        {
+          "required": [
+            "steps"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "verb"
+                ]
+              },
+              {
+                "required": [
+                  "target"
+                ]
+              },
+              {
+                "required": [
+                  "parameters"
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
   "unevaluatedProperties": false,
-  "required": ["verb", "target", "parameters"],
   "properties": {
-    "kind": { "const": "job" },
-    "verb": { "$ref": "urn:capabilities:schema:defs#/$defs/id" },
-    "target": { "$ref": "urn:capabilities:schema:defs#/$defs/id" },
-    "parameters": { "$ref": "urn:capabilities:schema:defs#/$defs/quantityMap" },
+    "kind": {
+      "const": "job"
+    },
+    "verb": {
+      "$ref": "urn:capabilities:schema:defs#/$defs/id"
+    },
+    "target": {
+      "$ref": "urn:capabilities:schema:defs#/$defs/id"
+    },
+    "parameters": {
+      "$ref": "urn:capabilities:schema:defs#/$defs/quantityMap"
+    },
+    "steps": {
+      "description": "Multi-step jobs: steps run in order; durations add up and final precision comes from the last step.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/step"
+      }
+    },
+    "limits": {
+      "$ref": "#/$defs/limits"
+    }
+  },
+  "$defs": {
     "limits": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "precision": { "description": "Required precision band (e.g. P2).", "type": "string" },
-        "max_duration_h": { "type": "number" },
-        "max_crew": { "type": "integer", "minimum": 1 }
+        "precision": {
+          "description": "Required precision band (e.g. P2). For multi-step jobs, checked on the final step.",
+          "type": "string"
+        },
+        "max_duration_h": {
+          "description": "Total working-time budget, in hours.",
+          "type": "number"
+        },
+        "max_crew": {
+          "description": "People available to work at once.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_units": {
+          "description": "How many tools can work on the job at once (e.g. workers that fit around a trench). Defaults to 1.",
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "step": {
+      "type": "object",
+      "required": [
+        "verb",
+        "target",
+        "parameters"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "verb": {
+          "$ref": "urn:capabilities:schema:defs#/$defs/id"
+        },
+        "target": {
+          "$ref": "urn:capabilities:schema:defs#/$defs/id"
+        },
+        "parameters": {
+          "$ref": "urn:capabilities:schema:defs#/$defs/quantityMap"
+        },
+        "limits": {
+          "$ref": "#/$defs/limits"
+        }
       }
     }
   }

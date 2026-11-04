@@ -2,9 +2,10 @@ id: heat-open-fire
 kind: route
 label: Open fire
 achieves: { effect: heat }
+techniques: [fire-making]
 requires:
   - { role: consumed, category: fuel }
-  - { role: know_how, thing: fire-making }
+  - { role: tool, category: fire-starter, notes: Something to light the fire with. }
 provides:
   temperature_c: [600, 900]
 notes: Temperature range is approximate (TODO-source). Enough to fire pottery and work soft metals, not enough to melt copper.

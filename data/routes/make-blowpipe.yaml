@@ -2,15 +2,16 @@ id: make-blowpipe
 kind: route
 label: Making a blowpipe
 achieves: { thing: blowpipe }
+techniques: [pottery]
 requires:
   - { role: consumed, thing: reed }
+  - { role: action, verb: cut, target: reed }
   - { role: consumed, thing: clay, notes: Fired clay tip so the reed does not burn. }
   - role: effect
     effect: heat
     where:
       - { quantity: temperature_c, op: ">=", value: 600 }
     notes: Firing clay hard; approximate temperature (TODO-source).
-  - { role: know_how, thing: pottery }
 outputs:
   - { thing: blowpipe }
 references:

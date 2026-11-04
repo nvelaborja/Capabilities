@@ -2,11 +2,11 @@ id: make-sledge
 kind: route
 label: Building a sledge
 achieves: { thing: sledge }
+techniques: [woodworking]
 requires:
   - { role: consumed, thing: wood }
   - { role: consumed, thing: rope, notes: Lashings. }
-  - { role: tool, category: edged-tool }
-  - { role: know_how, thing: woodworking }
+  - { role: action, verb: cut, target: wood }
 outputs:
   - { thing: sledge }
 references:

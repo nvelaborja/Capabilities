@@ -2,6 +2,7 @@ id: cast-copper-saw
 kind: route
 label: Casting a copper saw blade
 achieves: { thing: copper-saw }
+techniques: [casting, cold-hammering]
 requires:
   - { role: consumed, thing: copper }
   - { role: tool, thing: crucible }
@@ -11,10 +12,9 @@ requires:
     where:
       - { quantity: temperature_c, op: ">=", value: 1085 }
     notes: Copper must be molten to cast.
-  - { role: know_how, thing: casting }
-  - { role: know_how, thing: cold-hammering, notes: Hammering the cast blade flat and work-hardening it. }
 outputs:
   - { thing: copper-saw }
+notes: After casting, the blade is hammered flat and work-hardened (cold hammering).
 references:
   - citation: "Stocks, D. A. (1988). Industrial technology at Kahun and Gurob (MA thesis, University of Manchester), as summarized in 'Ancient Egyptian Copper Slabbing Saws', Hall of Ma'at."
     url: https://www.hallofmaat.com/unforbiddengeology/ancient-egyptian-copper-slabbing-saws/
