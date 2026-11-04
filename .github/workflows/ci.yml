@@ -1,0 +1,21 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: uv sync --locked
+      - name: Validate data
+        run: uv run capabilities validate --quiet
+      - name: Run tests
+        run: uv run pytest -q
