@@ -96,7 +96,7 @@ def graph_view(graph: Graph, levels: Levels, extra_actions: Iterable[Action] = (
     nodes += [_action_view(graph, levels, action) for action in actions]
     edges = []
     for route_id, route in sorted(graph.routes.items()):
-        nodes.append(_route_view(graph, route_id))
+        nodes.append(_route_view(graph, levels, route_id))
         edges += _requirement_edges(graph, route_id)
         edges += _product_edges(graph, route_id, actions)
     edges += _membership_edges(graph)
@@ -129,10 +129,11 @@ def _action_view(graph: Graph, levels: Levels, action: Action) -> dict:
     }
 
 
-def _route_view(graph: Graph, route_id: str) -> dict:
+def _route_view(graph: Graph, levels: Levels, route_id: str) -> dict:
     route = graph.routes[route_id]
     ((achieves_kind, achieves_id),) = route["achieves"].items()
-    return {"id": route_id, "label": route.get("label", route_id), "kind": "route",
+    # Verb routes have no single level (it depends on the target), so theirs is None.
+    return {"id": route_id, "label": route.get("label", route_id), "kind": "route", "level": levels.routes.get(route_id),
             "achieves": {"kind": achieves_kind, "id": achieves_id}, "techniques": route.get("techniques", [])}
 
 

@@ -16,3 +16,6 @@ build/
 *.iws
 *.ipr
 out/
+
+# Node
+node_modules/

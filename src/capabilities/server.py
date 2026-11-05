@@ -1,10 +1,15 @@
-"""Local HTTP API under /api. Run with `capabilities serve`, then open http://127.0.0.1:8000/docs for interactive docs."""
+"""Local server: the web UI at /, the API under /api, and interactive API docs at /docs.
+
+Run with `capabilities serve`. The web UI is served from web/dist, which `npm run build` creates in web/.
+"""
 
 from __future__ import annotations
 
 from pathlib import Path
 
 from fastapi import APIRouter, FastAPI, HTTPException, Query
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import __version__
@@ -31,8 +36,23 @@ class CheckRequest(SelectionRequest):
     job_spec: dict | None = Field(None, description="An inline job, in the same shape as a job YAML file.")
 
 
-def create_app(root: Path | None = None) -> FastAPI:
-    graph = Graph.load(root or find_root())
+UNBUILT_PAGE = """<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Capabilities</title>
+<style>body{font:16px/1.5 system-ui,sans-serif;max-width:40rem;margin:4rem auto;padding:0 1rem}code{font-size:.9em}</style>
+</head><body>
+<h1>Capabilities</h1>
+<p>The API is running, but the web app hasn't been built yet. Build it once (you need <a href="https://nodejs.org/">Node.js</a>):</p>
+<pre><code>cd web
+npm ci
+npm run build</code></pre>
+<p>Then reload this page. Meanwhile, the API docs are at <a href="/docs">/docs</a>.</p>
+</body></html>
+"""
+
+
+def create_app(root: Path | None = None, web_dist: Path | None = None) -> FastAPI:
+    root = root or find_root()
+    graph = Graph.load(root)
     levels = compute_levels(graph)
     api = APIRouter(prefix="/api")
     app = FastAPI(
@@ -151,4 +171,16 @@ def create_app(root: Path | None = None) -> FastAPI:
         return assess_job(graph, job, reach).to_dict()
 
     app.include_router(api)
+    _serve_web(app, web_dist or root / "web" / "dist")
     return app
+
+
+def _serve_web(app: FastAPI, dist: Path) -> None:
+    """Serve the built web UI at the root, after the API routes so /api and /docs keep priority."""
+    if (dist / "index.html").is_file():
+        app.mount("/", StaticFiles(directory=dist, html=True), name="web")
+        return
+
+    @app.get("/", response_class=HTMLResponse, include_in_schema=False)
+    def unbuilt() -> str:
+        return UNBUILT_PAGE
