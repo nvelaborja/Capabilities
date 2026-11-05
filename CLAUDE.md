@@ -45,7 +45,7 @@ npm run build                    # web/dist, which `capabilities serve` hosts at
 - `data/`: the graph (quantities, things, verbs, routes, profiles), licensed CC BY 4.0
 - `examples/jobs/`: feasibility-check jobs; `examples/README.md` holds worked results that tests check
 - `src/capabilities/`: `graph.py` (loading), `validate.py`, `tristate.py`, `reasoner.py` (the three questions), `levels.py` (tech levels), `views.py` (display-ready shapes for the web UI), `cli.py`, `server.py` (API under `/api`)
-- `web/src/`: `api/` (typed client), `graph/` (Cytoscape elements, styles, statuses, layout, focus), `legend/`, `state/`
+- `web/src/`: `api/` (typed client), `graph/` (Cytoscape elements, styles, statuses, tech-tree layout, focus), `legend/`, `state/` (explore hook, theme)
 - `tests/`: pytest suite
 - `docs/`: data format, reasoning rules, and ADRs
 
@@ -65,4 +65,4 @@ npm run build                    # web/dist, which `capabilities serve` hosts at
 - Conventional Commits (`feat:`, `fix:`, `docs:`...), lines under 120 characters.
 - Work on a branch and open a draft pull request. Never push to `main`.
 - Check a dependency's license against GPL-3.0 before adding it ([ADR 0014](docs/adr/0014-license-code-gpl-and-data-cc-by.md)).
-- Web: colours come from CSS custom properties in `web/src/theme.css` (light and dark); the graph reads them, so never hard-code colours in `graph/styles.ts`. Status must never rely on colour alone, and nothing may be available only on hover ([ADR 0019](docs/adr/0019-desktop-first-mobile-ready.md)).
+- Web: colours come from CSS custom properties in `web/src/theme.css` (light and dark); the graph reads them, so never hard-code colours in `graph/styles.ts`. Colour shows a node's type and border and fill show its status ([ADR 0021](docs/adr/0021-colour-for-type-border-for-status-tech-tree-layout.md)); status must never rely on colour alone, and nothing may be available only on hover ([ADR 0019](docs/adr/0019-desktop-first-mobile-ready.md)).

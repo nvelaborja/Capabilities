@@ -34,7 +34,7 @@ cd web && npm ci && npm run build && cd ..
 uv run capabilities serve                 # then open http://127.0.0.1:8000
 ```
 
-Try http://127.0.0.1:8000/?preset=middle-kingdom-egypt to see a preset's selections, what they imply, and what was within reach. Click a node to highlight what makes it and what it leads to. The preset picker and selection lists are coming next.
+Try http://127.0.0.1:8000/?preset=middle-kingdom-egypt to see a preset's selections, what they imply, and what was within reach. The graph reads as a technology tree, primitives on the left. Colour shows what each node is, and its border shows where it stands. Click a node to highlight what makes it and what it leads to. Pick Auto, Light or Dark in the header. The preset picker and selection lists are coming next.
 
 To work on the web app with live reload, run the API and the Vite dev server side by side:
 

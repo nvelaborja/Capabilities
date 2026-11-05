@@ -26,3 +26,4 @@ Each file records one significant design decision: the context, what we decided,
 | [0018](0018-rank-dependencies-by-tech-level.md) | Rank items by tech level | Accepted |
 | [0019](0019-desktop-first-mobile-ready.md) | Build desktop-first, without blocking mobile | Accepted |
 | [0020](0020-show-a-bounded-number-of-items.md) | Show one level at a time and a bounded number of items | Accepted |
+| [0021](0021-colour-for-type-border-for-status-tech-tree-layout.md) | Colour shows type, border shows status; lay the graph out as a tech tree | Accepted |
