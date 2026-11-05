@@ -2,6 +2,7 @@ import cytoscape from "cytoscape";
 import { describe, expect, it } from "vitest";
 
 import type { ExploreResponse } from "../api/types";
+import { exploreWith as sampleExplore } from "../test/sampleExplore";
 import { sampleGraph } from "../test/sampleGraph";
 import { toElements } from "./elements";
 import { applyStatuses } from "./statuses";
@@ -11,11 +12,7 @@ function headlessGraph() {
 }
 
 function exploreWith(status: ExploreResponse["status"], routeStatus: ExploreResponse["route_status"] = {}): ExploreResponse {
-  return {
-    selected: [], hypothetical: [], reachable: [], maybe: [], near_misses: [], warnings: [], actions: {}, implied_by: {},
-    implied: { things: [], categories: [], actions: [], techniques: [], effects: {} },
-    status, route_status: routeStatus,
-  };
+  return sampleExplore({ status, route_status: routeStatus });
 }
 
 describe("applyStatuses", () => {

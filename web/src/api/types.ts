@@ -52,6 +52,17 @@ export interface Profile {
   description?: string | null;
 }
 
+export interface ProfileItem {
+  id?: string;
+  verb?: string;
+  target?: string;
+  notes?: string;
+}
+
+export interface ProfileDetail extends Profile {
+  includes: ProfileItem[];
+}
+
 export interface SelectionRequest {
   profile?: string | null;
   select?: string[];
@@ -77,4 +88,13 @@ export interface ExploreResponse {
   status: Record<string, Status>;
   route_status: Record<string, Tri>;
   implied_by: Record<string, string[]>;
+  implied_effects: { id: string; label: string; conditions: string[] }[];
+  near: NearMiss[];
+}
+
+/** A thing one requirement away, with each route that would work and the one thing it is missing. */
+export interface NearMiss {
+  id: string;
+  label: string;
+  routes: { id: string; label: string; missing: { id: string; label: string; kind: string } }[];
 }

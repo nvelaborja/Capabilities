@@ -161,10 +161,10 @@ button {
   display: grid;
   height: 100dvh;
   grid-template-rows: auto minmax(0, 1fr);
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) clamp(18rem, 26vw, 24rem);
   grid-template-areas:
-    "header"
-    "graph";
+    "header header"
+    "graph side";
 }
 
 .app-header {
@@ -191,6 +191,30 @@ button {
 .app-context {
   margin-left: auto;
   color: var(--text-muted);
+}
+
+.history-buttons {
+  display: inline-flex;
+  gap: 0.25rem;
+}
+
+.history-buttons button {
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.history-buttons button:disabled {
+  color: var(--text-muted);
+  opacity: 0.5;
+  cursor: default;
+}
+
+.history-buttons button:not(:disabled):hover {
+  border-color: var(--accent);
 }
 
 .theme-switch {
