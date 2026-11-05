@@ -1,0 +1,14 @@
+id: hardened-steel
+kind: material
+label: Hardened steel
+origin: produced
+is_a: [metal]
+description: Steel that has been heated and then quenched, making it much harder (and more brittle). The same material as steel in a different state.
+quantities:
+  hardness_mohs: [7, 8]
+notes: These values are for modern hardened steel. Ancient steels with lower or uneven carbon content were probably softer after quenching (TODO-source).
+references:
+  - citation: "Mohs scale of mineral hardness: table of common materials. Wikipedia."
+    url: https://en.wikipedia.org/wiki/Mohs_scale
+    supports: Mohs hardness value.
+    status: secondary

@@ -1,0 +1,26 @@
+id: heat-forced-draft-furnace
+kind: route
+label: Charcoal furnace with forced draft
+achieves: { effect: heat }
+techniques: [fire-making]
+requires:
+  - { role: consumed, thing: charcoal }
+  - { role: tool, category: furnace }
+  - { role: tool, category: air-blower }
+provides:
+  temperature_c: [1100, 1250]
+  duration_h: 24
+notes: >-
+  Values are the maximum this route can deliver; a range means the maximum itself is uncertain. About 1200 °C is estimated as the practical
+  maximum for a normal-size bloomery furnace, though zones near the air inlet can be hotter (up to about 1400 °C has been suggested).
+  Experimental smelts run about 2–7 hours, but historical crucible-steel firings show a furnace can be kept hot for at least 24 hours,
+  and longer with enough fuel and labour. Bellows can heat a much larger volume than blowpipes; the model does not separate them yet.
+references:
+  - citation: "Experimental ironmaking papers, EXARC euroREA 6 (2009): 'A new look at experimental ironmaking'."
+    url: https://exarc.net/sites/default/files/exarc-eurorea_6_2009-a_new_look_at_experimental_ironmaking.pdf
+    supports: About 1200 °C as the maximum operating temperature for a normal-size bloomery furnace.
+    status: secondary
+  - citation: "Wealden Iron Research Group. Smelting experiments (2015)."
+    url: https://www.wealdeniron.org.uk/smelting-experiments-in-2015/
+    supports: Smelts of 5–6 hours after a preheat of about 2 hours.
+    status: secondary

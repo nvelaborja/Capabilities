@@ -1,0 +1,14 @@
+id: tolerance_mm
+kind: quantity
+label: Precision (tolerance)
+unit: mm
+scale: ratio
+description: How closely a result matches its intended shape or dimension. Smaller is more precise. Usually expressed as a ballpark band.
+bands:
+  - { id: P0, label: "Rough", min: 10, typical: "split or rough-hewn stone" }
+  - { id: P1, label: "Coarse", min: 3, max: 10, typical: "dressed stone, hand shaping" }
+  - { id: P2, label: "Fine", min: 0.3, max: 3, typical: "good joinery, careful hand work" }
+  - { id: P3, label: "Very fine", min: 0.03, max: 0.3, typical: "lapping, fine turning" }
+  - { id: P4, label: "Precision", min: 0.003, max: 0.03, typical: "machine-tool era" }
+  - { id: P5, label: "Ultra", max: 0.003, typical: "modern metrology" }
+notes: Bands are listed from roughest to finest. Boundaries sit halfway between orders of magnitude, so each band is centered on its ballpark value (P2 is about 1 mm).

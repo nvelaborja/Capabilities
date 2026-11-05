@@ -1,0 +1,20 @@
+id: forge-steel-spear
+kind: route
+label: Forging a steel spear
+achieves: { thing: steel-spear }
+techniques: [smithing, woodworking]
+requires:
+  - { role: consumed, thing: steel }
+  - { role: consumed, thing: wood, notes: Shaft. }
+  - role: effect
+    effect: heat
+    where:
+      - { quantity: temperature_c, op: ">=", value: 800 }
+    notes: Forging heat; approximate (TODO-source).
+  - { role: action, verb: cut, target: wood }
+outputs:
+  - { thing: steel-spear }
+references:
+  - citation: "Verhoeven, J. D. (2007). Steel Metallurgy for the Non-Metallurgist. ASM International."
+    supports: Forging and quench-hardening steel.
+    status: unverified

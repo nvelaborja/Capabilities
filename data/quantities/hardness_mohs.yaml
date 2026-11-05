@@ -1,0 +1,11 @@
+id: hardness_mohs
+kind: quantity
+label: Hardness (Mohs)
+unit: Mohs
+scale: ordinal
+description: Scratch hardness on the Mohs scale (talc 1 to diamond 10). It is a ranking, not a measurement, so only comparisons (>=, <=) are meaningful.
+notes: Hardness says whether one material can scratch another. It says nothing about toughness (resistance to chipping and shattering), which matters for pounding and percussion tools.
+references:
+  - citation: "Klein, C. & Dutrow, B. (2007). Manual of Mineral Science, 23rd ed. Wiley."
+    supports: Definition of the Mohs scale and reference minerals.
+    status: unverified

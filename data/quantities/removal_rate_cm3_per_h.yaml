@@ -1,0 +1,6 @@
+id: removal_rate_cm3_per_h
+kind: quantity
+label: Material removal rate
+unit: cm³/hour
+scale: ratio
+description: Volume of material removed per hour of work by one tool and its crew. Divide a job's removal volume by this rate to estimate its duration.

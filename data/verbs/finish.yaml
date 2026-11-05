@@ -1,0 +1,8 @@
+id: finish
+kind: verb
+label: Finish
+description: Grind, lap, or polish a surface flat and smooth. Usually the last step after rougher shaping.
+params:
+  target: { kinds: [material], description: The material being finished. }
+job_parameters: [volume_cm3]
+notes: Sized by the volume ground away, which is usually small compared with roughing out.

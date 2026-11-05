@@ -1,0 +1,14 @@
+id: granite-slab-saw-cut
+kind: job
+label: Saw one cut through a granite block
+description: A single saw cut 2 m long and 1 m deep through granite, with a precision of about 1 mm, using one saw.
+verb: cut
+target: granite
+parameters:
+  # Kerf volume = 200 cm long × 100 cm deep × 0.6–1.0 cm wide. The kerf width is an assumption: the replica
+  # blade was 0.6 cm thick and the slot came out V-shaped, so the average width is likely wider than the blade.
+  volume_cm3: [12000, 20000]
+limits:
+  precision: P2
+  max_crew: 2
+  max_units: 1

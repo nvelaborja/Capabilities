@@ -1,0 +1,7 @@
+id: fieldstone
+kind: material
+label: Fieldstone
+origin: natural
+availability: ubiquitous
+is_a: [stone]
+description: Ordinary rocks and pebbles of no particular type, found almost everywhere. Good enough for a hammerstone.

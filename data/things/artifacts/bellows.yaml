@@ -1,0 +1,6 @@
+id: bellows
+kind: artifact
+label: Bellows
+is_a: [air-blower]
+description: A bag or pot covered with hide that is squeezed or pumped to blow air into a fire. Delivers much more air than blowpipes.
+notes: In Egypt, pot bellows appear to replace blowpipes in metalworking scenes around the New Kingdom (TODO-source).

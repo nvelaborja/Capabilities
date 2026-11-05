@@ -1,0 +1,5 @@
+id: fire-drill
+kind: artifact
+label: Fire drill
+is_a: [fire-starter]
+description: A wooden spindle spun by hand against a wooden hearth board until friction makes a glowing ember.

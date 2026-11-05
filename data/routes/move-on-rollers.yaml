@@ -1,0 +1,19 @@
+id: move-on-rollers
+kind: route
+label: Rolling on wooden rollers
+achieves: { verb: move }
+techniques: [hauling]
+requires:
+  - { role: tool, thing: wooden-rollers }
+  - { role: tool, thing: rope }
+envelope:
+  capacity:
+    quantity: mass_kg
+    basis: unknown
+    scaling: unknown
+    notes: Capacity is limited by how much load each roller can bear before crushing or sinking into soft ground (TODO-source).
+notes: Whether rollers were used for very heavy loads is debated.
+references:
+  - citation: "Nicholson, P. T. & Shaw, I. (eds.) (2000). Ancient Egyptian Materials and Technology. Cambridge University Press."
+    supports: Methods of moving heavy stone in ancient Egypt.
+    status: unverified

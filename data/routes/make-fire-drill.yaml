@@ -1,0 +1,15 @@
+id: make-fire-drill
+kind: route
+label: Making a fire drill
+achieves: { thing: fire-drill }
+techniques: [woodworking]
+requires:
+  - { role: consumed, thing: wood, notes: A spindle and a hearth board. }
+  - { role: action, verb: cut, target: wood }
+outputs:
+  - { thing: fire-drill }
+references:
+  - citation: "Fire making. Wikipedia."
+    url: https://en.wikipedia.org/wiki/Fire_making
+    supports: Friction fire-making with a hand drill and hearth board.
+    status: unverified

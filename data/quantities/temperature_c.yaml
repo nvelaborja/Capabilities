@@ -1,0 +1,6 @@
+id: temperature_c
+kind: quantity
+label: Temperature
+unit: °C
+scale: ratio
+description: Temperature reached or required. Usually paired with duration_h (how long it is held) and volume_cm3 (how much material is at that temperature).

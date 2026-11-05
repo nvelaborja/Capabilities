@@ -1,0 +1,8 @@
+id: diamond-saw
+kind: artifact
+label: Diamond-tipped saw
+era: modern
+is_a: [saw, edged-tool]
+description: A modern saw with diamond grit bonded to its cutting edge. Kept for comparison and hypotheticals. It has no ancient route, so it is only available when toggled on.
+quantities:
+  hardness_mohs: 10

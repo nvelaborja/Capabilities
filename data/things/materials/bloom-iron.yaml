@@ -1,0 +1,14 @@
+id: bloom-iron
+kind: material
+label: Bloom iron (wrought iron)
+origin: produced
+is_a: [metal]
+description: Spongy iron from a bloomery furnace, consolidated by hammering into wrought iron. Mostly low in carbon, but blooms can contain steely regions. The iron is never melted.
+quantities:
+  hardness_mohs: [4, 5]
+notes: No source gives wrought iron's Mohs hardness directly; pure iron's value is used as the closest proxy.
+references:
+  - citation: "Mohs scale of mineral hardness: table of common materials. Wikipedia."
+    url: https://en.wikipedia.org/wiki/Mohs_scale
+    supports: Mohs hardness value.
+    status: secondary

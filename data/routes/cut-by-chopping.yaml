@@ -1,0 +1,22 @@
+id: cut-by-chopping
+kind: route
+label: Chopping and whittling
+achieves: { verb: cut }
+applies_to: [plant-material]
+techniques: [woodworking]
+requires:
+  - { role: tool, category: edged-tool }
+envelope:
+  rate:
+    quantity: removal_rate_cm3_per_h
+    crew: 1
+    basis: unknown
+    notes: Experiments compare stone and steel axes on trees (TODO-source for rates).
+  precision:
+    basis: unknown
+notes: Any edged tool, even a crude stone chopper, can cut wood and reeds. How fast and how cleanly depends a lot on the tool.
+references:
+  - citation: "Saraydar, S. & Shimada, I. (1971). A quantitative comparison of efficiency between a stone axe and a steel axe. American Antiquity 36(2), 216–217."
+    doi: 10.2307/278680
+    supports: Stone axes can fell trees, more slowly than steel axes.
+    status: unverified

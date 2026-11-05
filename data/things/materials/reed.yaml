@@ -1,0 +1,8 @@
+id: reed
+kind: material
+label: Reed
+origin: natural
+availability: ubiquitous
+is_a: [plant-material]
+description: Hollow plant stems. Used for blowpipes, mats, and light construction.
+notes: Grows along rivers and wetlands; treated as ubiquitous for now.

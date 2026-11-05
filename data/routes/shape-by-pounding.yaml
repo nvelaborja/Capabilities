@@ -1,0 +1,38 @@
+id: shape-by-pounding
+kind: route
+label: Pounding with stone balls
+achieves: { verb: shape }
+techniques: [stone-dressing]
+requires:
+  - role: tool
+    category: pounder
+    where:
+      - { quantity: toughness_mpa_sqrt_m, op: ">=", value: target.toughness_mpa_sqrt_m }
+    notes: The pounder must survive the blows, so it must be at least as tough as the stone it crushes. It does not need to be harder.
+envelope:
+  rate:
+    quantity: removal_rate_cm3_per_h
+    crew: 1
+    basis: measured
+    by_target:
+      - target: granite
+        value: 216
+        basis: measured
+        notes: >-
+          Measured by photogrammetry at Aswan with a dolerite pounder at about 85 blows per minute. The authors note this is slower than
+          earlier estimates, which were partly based on experiments on andesite rather than granite.
+  precision:
+    bands: [P0, P0]
+    basis: estimated
+    notes: Pounding roughs out trenches and surfaces. Flat, precise faces need a finishing step (grinding or lapping with abrasive).
+notes: >-
+  Dolerite is about as hard as granite, not harder. Pounding works by crushing the granite's surface, so the pounder's toughness is what
+  matters. Several workers can pound side by side, so a job's max_units sets how many pounders work at once.
+references:
+  - citation: "Marčiš, M. & Fraštia, M. (2023). The problems of the obelisk revisited: Photogrammetric measurement of the speed of quarrying granite using dolerite pounders. Digital Applications in Archaeology and Cultural Heritage 30, e00284."
+    doi: 10.1016/j.daach.2023.e00284
+    supports: "Quarrying granite with a dolerite pounder: about 216 cm³/hour at about 85 blows per minute; slower than previously assumed."
+    status: secondary
+  - citation: "Clarke, S. & Engelbach, R. (1930). Ancient Egyptian Masonry: The Building Craft. Oxford University Press."
+    supports: Dolerite pounders used to quarry granite at Aswan.
+    status: unverified

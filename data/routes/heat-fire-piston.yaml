@@ -1,0 +1,18 @@
+id: heat-fire-piston
+kind: route
+label: Fire piston (rapid compression)
+achieves: { effect: heat }
+requires:
+  - { role: tool, thing: fire-piston }
+provides:
+  temperature_c: [250, 500]
+  duration_h: 0.0003
+  volume_cm3: [1, 20]
+notes: >-
+  Compression heats a tiny pocket of air for about a second, enough to ignite tinder. All three numbers are estimates (TODO-source).
+  This route exists to check that a requirement for sustained, furnace-scale heat is not met by a brief, tiny spike.
+references:
+  - citation: "Fire piston. Wikipedia."
+    url: https://en.wikipedia.org/wiki/Fire_piston
+    supports: Fire pistons ignite tinder by rapid adiabatic compression of air.
+    status: unverified

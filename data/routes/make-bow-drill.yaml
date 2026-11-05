@@ -1,0 +1,15 @@
+id: make-bow-drill
+kind: route
+label: Making a bow drill
+achieves: { thing: bow-drill }
+techniques: [woodworking]
+requires:
+  - { role: consumed, thing: wood }
+  - { role: consumed, thing: rope }
+  - { role: action, verb: cut, target: wood }
+outputs:
+  - { thing: bow-drill }
+references:
+  - citation: "Stocks, D. A. (2003). Experiments in Egyptian Archaeology: Stoneworking Technology in Ancient Egypt. Routledge."
+    supports: Experimental reconstruction of this tool or process.
+    status: unverified

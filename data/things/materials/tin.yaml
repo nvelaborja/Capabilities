@@ -1,0 +1,13 @@
+id: tin
+kind: material
+label: Tin
+origin: produced
+is_a: [metal]
+description: Tin metal. Very soft and melts at about 232 °C. Mainly valuable as the alloying partner of copper in bronze.
+quantities:
+  hardness_mohs: 1.5
+references:
+  - citation: "Mohs scale of mineral hardness: table of common materials. Wikipedia."
+    url: https://en.wikipedia.org/wiki/Mohs_scale
+    supports: Mohs hardness value.
+    status: secondary

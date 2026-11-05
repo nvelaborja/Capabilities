@@ -1,0 +1,22 @@
+id: cut-diamond-saw
+kind: route
+label: Diamond sawing (modern)
+achieves: { verb: cut }
+requires:
+  - role: tool
+    thing: diamond-saw
+    where:
+      - { quantity: hardness_mohs, op: ">=", value: target.hardness_mohs }
+envelope:
+  rate:
+    quantity: removal_rate_cm3_per_h
+    basis: unknown
+    notes: Modern powered saws are far faster than any ancient method; numbers TODO-source.
+  precision:
+    basis: unknown
+notes: A modern route kept for comparison. Its saw has no ancient route, so it only applies when someone toggles the diamond saw on as a hypothetical.
+references:
+  - citation: "Diamond blade. Wikipedia."
+    url: https://en.wikipedia.org/wiki/Diamond_blade
+    supports: Diamond blades are used to cut stone.
+    status: unverified

@@ -1,0 +1,14 @@
+id: build-bloomery-furnace
+kind: route
+label: Building a bloomery furnace
+achieves: { thing: bloomery-furnace }
+techniques: [furnace-building, iron-smelting]
+requires:
+  - { role: consumed, thing: clay }
+outputs:
+  - { thing: bloomery-furnace }
+notes: The shaft and slag-tapping design is part of iron-smelting know-how.
+references:
+  - citation: "Pleiner, R. (2000). Iron in Archaeology: The European Bloomery Smelters. Archeologický ústav AV ČR."
+    supports: Construction of bloomery furnaces.
+    status: unverified

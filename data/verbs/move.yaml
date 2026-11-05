@@ -1,0 +1,7 @@
+id: move
+kind: verb
+label: Move
+description: Move a heavy load over the ground.
+params:
+  load: { kinds: [material, artifact], description: What is being moved. }
+job_parameters: [mass_kg]

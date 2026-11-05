@@ -1,0 +1,34 @@
+id: middle-kingdom-egypt
+kind: profile
+label: Middle Kingdom Egypt
+period: c. 2050–1650 BCE
+region: Nile valley
+description: Things Middle Kingdom Egypt is known to have made or done. In the tool these are "selected"; everything that follows from them is "reachable". A first draft for testing the model; every item still needs its own reference.
+includes:
+  # Resources they had access to
+  - { id: malachite, notes: Mined in Sinai and the Eastern Desert. }
+  - { id: granite, notes: Quarried at Aswan. }
+  - { id: limestone }
+  - { id: flint }
+  - { id: dolerite }
+  # Materials and tools they made
+  - { id: copper }
+  - { id: tin-bronze, notes: Tin was not available locally and must have been imported. }
+  - { id: blowpipe, notes: Metalworking scenes show blowpipes; bellows appear later (TODO-source). }
+  - { id: copper-saw }
+  - { id: copper-tube-drill }
+  - { id: copper-chisel }
+  - { id: bow-drill }
+  - { id: sledge }
+  - { id: dolerite-pounder }
+  # Things they did
+  - { verb: cut, target: granite }
+  - { verb: drill, target: granite }
+  - { verb: shape, target: granite }
+references:
+  - citation: "Nicholson, P. T. & Shaw, I. (eds.) (2000). Ancient Egyptian Materials and Technology. Cambridge University Press."
+    supports: Materials and technologies of pharaonic Egypt.
+    status: unverified
+  - citation: "Stocks, D. A. (2003). Experiments in Egyptian Archaeology: Stoneworking Technology in Ancient Egypt. Routledge."
+    supports: Egyptian stoneworking tools (saws, tube drills, chisels, pounders).
+    status: unverified

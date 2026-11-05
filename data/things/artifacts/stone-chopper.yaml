@@ -1,0 +1,5 @@
+id: stone-chopper
+kind: artifact
+label: Stone chopper
+is_a: [edged-tool]
+description: A cobble with a few flakes struck off one edge to make a rough cutting edge. The simplest stone tool, made from almost any hard rock.

@@ -1,0 +1,5 @@
+id: blowpipe
+kind: artifact
+label: Blowpipe
+is_a: [air-blower]
+description: A reed tube with a clay tip, blown by mouth to force air into a small fire or crucible. Several workers usually blew at once.

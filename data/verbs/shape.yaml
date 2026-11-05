@@ -1,0 +1,7 @@
+id: shape
+kind: verb
+label: Shape
+description: Remove material to rough out a shape, such as trenching around a block in a quarry.
+params:
+  target: { kinds: [material], description: The material being shaped. }
+job_parameters: [volume_cm3]

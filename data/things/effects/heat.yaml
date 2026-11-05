@@ -1,0 +1,5 @@
+id: heat
+kind: effect
+label: Heat
+description: A high temperature, held for some time over some volume. Many routes can produce it; requirements say how hot, how long, and how much.
+dimensions: [temperature_c, duration_h, volume_cm3]

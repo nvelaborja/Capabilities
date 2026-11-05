@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:capabilities:schema:verb",
+  "title": "Verb",
+  "description": "A parameterized capability such as cut(target). Routes that achieve a verb can refer to the target's quantities.",
+  "type": "object",
+  "allOf": [{ "$ref": "urn:capabilities:schema:defs#/$defs/common" }],
+  "unevaluatedProperties": false,
+  "required": ["params", "job_parameters"],
+  "properties": {
+    "kind": { "const": "verb" },
+    "params": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["kinds"],
+        "additionalProperties": false,
+        "properties": {
+          "kinds": { "type": "array", "items": { "enum": ["material", "artifact"] } },
+          "description": { "type": "string" }
+        }
+      }
+    },
+    "job_parameters": {
+      "description": "Quantities a job must specify for this verb (e.g. volume of material removed).",
+      "type": "array",
+      "items": { "$ref": "urn:capabilities:schema:defs#/$defs/quantityId" }
+    }
+  }
+}

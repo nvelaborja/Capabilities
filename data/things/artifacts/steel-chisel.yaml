@@ -1,0 +1,8 @@
+id: steel-chisel
+kind: artifact
+label: Hardened steel chisel
+is_a: [chisel]
+description: A chisel forged from steel and then quenched to harden its edge.
+quantities:
+  hardness_mohs: [7, 8]
+notes: Hardness is that of hardened steel.

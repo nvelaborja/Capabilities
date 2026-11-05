@@ -1,0 +1,4 @@
+id: edged-tool
+kind: category
+label: Edged tool
+description: A tool that cuts with its own edge (blade, chisel, adze). Can only cut materials no harder than itself.

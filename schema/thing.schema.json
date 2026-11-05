@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:capabilities:schema:thing",
+  "title": "Thing",
+  "description": "A node in the graph: a material, artifact, technique, piece of knowledge, effect, or category.",
+  "type": "object",
+  "unevaluatedProperties": false,
+  "properties": {
+    "kind": { "enum": ["material", "artifact", "technique", "knowledge", "effect", "category"] },
+    "is_a": {
+      "description": "Categories this thing belongs to.",
+      "$ref": "urn:capabilities:schema:defs#/$defs/ids"
+    },
+    "origin": { "enum": ["natural", "produced"] },
+    "availability": {
+      "description": "Natural materials only. ubiquitous = assumed available everywhere; regional = only some places have it (used for warnings, not reasoning).",
+      "enum": ["ubiquitous", "regional"]
+    },
+    "regions": { "type": "array", "items": { "type": "string" } },
+    "quantities": { "$ref": "urn:capabilities:schema:defs#/$defs/quantityMap" },
+    "dimensions": {
+      "description": "Effects only: the quantities that describe this effect.",
+      "type": "array",
+      "items": { "$ref": "urn:capabilities:schema:defs#/$defs/quantityId" }
+    },
+    "era": {
+      "description": "Optional flag for things outside the ancient scope (e.g. modern tools kept for comparison).",
+      "enum": ["ancient", "modern"]
+    }
+  },
+  "allOf": [
+    { "$ref": "urn:capabilities:schema:defs#/$defs/common" },
+    {
+      "if": { "properties": { "kind": { "const": "material" } } },
+      "then": { "required": ["origin"] }
+    },
+    {
+      "if": { "properties": { "origin": { "const": "natural" } }, "required": ["origin"] },
+      "then": { "required": ["availability"] }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "effect" } } },
+      "then": { "required": ["dimensions"] }
+    },
+    {
+      "if": { "properties": { "kind": { "not": { "const": "material" } } } },
+      "then": { "not": { "anyOf": [{ "required": ["origin"] }, { "required": ["availability"] }] } }
+    }
+  ]
+}

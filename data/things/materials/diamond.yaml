@@ -1,0 +1,14 @@
+id: diamond
+kind: material
+label: Diamond
+origin: natural
+availability: regional
+regions: ["India (the main ancient source)", "Southern Africa", "Brazil"]
+is_a: [abrasive]
+description: Crystalline carbon and the hardest natural material (Mohs 10).
+quantities:
+  hardness_mohs: 10
+references:
+  - citation: "Klein, C. & Dutrow, B. (2007). Manual of Mineral Science, 23rd ed. Wiley."
+    supports: Mohs hardness value.
+    status: unverified

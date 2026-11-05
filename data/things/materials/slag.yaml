@@ -1,0 +1,5 @@
+id: slag
+kind: material
+label: Slag
+origin: produced
+description: The glassy waste left from smelting. Archaeologically important, because finding slag is strong evidence that smelting happened at a site.

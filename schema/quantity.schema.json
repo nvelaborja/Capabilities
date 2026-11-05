@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:capabilities:schema:quantity",
+  "title": "Quantity",
+  "description": "A measurable dimension (temperature, hardness, precision...) with a unit and optional ballpark bands.",
+  "type": "object",
+  "required": ["id", "kind", "label", "unit", "scale"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "$ref": "urn:capabilities:schema:defs#/$defs/quantityId" },
+    "kind": { "const": "quantity" },
+    "label": { "type": "string" },
+    "description": { "type": "string" },
+    "unit": { "type": "string" },
+    "scale": {
+      "description": "ordinal = only order is meaningful (Mohs); ratio = arithmetic is meaningful.",
+      "enum": ["ordinal", "ratio"]
+    },
+    "bands": {
+      "description": "Contiguous ballpark bands, smallest first. min is inclusive, max is exclusive.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "label"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "label": { "type": "string" },
+          "min": { "type": "number" },
+          "max": { "type": "number" },
+          "typical": { "type": "string" }
+        }
+      }
+    },
+    "notes": { "type": "string" },
+    "references": { "$ref": "urn:capabilities:schema:defs#/$defs/references" },
+    "annotations": { "type": "object" }
+  }
+}

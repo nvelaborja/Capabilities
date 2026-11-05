@@ -1,0 +1,5 @@
+id: bloomery-furnace
+kind: artifact
+label: Bloomery furnace
+is_a: [furnace]
+description: A clay shaft furnace for smelting iron ore with charcoal. Hot enough to melt the slag so it drains away, but not hot enough to melt the iron.

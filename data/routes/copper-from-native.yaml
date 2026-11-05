@@ -1,0 +1,14 @@
+id: copper-from-native
+kind: route
+label: Cold-hammering native copper
+achieves: { thing: copper }
+techniques: [cold-hammering]
+requires:
+  - { role: consumed, thing: native-copper }
+  - { role: tool, category: stone, notes: Used as a hammerstone. }
+outputs:
+  - { thing: copper }
+references:
+  - citation: "Tylecote, R. F. (1992). A History of Metallurgy, 2nd ed. Institute of Materials."
+    supports: General description of this process.
+    status: unverified

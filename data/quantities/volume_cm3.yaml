@@ -1,0 +1,6 @@
+id: volume_cm3
+kind: quantity
+label: Volume
+unit: cm³
+scale: ratio
+description: A volume, such as material removed by a cut or the working volume of a furnace.

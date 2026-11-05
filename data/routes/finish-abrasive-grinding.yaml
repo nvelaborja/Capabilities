@@ -1,0 +1,24 @@
+id: finish-abrasive-grinding
+kind: route
+label: Grinding with stone and abrasive
+achieves: { verb: finish }
+techniques: [abrasive-cutting]
+requires:
+  - { role: tool, category: stone, notes: A grinding stone or rubber moved over the surface. }
+  - role: consumed
+    category: abrasive
+    where:
+      - { quantity: hardness_mohs, op: ">=", value: target.hardness_mohs }
+envelope:
+  rate:
+    quantity: removal_rate_cm3_per_h
+    crew: 1
+    basis: unknown
+    notes: Stocks experimented with grinding and polishing hard stone (TODO-source for rates).
+  precision:
+    basis: unknown
+    notes: Grinding with progressively finer abrasive can produce flat, glossy surfaces; how flat has to come from measurements of real artifacts (TODO-source).
+references:
+  - citation: "Stocks, D. A. (2003). Experiments in Egyptian Archaeology: Stoneworking Technology in Ancient Egypt. Routledge."
+    supports: Experimental grinding and polishing of hard stone with sand abrasive.
+    status: unverified

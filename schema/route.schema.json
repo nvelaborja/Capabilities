@@ -1,0 +1,396 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:capabilities:schema:route",
+  "title": "Route",
+  "description": "One way of obtaining a thing, producing an effect, or performing a verb. A route works only if ALL its requirements are met; a thing can have many routes (any one is enough). Know-how is not a requirement: routes list the techniques they use, but only inputs, tools, effects, and actions gate them.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "urn:capabilities:schema:defs#/$defs/common"
+    }
+  ],
+  "unevaluatedProperties": false,
+  "required": [
+    "achieves",
+    "requires",
+    "references"
+  ],
+  "properties": {
+    "kind": {
+      "const": "route"
+    },
+    "achieves": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "maxProperties": 1,
+      "properties": {
+        "thing": {
+          "$ref": "urn:capabilities:schema:defs#/$defs/id"
+        },
+        "effect": {
+          "$ref": "urn:capabilities:schema:defs#/$defs/id"
+        },
+        "verb": {
+          "$ref": "urn:capabilities:schema:defs#/$defs/id"
+        }
+      }
+    },
+    "requires": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/requirement"
+      }
+    },
+    "outputs": {
+      "description": "Things produced, including byproducts (slag, chips), with the quantities they carry.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "thing"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "thing": {
+            "$ref": "urn:capabilities:schema:defs#/$defs/id"
+          },
+          "byproduct": {
+            "type": "boolean"
+          },
+          "quantities": {
+            "$ref": "urn:capabilities:schema:defs#/$defs/quantityMap"
+          }
+        }
+      }
+    },
+    "provides": {
+      "description": "Effect routes only: the quantities this route delivers (e.g. temperature reached).",
+      "$ref": "urn:capabilities:schema:defs#/$defs/quantityMap"
+    },
+    "envelope": {
+      "$ref": "#/$defs/envelope"
+    },
+    "references": {
+      "description": "Every route is a scientific claim, so at least one reference is required.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "urn:capabilities:schema:defs#/$defs/reference"
+      }
+    },
+    "techniques": {
+      "description": "Techniques this route uses. Descriptive only: know-how never blocks a route. If someone had the inputs, the route counts as within reach.",
+      "$ref": "urn:capabilities:schema:defs#/$defs/ids"
+    },
+    "applies_to": {
+      "description": "Verb routes only: the targets (thing or category ids) this route works on. Omit to allow any target the conditions permit.",
+      "$ref": "urn:capabilities:schema:defs#/$defs/ids"
+    }
+  },
+  "$defs": {
+    "requirement": {
+      "type": "object",
+      "required": [
+        "role"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "role": {
+          "description": "consumed = used up; tool = used but not used up; effect = a physical effect such as heat; action = the ability to perform a verb on a target, e.g. cut(wood).",
+          "enum": [
+            "consumed",
+            "tool",
+            "effect",
+            "action"
+          ]
+        },
+        "thing": {
+          "$ref": "urn:capabilities:schema:defs#/$defs/id"
+        },
+        "category": {
+          "$ref": "urn:capabilities:schema:defs#/$defs/id"
+        },
+        "effect": {
+          "$ref": "urn:capabilities:schema:defs#/$defs/id"
+        },
+        "where": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "urn:capabilities:schema:defs#/$defs/condition"
+          }
+        },
+        "notes": {
+          "type": "string"
+        },
+        "verb": {
+          "$ref": "urn:capabilities:schema:defs#/$defs/id"
+        },
+        "target": {
+          "$ref": "urn:capabilities:schema:defs#/$defs/id"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "role": {
+                "const": "effect"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "effect"
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "thing"
+                  ]
+                },
+                {
+                  "required": [
+                    "category"
+                  ]
+                },
+                {
+                  "required": [
+                    "verb"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "role": {
+                "const": "action"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "verb",
+              "target"
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "thing"
+                  ]
+                },
+                {
+                  "required": [
+                    "category"
+                  ]
+                },
+                {
+                  "required": [
+                    "effect"
+                  ]
+                },
+                {
+                  "required": [
+                    "where"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "role": {
+                "enum": [
+                  "consumed",
+                  "tool"
+                ]
+              }
+            }
+          },
+          "then": {
+            "oneOf": [
+              {
+                "required": [
+                  "thing"
+                ]
+              },
+              {
+                "required": [
+                  "category"
+                ]
+              }
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "effect"
+                  ]
+                },
+                {
+                  "required": [
+                    "verb"
+                  ]
+                },
+                {
+                  "required": [
+                    "target"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "envelopeEntry": {
+      "type": "object",
+      "required": [
+        "basis"
+      ],
+      "properties": {
+        "basis": {
+          "$ref": "urn:capabilities:schema:defs#/$defs/basis"
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "envelope": {
+      "description": "Performance limits of the route, as ballpark ranges with their basis.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "precision": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/envelopeEntry"
+            }
+          ],
+          "type": "object",
+          "unevaluatedProperties": false,
+          "properties": {
+            "bands": {
+              "description": "[best, worst] precision band ids, e.g. [P2, P1].",
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1,
+              "maxItems": 2
+            }
+          }
+        },
+        "rate": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/envelopeEntry"
+            }
+          ],
+          "type": "object",
+          "unevaluatedProperties": false,
+          "required": [
+            "quantity"
+          ],
+          "properties": {
+            "quantity": {
+              "$ref": "urn:capabilities:schema:defs#/$defs/quantityId"
+            },
+            "crew": {
+              "description": "People needed to run one unit (one saw, one drill).",
+              "type": "integer",
+              "minimum": 1
+            },
+            "by_target": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "target",
+                  "value",
+                  "basis"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "target": {
+                    "$ref": "urn:capabilities:schema:defs#/$defs/id"
+                  },
+                  "value": {
+                    "$ref": "urn:capabilities:schema:defs#/$defs/quantityValue"
+                  },
+                  "basis": {
+                    "$ref": "urn:capabilities:schema:defs#/$defs/basis"
+                  },
+                  "notes": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "capacity": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/envelopeEntry"
+            }
+          ],
+          "type": "object",
+          "unevaluatedProperties": false,
+          "required": [
+            "quantity"
+          ],
+          "properties": {
+            "quantity": {
+              "$ref": "urn:capabilities:schema:defs#/$defs/quantityId"
+            },
+            "per_unit": {
+              "type": "object",
+              "required": [
+                "unit"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "unit": {
+                  "type": "string"
+                },
+                "value": {
+                  "$ref": "urn:capabilities:schema:defs#/$defs/quantityValue"
+                }
+              }
+            },
+            "scaling": {
+              "description": "How capacity grows with more units. linear = n units carry n times as much, up to scaling_cap.",
+              "enum": [
+                "linear",
+                "none",
+                "unknown"
+              ]
+            },
+            "scaling_cap": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "value": {
+                  "$ref": "urn:capabilities:schema:defs#/$defs/quantityValue"
+                },
+                "notes": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

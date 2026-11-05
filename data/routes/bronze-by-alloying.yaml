@@ -1,0 +1,20 @@
+id: bronze-by-alloying
+kind: route
+label: Alloying copper with tin metal
+achieves: { thing: tin-bronze }
+techniques: [alloying]
+requires:
+  - { role: consumed, thing: copper }
+  - { role: consumed, thing: tin }
+  - { role: tool, thing: crucible }
+  - role: effect
+    effect: heat
+    where:
+      - { quantity: temperature_c, op: ">=", value: 1085 }
+    notes: The copper must be melted. A 10% tin bronze is fully liquid at roughly 1000 °C.
+outputs:
+  - { thing: tin-bronze }
+references:
+  - citation: "Tylecote, R. F. (1992). A History of Metallurgy, 2nd ed. Institute of Materials."
+    supports: General description of this process.
+    status: unverified

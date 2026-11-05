@@ -1,0 +1,38 @@
+id: drill-abrasive-tube
+kind: route
+label: Abrasive tube drilling
+achieves: { verb: drill }
+techniques: [abrasive-cutting]
+requires:
+  - { role: tool, thing: copper-tube-drill }
+  - { role: tool, thing: bow-drill }
+  - role: consumed
+    category: abrasive
+    where:
+      - { quantity: hardness_mohs, op: ">=", value: target.hardness_mohs }
+envelope:
+  rate:
+    quantity: removal_rate_cm3_per_h
+    crew: 3
+    basis: measured
+    by_target:
+      - target: granite
+        value: [5.2, 10.4]
+        basis: measured
+        notes: 5.2 cm³/hour measured by Stocks with an 8 cm tube; 10.4 is his estimate for experienced workers.
+      - target: limestone
+        value: [78, 156]
+        basis: derived
+        notes: About 15 times the granite rate, per Stocks.
+  precision:
+    basis: unknown
+references:
+  - citation: "Stocks, D. A. (2001). Testing ancient Egyptian granite-working methods in Aswan, Upper Egypt. Antiquity 75, 89–94."
+    doi: 10.1017/S0003598X00052777
+    url: https://www.hallofmaat.com/unforbiddengeology/ancient-egyptian-copper-coring-drills/
+    supports: "Tube-drilling granite with dry quartz sand: 5.2 cm³/hour (a 6 cm core in 20 hours) with three workers; experience could double the rate."
+    status: secondary
+  - citation: "Stocks, D. A. (1999). Stone sarcophagus manufacture in ancient Egypt. Antiquity 73, 918–922."
+    url: https://www.hallofmaat.com/unforbiddengeology/ancient-egyptian-copper-coring-drills/
+    supports: Limestone was drilled about 15 times faster than granite.
+    status: secondary

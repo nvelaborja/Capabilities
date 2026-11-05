@@ -1,0 +1,15 @@
+id: make-bellows
+kind: route
+label: Making bellows
+achieves: { thing: bellows }
+techniques: [woodworking]
+requires:
+  - { role: consumed, thing: hide }
+  - { role: consumed, thing: wood }
+  - { role: action, verb: cut, target: wood }
+outputs:
+  - { thing: bellows }
+references:
+  - citation: "Tylecote, R. F. (1992). A History of Metallurgy, 2nd ed. Institute of Materials."
+    supports: General description of this process.
+    status: unverified

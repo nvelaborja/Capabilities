@@ -1,0 +1,18 @@
+id: make-crucible
+kind: route
+label: Making a crucible
+achieves: { thing: crucible }
+techniques: [pottery]
+requires:
+  - { role: consumed, thing: clay }
+  - role: effect
+    effect: heat
+    where:
+      - { quantity: temperature_c, op: ">=", value: 600 }
+    notes: Firing clay hard; approximate temperature (TODO-source).
+outputs:
+  - { thing: crucible }
+references:
+  - citation: "Tylecote, R. F. (1992). A History of Metallurgy, 2nd ed. Institute of Materials."
+    supports: General description of this process.
+    status: unverified

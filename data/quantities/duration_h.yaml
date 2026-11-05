@@ -1,0 +1,18 @@
+id: duration_h
+kind: quantity
+label: Duration
+unit: hours
+scale: ratio
+description: How long something takes or is sustained. Usually expressed as a ballpark band.
+bands:
+  - { id: minutes, label: "Minutes", max: 1 }
+  - { id: hours, label: "Hours", min: 1, max: 24 }
+  - { id: days, label: "Days", min: 24, max: 168 }
+  - { id: weeks, label: "Weeks", min: 168, max: 730 }
+  - { id: months, label: "Months", min: 730, max: 8766 }
+  - { id: years, label: "Years", min: 8766, max: 87660 }
+  - { id: decades, label: "Decades", min: 87660, max: 876600 }
+  - { id: centuries, label: "Centuries", min: 876600, max: 8766000 }
+  - { id: millennia, label: "Millennia", min: 8766000, max: 87660000 }
+  - { id: geological, label: "Geological (10,000+ years)", min: 87660000, typical: "erosion, sea-level change, continental drift" }
+notes: A month is taken as 730 hours and a year as 8,766 hours (365.25 days).
