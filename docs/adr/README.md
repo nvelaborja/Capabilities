@@ -23,5 +23,6 @@ Each file records one significant design decision: the context, what we decided,
 | [0015](0015-build-the-web-front-end-with-react-and-cytoscape.md) | Build the web front end with React, TypeScript, Vite and Cytoscape.js | Accepted |
 | [0016](0016-recompute-on-every-change.md) | Recompute results on every selection change | Accepted |
 | [0017](0017-ui-selection-model.md) | UI selection model: implicit selection, history and shareable state | Accepted |
-| [0018](0018-rank-dependencies-by-tech-level.md) | Rank dependencies by tech level | Proposed |
+| [0018](0018-rank-dependencies-by-tech-level.md) | Rank items by tech level | Accepted |
 | [0019](0019-desktop-first-mobile-ready.md) | Build desktop-first, without blocking mobile | Accepted |
+| [0020](0020-show-a-bounded-number-of-items.md) | Show one level at a time and a bounded number of items | Accepted |

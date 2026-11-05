@@ -1,17 +1,17 @@
-# 0018. Rank dependencies by tech level
+# 0018. Rank items by tech level
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-05
 
 ## Context
 
-When the user clicks a thing that is out of reach, the detail pane shows which of its dependencies are satisfied and which are missing. Those lists can be long (a hydrogen bomb needs a lot), so we show the top few and a "see all" button. That needs an order that puts the most advanced, most informative dependencies first, with primitives like wood, fire and clay last.
+The UI often has more items to show than fit: a thing's missing dependencies, a node's neighbours on the graph, the full dependency list. [ADR 0020](0020-show-a-bounded-number-of-items.md) shows the top few and summarizes the rest. That needs an order that puts the most advanced, most informative items first, and primitives like wood, fire and clay last.
 
 The first idea was the number of direct inputs (in-degree). It doesn't measure how advanced something is: a steel spear has only a few direct inputs (steel, wood) but sits high in the hierarchy, while fire also has few.
 
 ## Decision
 
-We will rank by **tech level**: the length of the shortest chain of steps from primitive materials.
+We will rank by **tech level**: the length of the shortest chain of steps from primitive materials, highest first.
 
 - Natural materials have level 0.
 - A route's level is the highest level among its requirements.
@@ -21,7 +21,7 @@ We will rank by **tech level**: the length of the shortest chain of steps from p
 - Ties are broken by the number of things it certainly needs (a transitive in-degree), then alphabetically.
 - Things with no known route and no natural origin have no level and sort last.
 
-The server computes levels once at startup and includes them in the graph data.
+The server computes levels once at startup and includes them in the graph data. Tech level only **orders** items. It never decides whether an item is shown; that depends only on how many items there are ([ADR 0020](0020-show-a-bounded-number-of-items.md)).
 
 ## Consequences
 
