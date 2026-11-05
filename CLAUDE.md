@@ -35,7 +35,7 @@ The web front end (`web/`, see [ADR 0015](docs/adr/0015-build-the-web-front-end-
 - `schema/`: JSON Schemas for every data file type
 - `data/`: the graph (quantities, things, verbs, routes, profiles), licensed CC BY 4.0
 - `examples/jobs/`: feasibility-check jobs; `examples/README.md` holds worked results that tests check
-- `src/capabilities/`: `graph.py` (loading), `validate.py`, `tristate.py`, `reasoner.py`, `cli.py`, `server.py`
+- `src/capabilities/`: `graph.py` (loading), `validate.py`, `tristate.py`, `reasoner.py` (the three questions), `levels.py` (tech levels), `views.py` (display-ready shapes for the web UI), `cli.py`, `server.py` (API under `/api`)
 - `tests/`: pytest suite
 - `docs/`: data format, reasoning rules, and ADRs
 
