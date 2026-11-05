@@ -5,8 +5,9 @@ from capabilities.server import create_app
 
 
 @pytest.fixture(scope="module")
-def client(repo_root) -> TestClient:
-    return TestClient(create_app(repo_root))
+def client(repo_root, tmp_path_factory) -> TestClient:
+    # Ignore any local web build so results don't depend on whether `npm run build` has been run.
+    return TestClient(create_app(repo_root, web_dist=tmp_path_factory.mktemp("no-web-build")))
 
 
 class TestServer:
@@ -87,3 +88,23 @@ class TestServer:
     def test_errors(self, client, method, path, payload, status):
         response = client.request(method, path, json=payload)
         assert response.status_code == status
+
+
+class TestWebUi:
+    def test_serves_the_built_page_at_the_root_without_shadowing_the_api(self, repo_root, tmp_path):
+        # given: a built web app
+        (tmp_path / "index.html").write_text("<!doctype html><title>Capabilities UI</title>")
+        (tmp_path / "assets").mkdir()
+        (tmp_path / "assets" / "app.js").write_text("console.log('hi')")
+        client = TestClient(create_app(repo_root, web_dist=tmp_path))
+        # then: the page and its assets load, and the API and docs still answer
+        assert "Capabilities UI" in client.get("/").text
+        assert client.get("/assets/app.js").status_code == 200
+        assert client.get("/api/health").json()["status"] == "ok"
+        assert client.get("/docs").status_code == 200
+
+    def test_explains_how_to_build_the_page_when_it_is_missing(self, repo_root, tmp_path):
+        client = TestClient(create_app(repo_root, web_dist=tmp_path / "missing"))
+        page = client.get("/")
+        assert page.status_code == 200
+        assert "npm run build" in page.text
