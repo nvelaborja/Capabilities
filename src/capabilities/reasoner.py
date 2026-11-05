@@ -311,6 +311,28 @@ def _effect_node(graph: Graph, requirement: dict, target: str | None, depth: int
     return node
 
 
+def condition_rhs(graph: Graph, quantities: dict[str, dict], condition: dict, target: str | None):
+    """The value a condition compares against: a number, a band's lower edge, or the target's quantity (or None)."""
+    if "band" in condition:
+        return graph.band(condition["quantity"], condition["band"]).get("min", 0.0)
+    value = condition["value"]
+    if isinstance(value, str):
+        if target is None:
+            return None
+        return quantities.get(target, {}).get(value.split(".", 1)[1])
+    return value
+
+
+def known_quantities(graph: Graph) -> dict[str, dict]:
+    """Each thing's quantities, plus any that a route states for its outputs (e.g. hardened steel's hardness)."""
+    quantities = {thing_id: dict(thing.get("quantities", {})) for thing_id, thing in graph.things.items()}
+    for route in graph.routes.values():
+        for output in route.get("outputs", []):
+            for quantity, value in output.get("quantities", {}).items():
+                quantities[output["thing"]].setdefault(quantity, value)
+    return quantities
+
+
 def _describe_condition(condition: dict) -> str:
     rhs = condition.get("band") or condition.get("value")
     return f"{condition['quantity']} {condition['op']} {rhs}"
@@ -417,14 +439,7 @@ class Reachability:
         return status
 
     def _rhs(self, condition: dict, target: str | None):
-        if "band" in condition:
-            return self.g.band(condition["quantity"], condition["band"]).get("min", 0.0)
-        value = condition["value"]
-        if isinstance(value, str):
-            if target is None:
-                return None
-            return self.quantities.get(target, {}).get(value.split(".", 1)[1])
-        return value
+        return condition_rhs(self.g, self.quantities, condition, target)
 
     def requirement_label(self, requirement: dict) -> str:
         if requirement["role"] == "action":
@@ -448,6 +463,8 @@ class ExploreResult:
     actions: dict[str, dict[str, str]]
     near_misses: list[dict]
     warnings: list[str]
+    # Kept so callers can ask follow-up questions (statuses, explanations) without recomputing.
+    reach: Reachability | None = field(default=None, repr=False, compare=False)
 
     def to_dict(self, graph: Graph) -> dict:
         return {
@@ -502,7 +519,8 @@ def explore(graph: Graph, selected: Selection, hypothetical: Selection = Selecti
         if len(missing) == 1:
             near_misses.append({"thing": thing, "route": route_id, "missing": missing[0]})
 
-    return ExploreResult(selected, hypothetical, implied, reachable, maybe, actions, near_misses, _regional_warnings(graph, selected | hypothetical, implied))
+    warnings = _regional_warnings(graph, selected | hypothetical, implied)
+    return ExploreResult(selected, hypothetical, implied, reachable, maybe, actions, near_misses, warnings, reach)
 
 
 def _target_quantities(graph: Graph, verb: str) -> set[str]:

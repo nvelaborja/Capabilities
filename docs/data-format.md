@@ -162,6 +162,18 @@ This is sound (each route's own bound implies the merged one), but it has side e
 - **It only applies to effects.** Things, categories, and actions are intersected exactly, so "charcoal" in one route and "any carbon source" in another do not merge into "any carbon source".
 - **It feeds forward.** Implied effect levels (rule 6) are used as achieved capabilities, so any understatement carries into what is reachable.
 
+### Tech levels
+
+Tech levels order items for display, highest first ([ADR 0018](adr/0018-rank-dependencies-by-tech-level.md)). They never decide whether something is shown.
+
+- Natural materials are level 0.
+- A route is at the highest level among its requirements.
+- A thing is one above its easiest route.
+- A category takes its lowest member. A heat requirement takes the easiest heat source that can reach its threshold, so "≥ 1200 °C" ranks above "≥ 900 °C".
+- Ties go to the item that certainly needs more, then alphabetical.
+
+For example: wood 0, stone chopper 1, cut wood 2, heat 4, charcoal 5, bloom iron 7, steel 8, hardened steel 9. The code is in `src/capabilities/levels.py`.
+
 ### Feasibility checks (question 3)
 
 - Each step is checked against every route that performs its verb on its target.

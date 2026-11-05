@@ -31,15 +31,17 @@ Every command takes `--json` for machine-readable output. `explore` and `check` 
 uv run capabilities serve                 # http://127.0.0.1:8000
 ```
 
-Open http://127.0.0.1:8000/docs for interactive API docs where you can try every endpoint in the browser.
+Open http://127.0.0.1:8000/docs for interactive API docs where you can try every endpoint in the browser. Every endpoint is under `/api`.
 
 | Endpoint | What it does |
 |---|---|
-| `GET /nodes`, `GET /nodes/{id}` | Browse things, verbs, and routes |
-| `GET /profiles`, `GET /jobs` | List presets and example jobs |
-| `GET /need/{id}` | Q1: the full tree of what it would take, plus what is certain |
-| `POST /explore` | Q2: `{"profile": "...", "select": [], "deselect": [], "hypothetical": []}` |
-| `POST /check` | Q3: the same plus `"job": "<id>"` or an inline `"job_spec"` |
+| `GET /api/nodes`, `GET /api/nodes/{id}` | Browse things, verbs, and routes |
+| `GET /api/profiles`, `GET /api/jobs` | List presets and example jobs |
+| `GET /api/graph` | Every drawable node and edge, with tech levels. Add `?action=cut:limestone` to draw extra actions |
+| `GET /api/need/{id}` | Q1: the full tree of what it would take, plus what is certain |
+| `POST /api/explore` | Q2: `{"profile": "...", "select": [], "deselect": [], "hypothetical": []}`. Includes a status for every node and what implies each implied item |
+| `POST /api/explain` | What a node needs, one level deep, each requirement met / missing / unknown with a reason: the same body plus `"node": "<id>"`. Add `"all": true` for every certain need at every depth |
+| `POST /api/check` | Q3: the same body plus `"job": "<id>"` or an inline `"job_spec"` |
 
 ### Tests
 
