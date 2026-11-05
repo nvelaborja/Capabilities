@@ -102,8 +102,12 @@ class Graph:
 
     def __post_init__(self) -> None:
         self.routes_achieving: dict[str, list[str]] = {}
+        # Byproducts (slag) are produced without being the route's goal, so they are indexed separately.
+        self.routes_producing: dict[str, list[str]] = {}
         for route_id, route in self.routes.items():
             self.routes_achieving.setdefault(achieved_id(route), []).append(route_id)
+            for output in route.get("outputs", []):
+                self.routes_producing.setdefault(output["thing"], []).append(route_id)
         self._members: dict[str, frozenset[str]] = {}
 
     @classmethod
@@ -198,6 +202,10 @@ class Graph:
         for param in self.verbs[verb].get("params", {}).values():
             kinds |= set(param.get("kinds", []))
         return sorted(tid for tid, thing in self.things.items() if thing["kind"] in kinds)
+
+    def is_natural(self, thing_id: str) -> bool:
+        thing = self.things.get(thing_id, {})
+        return thing.get("kind") == "material" and thing.get("origin") == "natural"
 
     def thing_routes(self) -> Iterable[str]:
         return (rid for rid, route in self.routes.items() if "thing" in route["achieves"])
