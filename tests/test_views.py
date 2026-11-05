@@ -48,6 +48,11 @@ class TestGraphView:
         assert into_steel == {"steel-by-carburizing", "steel-by-crucible"}
         assert heat_edge["label"] == "Temperature ≥ 1100 °C · Duration ≥ 2 hours"
 
+    def test_routes_carry_their_level_except_verb_routes(self, graph, levels):
+        nodes = {node["id"]: node for node in graph_view(graph, levels)["nodes"]}
+        assert nodes["bloomery-smelting"]["level"] == levels.of("bloom-iron") - 1
+        assert nodes["cut-abrasive-saw"]["level"] is None
+
     def test_extra_actions_are_drawn_and_connected_to_their_verb_routes(self, graph, levels):
         # given: nothing in the data references cut:limestone
         before = graph_view(graph, levels)
