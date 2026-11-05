@@ -262,7 +262,34 @@ def explore_view(graph: Graph, result: ExploreResult) -> dict:
         "status": {key: context.status(key) for key in sorted(keys)},
         "route_status": {rid: context.route_status(rid, actions).label for rid in sorted(graph.routes)},
         "implied_by": implied_by(graph, chosen),
+        "implied_effects": implied_effects(graph, result.implied),
+        "near": near_view(graph, result),
     }
+
+
+def implied_effects(graph: Graph, implied: Necessity) -> list[dict]:
+    """Effect levels the selection certainly reached, readable: Heat, ["Temperature ≥ 1085 °C"]."""
+    views = []
+    for effect, bounds in sorted(implied.effects.items()):
+        conditions = [describe_condition(graph, {"quantity": q, "op": op, "value": value}) for q, (op, value) in sorted(bounds.items())]
+        views.append({"id": effect, "label": graph.label(effect), "conditions": conditions})
+    return views
+
+
+def near_view(graph: Graph, result: ExploreResult) -> list[dict]:
+    """Things one requirement away, grouped by thing, each route naming what it is missing."""
+    reach = result.reach
+    grouped: dict[str, list[dict]] = defaultdict(list)
+    for miss in result.near_misses:
+        route = graph.routes[miss["route"]]
+        missing = next(r for r in route["requires"] if reach.requirement_status(r, None) == Tri.NO)
+        key = requirement_node(missing)
+        grouped[miss["thing"]].append({
+            "id": miss["route"], "label": route.get("label", miss["route"]),
+            "missing": {"id": key, "label": node_label(graph, key) + (" (any)" if "category" in missing else ""),
+                        "kind": "action" if ":" in key else graph.kind(key)},
+        })
+    return [{"id": thing, "label": graph.label(thing), "routes": routes} for thing, routes in sorted(grouped.items())]
 
 
 def implied_by(graph: Graph, chosen: Selection) -> dict[str, list[str]]:

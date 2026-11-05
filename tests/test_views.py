@@ -92,6 +92,21 @@ class TestStatuses:
         assert view["route_status"]["bloomery-smelting"] == "no"
 
 
+class TestExploreViewExtras:
+    def test_implied_effects_are_readable(self, graph):
+        view = explore_view(graph, explore(graph, egypt(graph)))
+        assert view["implied_effects"] == [{"id": "heat", "label": "Heat", "conditions": ["Temperature ≥ 1085 °C"]}]
+
+    def test_near_misses_are_grouped_by_thing_and_name_what_is_missing(self, graph):
+        near = {item["id"]: item for item in explore_view(graph, explore(graph, egypt(graph)))["near"]}
+        assert near["bloom-iron"]["routes"][0]["missing"] == {"id": "iron-ore", "label": "Iron ore (any)", "kind": "category"}
+        assert {r["id"] for r in near["steel"]["routes"]} == {"steel-by-carburizing", "steel-by-crucible"}
+
+    def test_warnings_use_names_not_ids(self, graph):
+        warnings = explore_view(graph, explore(graph, egypt(graph)))["warnings"]
+        assert warnings == ["Implies access to some tin ore (cassiterite); all known sources are regional, so it may have been traded."]
+
+
 class TestImpliedBy:
     def test_names_the_selections_that_imply_each_item(self, graph):
         found = implied_by(graph, egypt(graph))
