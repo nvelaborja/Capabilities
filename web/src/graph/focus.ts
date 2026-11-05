@@ -17,7 +17,8 @@ export function focusOn(node: NodeSingular): void {
   const keep = neighbourhood(node);
   cy.batch(() => {
     cy.elements().removeClass("faded focused");
-    cy.elements().not(keep).addClass("faded");
+    // Level headings stay visible so the columns still read while focused.
+    cy.elements().not(keep).not(".level-label").addClass("faded");
     node.addClass("focused");
   });
 }

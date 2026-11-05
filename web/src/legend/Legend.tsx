@@ -1,47 +1,77 @@
 import { type ReactNode, useState } from "react";
 
 import type { DrawnKind, Status } from "../api/types";
+import { STATUS_LOOK } from "../graph/styles";
 import "./Legend.css";
 
 const W = 30;
 const H = 18;
 
-// Same shapes the graph uses (graph/styles.ts), drawn as small SVGs.
-export const SHAPES: Record<DrawnKind | "route", { label: string; draw: (props: SwatchStyle) => ReactNode }> = {
-  material: { label: "Material", draw: (s) => <ellipse cx={W / 2} cy={H / 2} rx={W / 2 - 2} ry={H / 2 - 2} {...s} /> },
-  artifact: { label: "Tool or product", draw: (s) => <rect x={2} y={2} width={W - 4} height={H - 4} rx={4} {...s} /> },
-  action: { label: "Action (cut wood)", draw: (s) => <polygon points="7,2 23,2 28,9 23,16 7,16 2,9" {...s} /> },
-  category: { label: "Any of a kind (iron ore)", draw: (s) => <polygon points="15,1 28,9 15,17 2,9" {...s} /> },
-  effect: { label: "Effect (heat)", draw: (s) => <polygon points="10,2 20,2 27,6 27,12 20,16 10,16 3,12 3,6" {...s} /> },
-  route: { label: "A way to make it", draw: () => <circle cx={W / 2} cy={H / 2} r={4} fill="var(--edge)" /> },
+// Type colours, drawn with the same CSS variables the graph uses (graph/styles.ts).
+export const TYPE_LABELS: Record<DrawnKind, string> = {
+  material: "Material",
+  artifact: "Tool or product",
+  action: "Action (cut wood)",
+  category: "Any of a kind (iron ore)",
+  effect: "Effect (heat)",
 };
 
-interface SwatchStyle {
-  fill: string;
-  stroke: string;
-  strokeWidth: number;
-  strokeDasharray?: string;
-  opacity?: number;
-}
-
-const NEUTRAL: SwatchStyle = { fill: "var(--surface)", stroke: "var(--text-muted)", strokeWidth: 1 };
-
-// Mirrors the status rules in graph/styles.ts: fill or border pattern, never colour alone.
-export const STATUS_STYLES: Record<Status, { label: string; style: SwatchStyle; double?: boolean }> = {
-  selected: { label: "Selected", style: { fill: "var(--accent)", stroke: "var(--accent-strong)", strokeWidth: 3 } },
-  hypothetical: { label: "What-if", style: { fill: "var(--what-if)", stroke: "var(--accent-strong)", strokeWidth: 1.5 }, double: true },
-  implied: { label: "Implied (they must have had it)", style: { fill: "var(--accent-tint)", stroke: "var(--accent)", strokeWidth: 2 } },
-  reachable: { label: "Reachable (they could have made it)", style: { fill: "var(--surface)", stroke: "var(--accent)", strokeWidth: 2 } },
-  maybe: { label: "Maybe reachable", style: { fill: "var(--surface)", stroke: "var(--accent)", strokeWidth: 2, strokeDasharray: "1.5 2.5" } },
-  near: { label: "One step away", style: { fill: "var(--surface)", stroke: "var(--text-muted)", strokeWidth: 2, strokeDasharray: "5 3" } },
-  out: { label: "Out of reach", style: { fill: "var(--surface)", stroke: "var(--out)", strokeWidth: 1, opacity: 0.55 } },
+export const STATUS_LABELS: Record<Status, string> = {
+  selected: "Selected",
+  hypothetical: "What-if",
+  implied: "Implied (they must have had it)",
+  reachable: "Reachable (they could have made it)",
+  maybe: "Maybe reachable",
+  near: "One step away",
+  out: "Out of reach",
 };
+
+// SVG dash patterns standing in for the graph's border styles.
+const DASHES: Record<string, string | undefined> = { dotted: "1.5 2.5", dashed: "5 3" };
 
 function Swatch({ children }: { children: ReactNode }) {
   return (
     <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} aria-hidden="true" className="legend-swatch">
       {children}
     </svg>
+  );
+}
+
+function TypeSwatch({ kind }: { kind: DrawnKind }) {
+  return (
+    <Swatch>
+      <rect x={1.5} y={1.5} width={W - 3} height={H - 3} rx={5} fill={`var(--type-${kind}-tint)`} stroke={`var(--type-${kind}-line)`} />
+    </Swatch>
+  );
+}
+
+/** A status shown on a tool-coloured box, mirroring STATUS_LOOK. */
+function StatusSwatch({ status }: { status: Status }) {
+  const look = STATUS_LOOK[status];
+  const width = look["border-width"];
+  const strong = look.hadIt;
+  const out = status === "out";
+  const stroke = status === "selected" || status === "hypothetical" ? "var(--text)" : out ? "var(--out)" : "var(--type-artifact-line)";
+  const fill = strong ? "var(--type-artifact-fill)" : out || status === "near" ? "var(--surface)" : "var(--type-artifact-tint)";
+  const inset = Math.max(width, 1) / 2 + 0.5;
+  return (
+    <Swatch>
+      <rect
+        x={inset}
+        y={inset}
+        width={W - 2 * inset}
+        height={H - 2 * inset}
+        rx={5}
+        fill={fill}
+        stroke={width > 0 ? stroke : "none"}
+        strokeWidth={look["border-style"] === "double" ? 1.5 : width}
+        strokeDasharray={DASHES[look["border-style"]]}
+        opacity={look.opacity}
+      />
+      {look["border-style"] === "double" && (
+        <rect x={5} y={5} width={W - 10} height={H - 10} rx={3} fill="none" stroke={stroke} strokeWidth={1.5} />
+      )}
+    </Swatch>
   );
 }
 
@@ -70,34 +100,38 @@ export function Legend() {
     <details className="legend" open={open} onToggle={(event) => saveOpen(event.currentTarget.open)}>
       <summary>Legend</summary>
       <div className="legend-body">
-        <section aria-label="Shapes">
-          <h2>Shape: what it is</h2>
+        <section aria-label="Types">
+          <h2>Colour: what it is</h2>
           <ul>
-            {Object.entries(SHAPES).map(([kind, { label, draw }]) => (
+            {(Object.keys(TYPE_LABELS) as DrawnKind[]).map((kind) => (
               <li key={kind}>
-                <Swatch>{draw(NEUTRAL)}</Swatch>
-                {label}
+                <TypeSwatch kind={kind} />
+                {TYPE_LABELS[kind]}
               </li>
             ))}
+            <li>
+              <Swatch>
+                <circle cx={W / 2} cy={H / 2} r={4} fill="var(--edge)" />
+              </Swatch>
+              A way to make it
+            </li>
           </ul>
         </section>
         <section aria-label="Statuses">
-          <h2>Fill and border: where it stands</h2>
+          <h2>Border and fill: where it stands</h2>
           <ul>
-            {Object.entries(STATUS_STYLES).map(([status, { label, style, double }]) => (
+            {(Object.keys(STATUS_LABELS) as Status[]).map((status) => (
               <li key={status}>
-                <Swatch>
-                  <rect x={2} y={2} width={W - 4} height={H - 4} rx={4} {...style} />
-                  {double && <rect x={5} y={5} width={W - 10} height={H - 10} rx={2} fill="none" stroke={style.stroke} strokeWidth={1.5} />}
-                </Swatch>
-                {label}
+                <StatusSwatch status={status} />
+                {STATUS_LABELS[status]}
               </li>
             ))}
           </ul>
         </section>
         <p className="legend-note">
-          Several dots into a thing mean <em>any one</em> of these ways works. Lines into one dot mean that way needs{" "}
-          <em>all</em> of them. Dashed lines are tools; dotted lines are actions.
+          Columns are tech levels: primitive things on the left, advanced ones on the right. Several dots into a thing
+          mean <em>any one</em> of these ways works. Lines into one dot mean that way needs <em>all</em> of them. Dashed
+          lines are tools; dotted lines are actions.
         </p>
       </div>
     </details>

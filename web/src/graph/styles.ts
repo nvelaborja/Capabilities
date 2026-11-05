@@ -1,54 +1,87 @@
 import type { StylesheetJson } from "cytoscape";
 
-/** Colours the graph needs, read from CSS custom properties so light and dark themes stay in one place (theme.css). */
+import type { DrawnKind } from "../api/types";
+
+export const TYPED_KINDS: readonly DrawnKind[] = ["material", "artifact", "action", "category", "effect"];
+
+/** One node type's colours (see theme.css): strong fill and its label colour, pale tint, and border. */
+export interface TypeColours {
+  fill: string;
+  ink: string;
+  tint: string;
+  line: string;
+}
+
+/** Colours the graph needs, read from CSS custom properties so light and dark themes stay in one place. */
 export interface GraphTokens {
   surface: string;
   text: string;
   muted: string;
-  border: string;
   accent: string;
-  accentStrong: string;
-  accentTint: string;
-  onAccent: string;
-  whatIf: string;
   edge: string;
   edgeLive: string;
   out: string;
+  types: Record<DrawnKind, TypeColours>;
 }
-
-const TOKEN_VARIABLES: Record<keyof GraphTokens, string> = {
-  surface: "--surface",
-  text: "--text",
-  muted: "--text-muted",
-  border: "--border",
-  accent: "--accent",
-  accentStrong: "--accent-strong",
-  accentTint: "--accent-tint",
-  onAccent: "--on-accent",
-  whatIf: "--what-if",
-  edge: "--edge",
-  edgeLive: "--edge-live",
-  out: "--out",
-};
 
 export function readTokens(root: Element = document.documentElement): GraphTokens {
   const computed = getComputedStyle(root);
-  const entries = Object.entries(TOKEN_VARIABLES).map(([key, variable]) => [key, computed.getPropertyValue(variable).trim()]);
-  return Object.fromEntries(entries) as GraphTokens;
+  const read = (variable: string) => computed.getPropertyValue(variable).trim();
+  const typeColours = (kind: DrawnKind): TypeColours => ({
+    fill: read(`--type-${kind}-fill`),
+    ink: read(`--type-${kind}-ink`),
+    tint: read(`--type-${kind}-tint`),
+    line: read(`--type-${kind}-line`),
+  });
+  return {
+    surface: read("--surface"),
+    text: read("--text"),
+    muted: read("--text-muted"),
+    accent: read("--accent"),
+    edge: read("--edge"),
+    edgeLive: read("--edge-live"),
+    out: read("--out"),
+    types: Object.fromEntries(TYPED_KINDS.map((kind) => [kind, typeColours(kind)])) as Record<DrawnKind, TypeColours>,
+  };
 }
+
+/**
+ * How each status looks, independent of type. Every status has its own combination of border width, border style
+ * and opacity, so status never depends on colour alone. "Had it" statuses also get the type's strong fill.
+ */
+export const STATUS_LOOK = {
+  selected: { "border-width": 3, "border-style": "solid", opacity: 1, hadIt: true },
+  hypothetical: { "border-width": 4, "border-style": "double", opacity: 1, hadIt: true },
+  implied: { "border-width": 0, "border-style": "solid", opacity: 1, hadIt: true },
+  reachable: { "border-width": 2, "border-style": "solid", opacity: 1, hadIt: false },
+  maybe: { "border-width": 2, "border-style": "dotted", opacity: 1, hadIt: false },
+  near: { "border-width": 2, "border-style": "dashed", opacity: 1, hadIt: false },
+  out: { "border-width": 1, "border-style": "solid", opacity: 0.45, hadIt: false },
+} as const;
 
 const FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
 
-/**
- * Shape encodes the type of node and fill or border encodes its status, so status never depends on colour alone
- * (design doc, "Status styling"). Later rules override earlier ones.
- */
+/** Every node is a rounded rectangle; its colour says what it is and its border says where it stands. */
 export function buildStylesheet(t: GraphTokens): StylesheetJson {
+  const typeRules: StylesheetJson = TYPED_KINDS.map((kind) => ({
+    selector: `node.${kind}`,
+    style: { "background-color": t.types[kind].tint, "border-color": t.types[kind].line },
+  }));
+  const statusRules: StylesheetJson = Object.entries(STATUS_LOOK).map(([status, look]) => ({
+    selector: `node.status-${status}`,
+    style: { "border-width": look["border-width"], "border-style": look["border-style"], opacity: look.opacity },
+  }));
+  const hadItRules: StylesheetJson = TYPED_KINDS.map((kind) => ({
+    selector: ["selected", "hypothetical", "implied"].map((status) => `node.${kind}.status-${status}`).join(", "),
+    style: { "background-color": t.types[kind].fill, color: t.types[kind].ink },
+  }));
+
   return [
     // ---------------------------------------------------------------- base
     {
       selector: "node",
       style: {
+        shape: "round-rectangle",
         label: "data(label)",
         width: "data(width)",
         height: "data(height)",
@@ -61,18 +94,16 @@ export function buildStylesheet(t: GraphTokens): StylesheetJson {
         "text-max-width": "160px",
         "background-color": t.surface,
         "border-width": 1,
-        "border-color": t.border,
         "border-style": "solid",
         "min-zoomed-font-size": 7,
       },
     },
-    { selector: "node.material", style: { shape: "ellipse" } },
-    { selector: "node.artifact", style: { shape: "round-rectangle" } },
-    { selector: "node.action", style: { shape: "hexagon" } },
-    { selector: "node.category", style: { shape: "diamond", "font-style": "italic" } },
-    { selector: "node.effect", style: { shape: "octagon" } },
+    ...typeRules,
+    // Italic as a second cue for "any of a kind", besides colour.
+    { selector: "node.category", style: { "font-style": "italic" } },
     { selector: "node.ubiquitous", style: { "font-size": 11 } },
     {
+      // Route junctions stay small dots: they are connectors, not things.
       selector: "node.route",
       style: {
         shape: "ellipse",
@@ -84,6 +115,18 @@ export function buildStylesheet(t: GraphTokens): StylesheetJson {
         "text-margin-y": 3,
         // Route names only appear once zoomed in, to keep the overview readable.
         "min-zoomed-font-size": 12,
+      },
+    },
+    {
+      selector: "node.level-label",
+      style: {
+        shape: "round-rectangle",
+        "background-opacity": 0,
+        "border-width": 0,
+        color: t.muted,
+        "font-size": 13,
+        "font-weight": "bold",
+        "min-zoomed-font-size": 6,
       },
     },
     {
@@ -114,20 +157,11 @@ export function buildStylesheet(t: GraphTokens): StylesheetJson {
     { selector: "edge.is_a", style: { width: 0.75, "line-style": "dashed", "target-arrow-shape": "none", opacity: 0.6 } },
     { selector: "edge.live", style: { "line-color": t.edgeLive, "target-arrow-color": t.edgeLive, width: 1.5, opacity: 0.9 } },
 
-    // ---------------------------------------------------------------- statuses (fill or border, never colour alone)
-    {
-      selector: "node.status-selected",
-      style: { "background-color": t.accent, color: t.onAccent, "border-width": 3, "border-color": t.accentStrong },
-    },
-    {
-      selector: "node.status-hypothetical",
-      style: { "background-color": t.whatIf, color: t.onAccent, "border-width": 4, "border-style": "double", "border-color": t.accentStrong },
-    },
-    { selector: "node.status-implied", style: { "background-color": t.accentTint, "border-width": 2, "border-color": t.accent } },
-    { selector: "node.status-reachable", style: { "border-width": 2, "border-color": t.accent } },
-    { selector: "node.status-maybe", style: { "border-width": 2, "border-style": "dotted", "border-color": t.accent } },
-    { selector: "node.status-near", style: { "border-width": 2, "border-style": "dashed", "border-color": t.muted } },
-    { selector: "node.status-out", style: { color: t.muted, "border-color": t.out, opacity: 0.55 } },
+    // ---------------------------------------------------------------- statuses
+    ...statusRules,
+    ...hadItRules,
+    { selector: "node.status-selected, node.status-hypothetical", style: { "border-color": t.text, "font-weight": "bold" } },
+    { selector: "node.status-out", style: { "background-color": t.surface, "border-color": t.out, color: t.muted } },
     { selector: "node.route.route-yes", style: { "background-color": t.accent } },
     { selector: "node.route.route-maybe", style: { "background-color": t.surface, "border-width": 1.5, "border-color": t.accent } },
     { selector: "node.route.route-no", style: { "background-color": t.out } },
