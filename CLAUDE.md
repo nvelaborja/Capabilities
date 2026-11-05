@@ -45,7 +45,7 @@ npm run build                    # web/dist, which `capabilities serve` hosts at
 - `data/`: the graph (quantities, things, verbs, routes, profiles), licensed CC BY 4.0
 - `examples/jobs/`: feasibility-check jobs; `examples/README.md` holds worked results that tests check
 - `src/capabilities/`: `graph.py` (loading), `validate.py`, `tristate.py`, `reasoner.py` (the three questions), `levels.py` (tech levels), `views.py` (display-ready shapes for the web UI), `cli.py`, `server.py` (API under `/api`)
-- `web/src/`: `api/` (typed client), `graph/` (Cytoscape elements, styles, statuses, tech-tree layout, focus), `legend/`, `state/` (explore hook, theme)
+- `web/src/`: `api/` (typed client), `graph/` (Cytoscape elements, styles, statuses, tech-tree layout, focus), `panes/` (side pane, lists, node card, dialog), `legend/`, `state/` (selection history and links, explore hook, theme), `catalog.ts` (labels for any id)
 - `tests/`: pytest suite
 - `docs/`: data format, reasoning rules, and ADRs
 
