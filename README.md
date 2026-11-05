@@ -25,13 +25,33 @@ uv run capabilities check granite-slab-saw-cut --profile middle-kingdom-egypt   
 
 Every command takes `--json` for machine-readable output. `explore` and `check` take `--profile`, `--select`, `--deselect`, and `--hypothetical`. Items are thing ids (`copper-saw`) or actions (`cut:granite`).
 
+### Web app
+
+The web app needs [Node.js](https://nodejs.org/) 22 or later to build, once:
+
+```bash
+cd web && npm ci && npm run build && cd ..
+uv run capabilities serve                 # then open http://127.0.0.1:8000
+```
+
+Try http://127.0.0.1:8000/?preset=middle-kingdom-egypt to see a preset's selections, what they imply, and what was within reach. Click a node to highlight what makes it and what it leads to. The preset picker and selection lists are coming next.
+
+To work on the web app with live reload, run the API and the Vite dev server side by side:
+
+```bash
+uv run capabilities serve                 # API on :8000
+cd web && npm run dev                     # app on http://localhost:5173, forwarding /api to :8000
+```
+
+`npm test`, `npm run lint` and `npm run typecheck` check the web code. See [web/](web/) and [ADR 0015](docs/adr/0015-build-the-web-front-end-with-react-and-cytoscape.md).
+
 ### Local server
 
 ```bash
 uv run capabilities serve                 # http://127.0.0.1:8000
 ```
 
-Open http://127.0.0.1:8000/docs for interactive API docs where you can try every endpoint in the browser. Every endpoint is under `/api`.
+The server hosts the web app at `/` (if built), the API under `/api`, and interactive API docs at http://127.0.0.1:8000/docs, where you can try every endpoint in the browser.
 
 | Endpoint | What it does |
 |---|---|
@@ -56,6 +76,7 @@ schema/            JSON Schemas for every data file type
 data/              the graph: quantities, things, verbs, routes, profiles
 examples/          example jobs and worked results
 src/capabilities/  reasoner, CLI, and API server
+web/               the web app (React, TypeScript, Cytoscape.js)
 tests/             pytest suite
 docs/              data format, reasoning rules, and design decisions (docs/adr/)
 ```
