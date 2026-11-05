@@ -55,11 +55,12 @@ data/              the graph: quantities, things, verbs, routes, profiles
 examples/          example jobs and worked results
 src/capabilities/  reasoner, CLI, and API server
 tests/             pytest suite
-docs/              data format and reasoning rules
+docs/              data format, reasoning rules, and design decisions (docs/adr/)
 ```
 
 - Data format and reasoning rules: [docs/data-format.md](docs/data-format.md)
 - Worked examples of the three questions: [examples/README.md](examples/README.md)
+- Design decisions and why we made them: [docs/adr/](docs/adr/README.md)
 
 ## Contributing data
 
