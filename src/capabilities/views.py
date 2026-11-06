@@ -262,7 +262,8 @@ def explore_view(graph: Graph, result: ExploreResult) -> dict:
     context = StatusContext.from_explore(graph, result)
     chosen = result.selected | result.hypothetical
     actions = referenced_actions(graph) | set(chosen.actions) | set(result.implied.actions)
-    keys = [tid for tid, t in graph.things.items() if t["kind"] in DRAWN_KINDS] + [action_key(a) for a in actions]
+    # Every possible action gets a status, since search can add any of them to the graph.
+    keys = [tid for tid, t in graph.things.items() if t["kind"] in DRAWN_KINDS] + [action_key(a) for a in actions | set(all_actions(graph))]
     return {
         **result.to_dict(graph),
         "status": {key: context.status(key) for key in sorted(keys)},

@@ -96,6 +96,10 @@ class TestStatuses:
         assert set(view["route_status"]) == set(graph.routes)
         assert view["route_status"]["bloomery-smelting"] == "no"
 
+    def test_actions_search_can_add_have_a_status_too(self, graph):
+        view = explore_view(graph, explore(graph, egypt(graph)))
+        assert view["status"]["cut:limestone"] in {"reachable", "maybe", "selected", "implied"}
+
 
 class TestExploreViewExtras:
     def test_implied_effects_are_readable(self, graph):
