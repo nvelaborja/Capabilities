@@ -103,7 +103,7 @@ export function Legend() {
         <p className="legend-note">
           Columns are tech levels: primitive things on the left, advanced ones on the right. Lines run from what a thing
           needs to the thing. Dashed lines are tools; dotted lines are actions. When there are several ways to make
-          something, click it to see each one.
+          something, click it to see each one. A dashed “8 other …” node stands for a busy node's remaining links; click it to show them.
         </p>
       </div>
     </details>

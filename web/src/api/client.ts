@@ -1,4 +1,4 @@
-import type { ExploreResponse, GraphResponse, Profile, ProfileDetail, SelectionRequest } from "./types";
+import type { ExplainRequest, ExplainResponse, ExploreResponse, GraphResponse, Profile, ProfileDetail, SelectionRequest } from "./types";
 
 export class ApiError extends Error {
   readonly status: number;
@@ -43,5 +43,9 @@ export const api = {
 
   explore(selection: SelectionRequest, signal?: AbortSignal): Promise<ExploreResponse> {
     return postJson<ExploreResponse>("/api/explore", selection, signal);
+  },
+
+  explain(request: ExplainRequest, signal?: AbortSignal): Promise<ExplainResponse> {
+    return postJson<ExplainResponse>("/api/explain", request, signal);
   },
 };

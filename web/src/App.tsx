@@ -1,44 +1,61 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
 
 import { api } from "./api/client";
 import type { GraphResponse, Profile } from "./api/types";
 import { createCatalog } from "./catalog";
+import { DetailPane } from "./detail/DetailPane";
 import { type GraphFocus, GraphView } from "./graph/GraphView";
 import { Legend } from "./legend/Legend";
 import { ConfirmDialog } from "./panes/ConfirmDialog";
-import { NodeCard } from "./panes/NodeCard";
 import { SidePane } from "./panes/SidePane";
+import { searchIndex, type SearchEntry } from "./search/match";
+import { SearchBox } from "./search/SearchBox";
 import { isEdited, toRequest } from "./state/selection";
 import { ThemeSwitch } from "./state/ThemeSwitch";
 import { useTheme } from "./state/theme";
+import { current, trailReducer } from "./state/trail";
+import { decodeSelection } from "./state/url";
 import { useExplore } from "./state/useExplore";
 import { usePresetItems } from "./state/usePresetItems";
 import { useSelectionHistory } from "./state/useSelectionHistory";
 
 type Loaded<T> = { status: "loading" } | { status: "ready"; value: T } | { status: "failed"; error: string };
 
-const NO_FOCUS: GraphFocus = { id: null, center: false, seq: 0 };
+/** Actions in the link that the graph doesn't draw by default ("cut:limestone") are drawn from the start. */
+function linkedActions(): string[] {
+  return decodeSelection(window.location.search).added.filter((item) => item.includes(":"));
+}
 
 export function App() {
   const [graph, setGraph] = useState<Loaded<GraphResponse>>({ status: "loading" });
+  const [graphActions, setGraphActions] = useState<string[]>(linkedActions);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const { selection, canUndo, canRedo, dispatch } = useSelectionHistory();
   const presetItems = usePresetItems(selection.preset);
   const request = useMemo(() => toRequest(selection), [selection]);
   const explore = useExplore(request);
   const { preference, choose, theme } = useTheme();
-  const [focus, setFocus] = useState<GraphFocus>(NO_FOCUS);
+  const [trail, navigate] = useReducer(trailReducer, []);
+  const [centerSeq, setCenterSeq] = useState({ center: false, seq: 0 });
+  const [isolated, setIsolated] = useState<string | null>(null);
   // undefined: no confirmation pending. null or an id: the preset waiting to replace an edited selection.
   const [pendingPreset, setPendingPreset] = useState<string | null | undefined>(undefined);
 
+  const actionsKey = graphActions.join(",");
   useEffect(() => {
     const controller = new AbortController();
+    // The graph already on screen stays up while a larger one (with a new action) loads.
     api
-      .graph([], controller.signal)
+      .graph(actionsKey ? actionsKey.split(",") : [], controller.signal)
       .then((value) => setGraph({ status: "ready", value }))
       .catch((error: unknown) => {
-        if (!controller.signal.aborted) setGraph({ status: "failed", error: String(error) });
+        if (!controller.signal.aborted) setGraph((previous) => (previous.status === "ready" ? previous : { status: "failed", error: String(error) }));
       });
+    return () => controller.abort();
+  }, [actionsKey]);
+
+  useEffect(() => {
+    const controller = new AbortController();
     api
       .profiles(controller.signal)
       .then(setProfiles)
@@ -46,12 +63,42 @@ export function App() {
     return () => controller.abort();
   }, []);
 
-  const catalog = useMemo(() => (graph.status === "ready" ? createCatalog(graph.value) : null), [graph]);
+  const loaded = graph.status === "ready" ? graph.value : null;
+  const catalog = useMemo(() => (loaded ? createCatalog(loaded) : null), [loaded]);
+  const entries = useMemo(() => (loaded ? searchIndex(loaded) : []), [loaded]);
+  const shown = current(trail);
+  const focus: GraphFocus = useMemo(() => ({ id: shown, ...centerSeq }), [shown, centerSeq]);
 
-  const showNode = useCallback((id: string | null, center: boolean) => {
-    setFocus((previous) => ({ id, center, seq: previous.seq + 1 }));
+  /** Open a node's details from the graph, a list or search; `center` also brings it into view. */
+  const open = useCallback((id: string | null, center: boolean) => {
+    navigate(id ? { type: "open", id } : { type: "close" });
+    setCenterSeq((previous) => ({ center, seq: previous.seq + 1 }));
   }, []);
-  const onSelectNode = useCallback((id: string | null) => showNode(id, false), [showNode]);
+  const onSelectNode = useCallback((id: string | null) => open(id, false), [open]);
+  const drill = (id: string) => {
+    navigate({ type: "drill", id });
+    setCenterSeq((previous) => ({ center: true, seq: previous.seq + 1 }));
+  };
+  const back = (index: number) => {
+    navigate({ type: "back", index });
+    setCenterSeq((previous) => ({ center: true, seq: previous.seq + 1 }));
+  };
+  const chooseResult = (entry: SearchEntry) => {
+    if (!entry.drawn) setGraphActions((actions) => [...new Set([...actions, entry.id])].sort());
+    open(entry.id, true);
+  };
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      // A dialog handles its own Escape; otherwise Escape closes the details.
+      if (event.key !== "Escape" || document.querySelector("dialog[open]")) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.tagName === "INPUT") return;
+      navigate({ type: "close" });
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   const choosePreset = (preset: string | null) => {
     if (preset === selection.preset) return;
@@ -65,10 +112,11 @@ export function App() {
   const editedCount = selection.added.length + selection.removed.length;
 
   return (
-    <div className="app">
+    <div className={`app${shown ? " has-detail" : ""}`}>
       <header className="app-header">
         <h1>Capabilities</h1>
         <span className="app-tagline">What it takes to make things, and what else was within reach.</span>
+        <SearchBox entries={entries} onChoose={chooseResult} />
         <span className="app-context" aria-live="polite">
           {explore.error && <span className="error">Couldn't update results.</span>}
         </span>
@@ -82,9 +130,32 @@ export function App() {
         </div>
         <ThemeSwitch preference={preference} onChoose={choose} />
       </header>
+      {shown && catalog && (
+        <DetailPane
+          trail={trail}
+          catalog={catalog}
+          explore={explore.data}
+          selection={request}
+          isolated={isolated}
+          onDrill={drill}
+          onBack={back}
+          onClose={() => open(null, false)}
+          onAdd={add}
+          onRemove={remove}
+          onIsolate={setIsolated}
+        />
+      )}
       <main className="app-graph">
-        {graph.status === "ready" && (
-          <GraphView graph={graph.value} explore={explore.data} theme={theme} focus={focus} onSelectNode={onSelectNode} />
+        {loaded && (
+          <GraphView
+            graph={loaded}
+            explore={explore.data}
+            theme={theme}
+            focus={focus}
+            isolated={isolated}
+            onSelectNode={onSelectNode}
+            onShowWholeGraph={() => setIsolated(null)}
+          />
         )}
         {graph.status === "loading" && <p className="notice">Loading the graph…</p>}
         {graph.status === "failed" && (
@@ -94,16 +165,6 @@ export function App() {
               Start it with <code>uv run capabilities serve</code>, then reload this page.
             </span>
           </div>
-        )}
-        {focus.id && catalog && (
-          <NodeCard
-            id={focus.id}
-            catalog={catalog}
-            explore={explore.data}
-            onAdd={add}
-            onRemove={remove}
-            onClose={() => showNode(null, false)}
-          />
         )}
         <Legend />
       </main>
@@ -117,7 +178,7 @@ export function App() {
           onChoosePreset={choosePreset}
           onClear={() => dispatch({ type: "clear" })}
           onRemove={remove}
-          onPick={(id) => showNode(id, true)}
+          onPick={(id) => open(id, true)}
         />
       )}
       <ConfirmDialog

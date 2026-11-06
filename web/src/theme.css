@@ -26,6 +26,9 @@
   --edge-live: #3d7a98;
   --out: #bcc2c9;
   --danger: #a3342b;
+  /* Requirement marks in the detail pane; the ✓ ✗ ? glyphs carry the meaning, colour only reinforces it. */
+  --met: #2d7a4b;
+  --missing: #b0352b;
   --shadow: 0 1px 2px rgb(0 0 0 / 0.06), 0 2px 8px rgb(0 0 0 / 0.06);
   --radius: 8px;
   --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -71,6 +74,8 @@
     --edge-live: #79b8d6;
     --out: #4a525c;
     --danger: #ef8a80;
+    --met: #6fcf97;
+    --missing: #f08a80;
     --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 2px 8px rgb(0 0 0 / 0.3);
 
     --node-bg: #262b33;
@@ -114,6 +119,8 @@
   --edge-live: #79b8d6;
   --out: #4a525c;
   --danger: #ef8a80;
+  --met: #6fcf97;
+  --missing: #f08a80;
   --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 2px 8px rgb(0 0 0 / 0.3);
 
   --node-bg: #262b33;
@@ -171,10 +178,18 @@ button {
   display: grid;
   height: 100dvh;
   grid-template-rows: auto minmax(0, 1fr);
-  grid-template-columns: minmax(0, 1fr) clamp(18rem, 26vw, 24rem);
+  /* The detail column sizes to the detail pane, and takes no space while it is closed. */
+  grid-template-columns: auto minmax(0, 1fr) clamp(18rem, 26vw, 24rem);
   grid-template-areas:
-    "header header"
-    "graph side";
+    "header header header"
+    "detail graph side";
+}
+
+/* The tagline gives way to search on narrower screens. */
+@media (max-width: 75rem) {
+  .app-tagline {
+    display: none;
+  }
 }
 
 .app-header {

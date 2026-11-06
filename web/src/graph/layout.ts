@@ -1,5 +1,6 @@
 import type { Core, NodeCollection } from "cytoscape";
 
+import { OUTSIDE } from "./focus";
 import { TYPED_KINDS } from "./styles";
 
 /** Below this zoom, node labels are too small to read, so the first view zooms in to it instead of fitting all. */
@@ -21,13 +22,14 @@ export interface ColumnItem {
 
 /**
  * Lay the graph out as a technology tree (ADR 0018, 0023): one column per tech level, primitives on the left.
- * Within a column, nodes are sorted by type, then alphabetically, like the lists in the side pane.
+ * Within a column, nodes are sorted by type, then alphabetically, like the lists in the side pane; summary nodes go
+ * last. Only nodes that are showing are placed, so focus mode closes up the gaps.
  */
 export function runLayout(cy: Core): void {
   cy.remove(".level-label");
   const ranks = resolveRanks(cy);
   const columns = new Map<number, ColumnItem[]>();
-  cy.nodes().forEach((node) => {
+  cy.nodes().not(`.${OUTSIDE}`).forEach((node) => {
     const rank = ranks.get(node.id()) ?? 0;
     const item = { id: node.id(), label: node.data("label") as string, kind: node.data("kind") as string, height: node.data("height") as number };
     columns.set(rank, [...(columns.get(rank) ?? []), item]);
@@ -107,7 +109,7 @@ function addLevelLabels(cy: Core, ranks: number[]): void {
   const levels = [...ranks].sort((a, b) => a - b);
   cy.add(
     levels.map((rank) => {
-      const column = cy.nodes().filter((node) => node.position("x") === rank * COLUMN_GAP);
+      const column = cy.nodes().filter((node) => !node.hasClass(OUTSIDE) && node.position("x") === rank * COLUMN_GAP);
       return {
         group: "nodes" as const,
         data: { id: `level-label-${rank}`, label: `Level ${rank}`, width: 80, height: 24 },

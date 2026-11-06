@@ -103,7 +103,10 @@ export function toElements(graph: GraphResponse): ElementDefinition[] {
     .filter((node) => node.kind !== "route")
     .map((node) => ({
       group: "nodes",
-      data: { id: node.id, label: node.label, kind: node.kind, level: node.level ?? null, rank: layoutRank(node), ...nodeSize(node) },
+      data: {
+        id: node.id, label: node.label, kind: node.kind, level: node.level ?? null, prerequisites: node.prerequisites ?? 0,
+        rank: layoutRank(node), ...nodeSize(node),
+      },
       classes: nodeClasses(node),
     }));
   const edges: ElementDefinition[] = drawnEdges(graph).map((edge) => ({

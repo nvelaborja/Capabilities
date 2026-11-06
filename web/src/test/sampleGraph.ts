@@ -30,4 +30,8 @@ export const sampleGraph: GraphResponse = {
   ],
   verbs: [{ id: "cut", label: "Cut" }],
   techniques: [],
+  actions: [
+    { id: "cut:flint", label: "Cut flint" },
+    { id: "cut:wood", label: "Cut wood" },
+  ],
 };

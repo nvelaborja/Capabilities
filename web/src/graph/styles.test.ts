@@ -76,6 +76,12 @@ describe("graph stylesheet", () => {
     expect(sheet.findIndex((b) => b.selector === "edge.highlighted")).toBeGreaterThan(live);
   });
 
+  it("draws summary nodes without a type strip, and hides folded edges and anything outside focus mode", () => {
+    expect(styleOf("node.summary")).not.toHaveProperty("background-image");
+    expect(styleOf("node.summary")?.["text-margin-x"]).toBe(0);
+    expect(styleOf(".folded, .outside")?.display).toBe("none");
+  });
+
   it("puts status rules after type rules so they win", () => {
     const type = sheet.findIndex((b) => b.selector === "node.material");
     const status = sheet.findIndex((b) => b.selector === "node.status-out");
