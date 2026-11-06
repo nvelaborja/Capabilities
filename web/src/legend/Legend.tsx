@@ -26,18 +26,30 @@ export const STATUS_LABELS: Record<Status, string> = {
 /** A tiny node: the type's strip and emoji on the left, the status border around the whole thing. */
 function MiniNode({ kind, status }: { kind: DrawnKind; status?: Status }) {
   const look = status ? STATUS_LOOK[status] : STATUS_LOOK.reachable;
-  const style: CSSProperties = {
-    borderWidth: look["border-width"],
-    borderStyle: look["border-style"],
-    borderColor: status === "out" ? "var(--out)" : `var(--type-${kind}-line)`,
-    opacity: look.opacity,
-  };
+  const colour = status === "out" ? "var(--out)" : `var(--type-${kind}-line)`;
+  const dashes = look["border-dash-pattern"];
+  const style: CSSProperties = dashes
+    ? { opacity: look.opacity }
+    : { borderWidth: look["border-width"], borderStyle: look["border-style"], borderColor: colour, opacity: look.opacity };
   return (
     <span className="mini-node" style={style} aria-hidden="true">
       <span className="mini-node-strip" style={{ background: `var(--type-${kind}-fill)` }}>
         {TYPE_ICONS[kind]}
       </span>
+      {dashes && <DashedOutline width={look["border-width"]} dashes={dashes} colour={colour} />}
     </span>
+  );
+}
+
+/**
+ * CSS can't space out dashes, so a sparse dashed border is drawn in SVG to match the graph. The stroke is doubled
+ * because the node clips its outer half.
+ */
+function DashedOutline({ width, dashes, colour }: { width: number; dashes: readonly [number, number]; colour: string }) {
+  return (
+    <svg className="mini-node-outline">
+      <rect width="100%" height="100%" rx="5" fill="none" stroke={colour} strokeWidth={width * 2} strokeDasharray={dashes.join(" ")} />
+    </svg>
   );
 }
 

@@ -1,6 +1,6 @@
 import type { StylesheetJson } from "cytoscape";
 
-import type { DrawnKind } from "../api/types";
+import type { DrawnKind, Status } from "../api/types";
 import { STRIP_WIDTH } from "./elements";
 
 export const TYPED_KINDS: readonly DrawnKind[] = ["material", "artifact", "action", "category", "effect"];
@@ -61,19 +61,28 @@ export function readTokens(root: Element = document.documentElement): GraphToken
   };
 }
 
+export interface StatusLook {
+  "border-width": number;
+  "border-style": "solid" | "double" | "dotted" | "dashed";
+  /** Dash and gap lengths, for a dashed border that needs more spacing than the default. */
+  "border-dash-pattern"?: readonly [number, number];
+  opacity: number;
+}
+
 /**
  * How each status looks. The border runs around the whole node in the type's colour; its width and style (and the
  * node's opacity) give every status its own look, so status never depends on colour alone. Selected labels are bold.
+ * "One step away" is deliberately quiet (thin, sparse dashes, slightly faded): it sits between reachable and out.
  */
-export const STATUS_LOOK = {
+export const STATUS_LOOK: Record<Status, StatusLook> = {
   selected: { "border-width": 3, "border-style": "solid", opacity: 1 },
   hypothetical: { "border-width": 4, "border-style": "double", opacity: 1 },
   implied: { "border-width": 2, "border-style": "solid", opacity: 1 },
   reachable: { "border-width": 1, "border-style": "solid", opacity: 1 },
   maybe: { "border-width": 2, "border-style": "dotted", opacity: 1 },
-  near: { "border-width": 2, "border-style": "dashed", opacity: 1 },
+  near: { "border-width": 1, "border-style": "dashed", "border-dash-pattern": [4, 6], opacity: 0.75 },
   out: { "border-width": 1, "border-style": "solid", opacity: 0.45 },
-} as const;
+};
 
 const svgUri = (svg: string) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 
@@ -120,7 +129,12 @@ export function buildStylesheet(t: GraphTokens): StylesheetJson {
   }));
   const statusRules: StylesheetJson = Object.entries(STATUS_LOOK).map(([status, look]) => ({
     selector: `node.status-${status}`,
-    style: { "border-width": look["border-width"], "border-style": look["border-style"], opacity: look.opacity },
+    style: {
+      "border-width": look["border-width"],
+      "border-style": look["border-style"],
+      ...(look["border-dash-pattern"] && { "border-dash-pattern": [...look["border-dash-pattern"]] }),
+      opacity: look.opacity,
+    },
   }));
 
   return [

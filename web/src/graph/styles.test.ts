@@ -49,6 +49,17 @@ describe("graph stylesheet", () => {
     expect(new Set(looks).size).toBe(STATUSES.length);
   });
 
+  it("draws one step away as a quiet border: thinner than maybe, sparsely dashed, and a little faded", () => {
+    // given: near sits between reachable (solid, full) and out (faded); it must not compete with maybe or implied
+    const near = styleOf("node.status-near");
+    const [dash, gap] = near?.["border-dash-pattern"] as number[];
+    // then: thin, more gap than dash, and faded but less than out
+    expect(near?.["border-width"]).toBeLessThan(STATUS_LOOK.maybe["border-width"]);
+    expect(gap).toBeGreaterThan(dash ?? Infinity);
+    expect(near?.opacity).toBeLessThan(STATUS_LOOK.reachable.opacity);
+    expect(near?.opacity).toBeGreaterThan(STATUS_LOOK.out.opacity);
+  });
+
   it("never changes a node's background for its status, only its border and opacity", () => {
     for (const status of Object.keys(STATUS_LOOK)) {
       expect(styleOf(`node.status-${status}`)).not.toHaveProperty("background-color");
