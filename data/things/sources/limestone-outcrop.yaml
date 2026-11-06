@@ -1,0 +1,6 @@
+id: limestone-outcrop
+kind: source
+label: Limestone outcrop
+availability: regional
+regions: ["Giza and Tura (Egypt)", "Widespread"]
+description: Limestone bedrock at or near the surface, quarried in blocks.

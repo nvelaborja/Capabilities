@@ -1,0 +1,14 @@
+id: stream-tin
+kind: route
+label: Streaming tin from gravel
+achieves: { thing: cassiterite }
+requires:
+  - { role: consumed, thing: tin-gravel }
+  - { role: consumed, thing: water, notes: Running water washes the lighter gravel away from the heavy ore. }
+outputs:
+  - { thing: cassiterite }
+notes: Lode mining of tin underground came much later and isn't recorded.
+references:
+  - citation: "Penhallurick, R. D. (1986). Tin in Antiquity: Its Mining and Trade Throughout the Ancient World with Particular Reference to Cornwall. Institute of Metals."
+    supports: "Cassiterite was won from alluvial deposits by streaming in Cornwall from prehistory onwards."
+    status: unverified

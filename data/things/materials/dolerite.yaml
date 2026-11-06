@@ -1,9 +1,7 @@
 id: dolerite
 kind: material
 label: Dolerite
-origin: natural
-availability: regional
-regions: ["Widespread as dikes and sills; dolerite pounders are found at the Aswan granite quarries"]
+origin: extracted
 is_a: [stone]
 description: A dark, very tough igneous rock. About as hard as granite, but tougher, so it survives being used to pound granite.
 quantities:

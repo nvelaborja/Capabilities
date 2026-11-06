@@ -1,9 +1,7 @@
 id: flint
 kind: material
 label: Flint
-origin: natural
-availability: regional
-regions: ["Chalk and limestone deposits (Egypt, Britain, northern France)"]
+origin: extracted
 is_a: [stone]
 description: Microcrystalline quartz that breaks with sharp, predictable edges. The main material for stone blades.
 quantities:

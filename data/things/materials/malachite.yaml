@@ -1,9 +1,7 @@
 id: malachite
 kind: material
 label: Malachite
-origin: natural
-availability: regional
-regions: ["Sinai", "Eastern Desert of Egypt", "Timna (southern Levant)"]
+origin: extracted
 is_a: [copper-ore]
 description: A green copper carbonate mineral, one of the earliest copper ores smelted.
 quantities:

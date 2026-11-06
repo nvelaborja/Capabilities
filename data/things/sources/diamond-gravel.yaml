@@ -1,0 +1,6 @@
+id: diamond-gravel
+kind: source
+label: Diamond-bearing gravel
+availability: regional
+regions: ["India (the main ancient source)", "Southern Africa", "Brazil"]
+description: Gravels and conglomerates holding diamonds weathered out of their parent rock.

@@ -1,9 +1,7 @@
 id: limonite
 kind: material
 label: Limonite (bog iron ore)
-origin: natural
-availability: regional
-regions: ["Wetlands of northern Europe", "Widespread in bogs and lake beds"]
+origin: extracted
 is_a: [iron-ore]
 description: Hydrated iron oxide that forms in bogs and wetlands. Easy to dig and smelt, so it was a major source of iron in northern Europe.
 quantities:

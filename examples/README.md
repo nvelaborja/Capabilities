@@ -28,11 +28,11 @@ No ancient route needs 1370 °C. Bloomery iron is never melted, and historical c
 uv run capabilities explore --profile middle-kingdom-egypt
 ```
 
-- **Selected:** copper, tin bronze, blowpipes, copper saws, tube drills and chisels, bow drills, sledges, dolerite pounders; access to malachite, the Aswan granite outcrop, limestone, flint, and dolerite; and the actions cut, drill, and shape granite.
+- **Selected:** copper, tin bronze, blowpipes, copper saws, tube drills and chisels, bow drills, sledges, dolerite pounders; access to malachite and flint deposits and to granite (Aswan), limestone (Giza and Tura) and dolerite outcrops; and the actions cut, drill, and shape granite.
 - **Implied:** crucibles, casting molds, rope, timber (felled from standing trees), heat ≥ 1085 °C, and the actions cut timber, reeds, and plant fiber.
-- **Reachable:** granite (quarried from the outcrop by pounding), charcoal, clay and bloomery furnaces, bellows, fire drills, fire pistons, flint blades, stone choppers, wooden rollers.
+- **Reachable:** the materials taken from those sources: granite (quarried by pounding), limestone (quarried with chisels), malachite (mined with stone hammers), and flint; then charcoal, clay and bloomery furnaces, bellows, fire drills, fire pistons, flint blades, stone choppers, wooden rollers.
 - **Actions:** cut and drill everything up to granite's hardness via sand abrasive; move any load; shape granite by pounding (limestone is a *maybe*, because dolerite's toughness hasn't been sourced yet).
-- **One step away:** iron is **one ingredient away**: a hematite deposit (mined with stone hammers) or limonite unlocks bloom iron, and with it steel, hardened steel, steel chisels and steel spears. Tin is one away (cassiterite).
+- **One step away:** iron is **one ingredient away**: a hematite deposit (mined with stone hammers) or a bog iron deposit (dug for limonite) unlocks bloom iron, and with it steel, hardened steel, steel chisels and steel spears. Tin is one away: tin-bearing gravel, streamed for cassiterite.
 - **Warning:** implies access to some tin ore (cassiterite); all known sources are regional, so it may have been traded.
 
 **What-if:** `--hypothetical hematite` (iron ore) unlocks bloom iron, steel, hardened steel, steel chisels, and steel spears. No smelting know-how is needed, because the tool asks what was within reach of the ingredients.

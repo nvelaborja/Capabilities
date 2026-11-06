@@ -54,12 +54,12 @@ class TestGraphView:
         assert nodes["cut-abrasive-saw"]["level"] is None
 
     def test_extra_actions_are_drawn_and_connected_to_their_verb_routes(self, graph, levels):
-        # given: nothing in the data references cut:limestone
+        # given: nothing in the data references cut:malachite
         before = graph_view(graph, levels)
-        after = graph_view(graph, levels, [("cut", "limestone")])
+        after = graph_view(graph, levels, [("cut", "malachite")])
         # then: it appears only on request, with the routes that can perform it (chopping is for plant material only)
-        assert "cut:limestone" not in {n["id"] for n in before["nodes"]}
-        performers = {e["source"] for e in after["edges"] if e["target"] == "cut:limestone"}
+        assert "cut:malachite" not in {n["id"] for n in before["nodes"]}
+        performers = {e["source"] for e in after["edges"] if e["target"] == "cut:malachite"}
         assert {"cut-abrasive-saw", "cut-by-chiseling"} <= performers
         assert "cut-by-chopping" not in performers
 
@@ -138,8 +138,8 @@ class TestExploreViewExtras:
 
     def test_near_misses_are_grouped_by_thing_and_name_what_is_missing(self, graph):
         near = {item["id"]: item for item in explore_view(graph, explore(graph, egypt(graph)))["near"]}
-        assert {r["missing"]["label"] for r in near["bloom-iron"]["routes"]} == {"Hematite deposit", "Limonite (bog iron ore)"}
-        assert near["bloom-iron"]["routes"][0]["missing"] == {"id": "hematite-deposit", "label": "Hematite deposit", "kind": "source"}
+        assert {r["missing"]["label"] for r in near["bloom-iron"]["routes"]} == {"Hematite deposit", "Bog iron deposit"}
+        assert near["bloom-iron"]["routes"][0]["missing"] == {"id": "bog-iron-deposit", "label": "Bog iron deposit", "kind": "source"}
         assert {r["id"] for r in near["steel"]["routes"]} == {"steel-by-carburizing", "steel-by-crucible"}
 
     def test_warnings_use_names_not_ids(self, graph):
@@ -222,7 +222,7 @@ class TestExplain:
 
     def test_drill_down_works_on_categories(self, graph, levels):
         view = explain(graph, levels, context_for(graph, egypt(graph)), "iron-ore")
-        assert [(m["id"], m["status"]) for m in view["members"]] == [("hematite", "near"), ("limonite", "out")]
+        assert [(m["id"], m["status"]) for m in view["members"]] == [("hematite", "near"), ("limonite", "near")]
 
     def test_expand_all_lists_every_certain_need_by_level(self, graph, levels):
         view = explain(graph, levels, context_for(graph, egypt(graph)), "steel", everything=True)

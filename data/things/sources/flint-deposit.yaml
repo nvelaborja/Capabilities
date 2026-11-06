@@ -1,0 +1,6 @@
+id: flint-deposit
+kind: source
+label: Flint deposit
+availability: regional
+regions: ["Chalk and limestone deposits (Egypt, Britain, northern France)"]
+description: Chalk or limestone beds holding flint nodules, and gravels where weathered nodules collect.

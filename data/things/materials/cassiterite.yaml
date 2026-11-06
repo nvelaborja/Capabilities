@@ -1,14 +1,11 @@
 id: cassiterite
 kind: material
 label: Cassiterite
-origin: natural
-availability: regional
-regions: ["Cornwall (Britain)", "Iberia", "Erzgebirge (central Europe)", "Central Asia"]
+origin: extracted
 is_a: [tin-ore]
 description: Tin oxide, the main ore of tin. Tin sources were scarce in the ancient Near East and Mediterranean, so tin was widely traded.
 quantities:
   hardness_mohs: [6, 7]
-notes: The regions listed are examples of known deposits, not a complete list. Which deposits were exploited in antiquity is debated (TODO-source).
 references:
   - citation: "Klein, C. & Dutrow, B. (2007). Manual of Mineral Science, 23rd ed. Wiley."
     supports: Mohs hardness value.
