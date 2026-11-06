@@ -1,0 +1,292 @@
+/* ---------------------------------------------------------------- side pane */
+
+.side-pane {
+  grid-area: side;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) minmax(0, 1fr);
+  min-height: 0;
+  border-left: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.preset-picker {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.preset-picker label {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.preset-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.preset-row select {
+  flex: 1;
+  min-width: 0;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  color: var(--text);
+  font: inherit;
+}
+
+.preset-details {
+  margin: 0.35rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.edited-badge,
+.badge {
+  flex: none;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  line-height: 1.3rem;
+}
+
+.edited-badge {
+  border: 1px dashed var(--text-muted);
+  color: var(--text-muted);
+}
+
+.warnings {
+  margin: 0;
+  padding: 0.5rem 1rem 0.5rem 2rem;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--type-effect-tint) 60%, var(--surface));
+  font-size: 0.8rem;
+}
+
+.capability-list {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+}
+
+.capability-list + .capability-list {
+  border-top: 1px solid var(--border);
+}
+
+.capability-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 0.6rem 1rem 0.3rem;
+}
+
+.capability-header h2 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.count {
+  color: var(--text-muted);
+  font-weight: 400;
+  font-size: 0.8em;
+}
+
+.capability-scroll {
+  overflow-y: auto;
+  padding: 0 0.5rem 0.75rem;
+}
+
+.empty {
+  margin: 0.25rem 0.5rem;
+  color: var(--text-muted);
+}
+
+.group summary {
+  padding: 0.3rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.group ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.4rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 6px;
+}
+
+.row:hover {
+  background: var(--bg);
+}
+
+.row-label {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.row-label:hover {
+  text-decoration: underline;
+}
+
+.row-note {
+  flex-basis: 100%;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.badge-implied {
+  border: 1px solid var(--accent);
+  color: var(--accent);
+}
+
+.badge-maybe {
+  border: 1px dotted var(--text-muted);
+  color: var(--text-muted);
+}
+
+.row-remove,
+.icon-button {
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--text-muted);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.row-remove:hover,
+.icon-button:hover {
+  background: var(--border);
+  color: var(--text);
+}
+
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.link-button:hover {
+  text-decoration: underline;
+}
+
+button:focus-visible,
+select:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* ---------------------------------------------------------------- node card */
+
+.node-card {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  width: min(20rem, calc(100% - 1.5rem));
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow);
+}
+
+.node-card header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.node-card h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.node-card-meta {
+  margin: 0.1rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.node-card p {
+  margin: 0.5rem 0 0;
+}
+
+.node-card-actions {
+  margin-top: 0.75rem;
+}
+
+/* ---------------------------------------------------------------- buttons and dialog */
+
+.node-card-actions button,
+.confirm-actions button {
+  padding: 0.35rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.node-card-actions button.primary,
+.confirm-actions button.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.confirm-dialog {
+  max-width: 26rem;
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+
+.confirm-dialog::backdrop {
+  background: rgb(0 0 0 / 0.35);
+}
+
+.confirm-dialog h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}

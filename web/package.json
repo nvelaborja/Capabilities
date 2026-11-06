@@ -19,7 +19,6 @@
   },
   "dependencies": {
     "cytoscape": "^3.34.4",
-    "cytoscape-dagre": "^4.0.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },

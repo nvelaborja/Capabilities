@@ -20,10 +20,12 @@ Each file records one significant design decision: the context, what we decided,
 | [0012](0012-use-regionality-only-for-warnings.md) | Record regionality; use it only for warnings | Accepted |
 | [0013](0013-use-python-for-the-reasoner-cli-and-server.md) | Use Python for the reasoner, CLI and local API server | Accepted |
 | [0014](0014-license-code-gpl-and-data-cc-by.md) | License the code under GPL-3.0-or-later and the data under CC BY 4.0 | Accepted |
-| [0015](0015-build-the-web-front-end-with-react-and-cytoscape.md) | Build the web front end with React, TypeScript, Vite and Cytoscape.js | Accepted |
+| [0015](0015-build-the-web-front-end-with-react-and-cytoscape.md) | Build the web front end with React, TypeScript, Vite and Cytoscape.js | Accepted; drawing and layout superseded by 0023 |
 | [0016](0016-recompute-on-every-change.md) | Recompute results on every selection change | Accepted |
 | [0017](0017-ui-selection-model.md) | UI selection model: implicit selection, history and shareable state | Accepted |
 | [0018](0018-rank-dependencies-by-tech-level.md) | Rank items by tech level | Accepted |
 | [0019](0019-desktop-first-mobile-ready.md) | Build desktop-first, without blocking mobile | Accepted |
 | [0020](0020-show-a-bounded-number-of-items.md) | Show one level at a time and a bounded number of items | Accepted |
-| [0021](0021-colour-for-type-border-for-status-tech-tree-layout.md) | Colour shows type, border shows status; lay the graph out as a tech tree | Accepted |
+| [0021](0021-colour-for-type-border-for-status-tech-tree-layout.md) | Colour shows type, border shows status; lay the graph out as a tech tree | Accepted; node colouring superseded by 0022, ordering by 0023 |
+| [0022](0022-type-strip-with-emoji-on-neutral-nodes.md) | Show type with a coloured strip and emoji on neutral nodes | Accepted |
+| [0023](0023-draw-requirements-straight-to-products.md) | Draw requirements straight to products, and order columns by type and name | Accepted |

@@ -12,11 +12,11 @@ function headlessGraph() {
 const ids = (collection: Collection) => collection.nodes().map((n) => n.id()).sort();
 
 describe("neighbourhood", () => {
-  it("reaches one route out in each direction, plus the categories a thing belongs to", () => {
-    // given: knife is made by knapping flint, is a blade, and is used to make a spear
+  it("includes what a thing needs, what it helps make, and the categories it belongs to", () => {
+    // given: a knife is knapped from flint, is a blade, and helps make a spear
     const cy = headlessGraph();
-    // then: flint and the spear are included, but not what the blade category feeds (chopping, cut wood)
-    expect(ids(neighbourhood(cy.$id("knife")))).toEqual(["blade", "flint", "knap", "knife", "make-spear", "spear"]);
+    // then: cut wood (which only the blade category leads to) is two steps away and left out
+    expect(ids(neighbourhood(cy.$id("knife")))).toEqual(["blade", "flint", "knife", "spear"]);
   });
 
   it("shows a category's members", () => {
@@ -33,6 +33,14 @@ describe("focus", () => {
     expect(cy.$id("spear").hasClass("faded")).toBe(false);
     expect(cy.$id("knife").hasClass("focused")).toBe(true);
     clearFocus(cy);
-    expect(cy.$(".faded, .focused")).toHaveLength(0);
+    expect(cy.$(".faded, .focused, .highlighted")).toHaveLength(0);
+  });
+
+  it("brings the neighbourhood's edges forward and fades the rest", () => {
+    const cy = headlessGraph();
+    focusOn(cy.$id("knife"));
+    expect(cy.$id("knife->spear").hasClass("highlighted")).toBe(true);
+    expect(cy.$id("blade->cut:wood").hasClass("highlighted")).toBe(false);
+    expect(cy.$id("blade->cut:wood").hasClass("faded")).toBe(true);
   });
 });

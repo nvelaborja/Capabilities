@@ -199,7 +199,7 @@ class TestExplore:
 
     def test_warns_about_imported_tin(self, graph):
         result = explore(graph, egypt(graph))
-        assert any("tin-ore" in warning for warning in result.warnings)
+        assert any("tin ore (cassiterite)" in warning for warning in result.warnings)
 
     def test_reports_target_independent_verbs_once(self, graph):
         result = explore(graph, egypt(graph))

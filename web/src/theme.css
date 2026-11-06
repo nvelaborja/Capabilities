@@ -4,11 +4,12 @@
  * Theme: follows the system unless the viewer picks one, which sets data-theme on <html> (state/theme.ts).
  * The dark values appear twice on purpose: once for "system is dark and nothing was picked", once for "dark picked".
  *
- * Node types are told apart by colour (a colour-blind-safe set based on Okabe & Ito). Each type has:
- *   fill  strong fill, for things they had (selected, implied)
- *   ink   label colour on the strong fill
- *   tint  pale fill, for everything else
- *   line  border colour
+ * Nodes share one surface (--node-bg, --node-text). Their type shows as a coloured strip with an emoji on the left,
+ * from a colour-blind-safe set based on Okabe & Ito. Each type has:
+ *   fill  the strip colour
+ *   ink   text colour on the strip (used by the legend)
+ *   tint  a pale version, for backgrounds such as the warning banner
+ *   line  the border colour
  */
 :root {
   color-scheme: light;
@@ -28,6 +29,9 @@
   --shadow: 0 1px 2px rgb(0 0 0 / 0.06), 0 2px 8px rgb(0 0 0 / 0.06);
   --radius: 8px;
   --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  --node-bg: #fbfaf6;
+  --node-text: #111111;
 
   --type-material-fill: #d99000;
   --type-material-ink: #241800;
@@ -69,6 +73,9 @@
     --danger: #ef8a80;
     --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 2px 8px rgb(0 0 0 / 0.3);
 
+    --node-bg: #262b33;
+    --node-text: #eef0f2;
+
     --type-material-fill: #f0b440;
     --type-material-ink: #1c1404;
     --type-material-tint: #3a2d12;
@@ -108,6 +115,9 @@
   --out: #4a525c;
   --danger: #ef8a80;
   --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 2px 8px rgb(0 0 0 / 0.3);
+
+  --node-bg: #262b33;
+  --node-text: #eef0f2;
 
   --type-material-fill: #f0b440;
   --type-material-ink: #1c1404;
@@ -161,10 +171,10 @@ button {
   display: grid;
   height: 100dvh;
   grid-template-rows: auto minmax(0, 1fr);
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) clamp(18rem, 26vw, 24rem);
   grid-template-areas:
-    "header"
-    "graph";
+    "header header"
+    "graph side";
 }
 
 .app-header {
@@ -191,6 +201,30 @@ button {
 .app-context {
   margin-left: auto;
   color: var(--text-muted);
+}
+
+.history-buttons {
+  display: inline-flex;
+  gap: 0.25rem;
+}
+
+.history-buttons button {
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.history-buttons button:disabled {
+  color: var(--text-muted);
+  opacity: 0.5;
+  cursor: default;
+}
+
+.history-buttons button:not(:disabled):hover {
+  border-color: var(--accent);
 }
 
 .theme-switch {

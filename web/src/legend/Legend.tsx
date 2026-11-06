@@ -1,13 +1,10 @@
-import { type ReactNode, useState } from "react";
+import { type CSSProperties, useState } from "react";
 
 import type { DrawnKind, Status } from "../api/types";
-import { STATUS_LOOK } from "../graph/styles";
+import { STATUS_LOOK, TYPE_ICONS } from "../graph/styles";
 import "./Legend.css";
 
-const W = 30;
-const H = 18;
-
-// Type colours, drawn with the same CSS variables the graph uses (graph/styles.ts).
+// Drawn with the same CSS variables, emoji and border rules as the graph (graph/styles.ts).
 export const TYPE_LABELS: Record<DrawnKind, string> = {
   material: "Material",
   artifact: "Tool or product",
@@ -26,52 +23,33 @@ export const STATUS_LABELS: Record<Status, string> = {
   out: "Out of reach",
 };
 
-// SVG dash patterns standing in for the graph's border styles.
-const DASHES: Record<string, string | undefined> = { dotted: "1.5 2.5", dashed: "5 3" };
-
-function Swatch({ children }: { children: ReactNode }) {
+/** A tiny node: the type's strip and emoji on the left, the status border around the whole thing. */
+function MiniNode({ kind, status }: { kind: DrawnKind; status?: Status }) {
+  const look = status ? STATUS_LOOK[status] : STATUS_LOOK.reachable;
+  const colour = status === "out" ? "var(--out)" : `var(--type-${kind}-line)`;
+  const dashes = look["border-dash-pattern"];
+  const style: CSSProperties = dashes
+    ? { opacity: look.opacity }
+    : { borderWidth: look["border-width"], borderStyle: look["border-style"], borderColor: colour, opacity: look.opacity };
   return (
-    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} aria-hidden="true" className="legend-swatch">
-      {children}
+    <span className="mini-node" style={style} aria-hidden="true">
+      <span className="mini-node-strip" style={{ background: `var(--type-${kind}-fill)` }}>
+        {TYPE_ICONS[kind]}
+      </span>
+      {dashes && <DashedOutline width={look["border-width"]} dashes={dashes} colour={colour} />}
+    </span>
+  );
+}
+
+/**
+ * CSS can't space out dashes, so a sparse dashed border is drawn in SVG to match the graph. The stroke is doubled
+ * because the node clips its outer half.
+ */
+function DashedOutline({ width, dashes, colour }: { width: number; dashes: readonly [number, number]; colour: string }) {
+  return (
+    <svg className="mini-node-outline">
+      <rect width="100%" height="100%" rx="5" fill="none" stroke={colour} strokeWidth={width * 2} strokeDasharray={dashes.join(" ")} />
     </svg>
-  );
-}
-
-function TypeSwatch({ kind }: { kind: DrawnKind }) {
-  return (
-    <Swatch>
-      <rect x={1.5} y={1.5} width={W - 3} height={H - 3} rx={5} fill={`var(--type-${kind}-tint)`} stroke={`var(--type-${kind}-line)`} />
-    </Swatch>
-  );
-}
-
-/** A status shown on a tool-coloured box, mirroring STATUS_LOOK. */
-function StatusSwatch({ status }: { status: Status }) {
-  const look = STATUS_LOOK[status];
-  const width = look["border-width"];
-  const strong = look.hadIt;
-  const out = status === "out";
-  const stroke = status === "selected" || status === "hypothetical" ? "var(--text)" : out ? "var(--out)" : "var(--type-artifact-line)";
-  const fill = strong ? "var(--type-artifact-fill)" : out || status === "near" ? "var(--surface)" : "var(--type-artifact-tint)";
-  const inset = Math.max(width, 1) / 2 + 0.5;
-  return (
-    <Swatch>
-      <rect
-        x={inset}
-        y={inset}
-        width={W - 2 * inset}
-        height={H - 2 * inset}
-        rx={5}
-        fill={fill}
-        stroke={width > 0 ? stroke : "none"}
-        strokeWidth={look["border-style"] === "double" ? 1.5 : width}
-        strokeDasharray={DASHES[look["border-style"]]}
-        opacity={look.opacity}
-      />
-      {look["border-style"] === "double" && (
-        <rect x={5} y={5} width={W - 10} height={H - 10} rx={3} fill="none" stroke={stroke} strokeWidth={1.5} />
-      )}
-    </Swatch>
   );
 }
 
@@ -101,37 +79,31 @@ export function Legend() {
       <summary>Legend</summary>
       <div className="legend-body">
         <section aria-label="Types">
-          <h2>Colour: what it is</h2>
+          <h2>Strip: what it is</h2>
           <ul>
             {(Object.keys(TYPE_LABELS) as DrawnKind[]).map((kind) => (
               <li key={kind}>
-                <TypeSwatch kind={kind} />
+                <MiniNode kind={kind} />
                 {TYPE_LABELS[kind]}
               </li>
             ))}
-            <li>
-              <Swatch>
-                <circle cx={W / 2} cy={H / 2} r={4} fill="var(--edge)" />
-              </Swatch>
-              A way to make it
-            </li>
           </ul>
         </section>
         <section aria-label="Statuses">
-          <h2>Border and fill: where it stands</h2>
+          <h2>Border: where it stands</h2>
           <ul>
             {(Object.keys(STATUS_LABELS) as Status[]).map((status) => (
               <li key={status}>
-                <StatusSwatch status={status} />
+                <MiniNode kind="artifact" status={status} />
                 {STATUS_LABELS[status]}
               </li>
             ))}
           </ul>
         </section>
         <p className="legend-note">
-          Columns are tech levels: primitive things on the left, advanced ones on the right. Several dots into a thing
-          mean <em>any one</em> of these ways works. Lines into one dot mean that way needs <em>all</em> of them. Dashed
-          lines are tools; dotted lines are actions.
+          Columns are tech levels: primitive things on the left, advanced ones on the right. Lines run from what a thing
+          needs to the thing. Dashed lines are tools; dotted lines are actions. When there are several ways to make
+          something, click it to see each one.
         </p>
       </div>
     </details>

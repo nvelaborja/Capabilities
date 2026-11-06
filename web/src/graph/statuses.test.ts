@@ -2,6 +2,7 @@ import cytoscape from "cytoscape";
 import { describe, expect, it } from "vitest";
 
 import type { ExploreResponse } from "../api/types";
+import { exploreWith as sampleExplore } from "../test/sampleExplore";
 import { sampleGraph } from "../test/sampleGraph";
 import { toElements } from "./elements";
 import { applyStatuses } from "./statuses";
@@ -11,11 +12,7 @@ function headlessGraph() {
 }
 
 function exploreWith(status: ExploreResponse["status"], routeStatus: ExploreResponse["route_status"] = {}): ExploreResponse {
-  return {
-    selected: [], hypothetical: [], reachable: [], maybe: [], near_misses: [], warnings: [], actions: {}, implied_by: {},
-    implied: { things: [], categories: [], actions: [], techniques: [], effects: {} },
-    status, route_status: routeStatus,
-  };
+  return sampleExplore({ status, route_status: routeStatus });
 }
 
 describe("applyStatuses", () => {
@@ -35,21 +32,19 @@ describe("applyStatuses", () => {
     expect(cy.$id("knife").hasClass("status-reachable")).toBe(true);
   });
 
-  it("marks the edges of working routes as live", () => {
+  it("marks edges live when a route behind them works", () => {
     // given: knapping works, making a spear doesn't
     const cy = headlessGraph();
     applyStatuses(cy, exploreWith({}, { knap: "yes", "make-spear": "no" }));
-    // then: knapping's edges are live and the spear route's are not
-    expect(cy.$id("knap/requires/0").hasClass("live")).toBe(true);
-    expect(cy.$id("knap/produces/knife").hasClass("live")).toBe(true);
-    expect(cy.$id("make-spear/produces/spear").hasClass("live")).toBe(false);
-    expect(cy.$id("make-spear").hasClass("route-no")).toBe(true);
+    // then: flint → knife (knapping) is live, knife → spear is not
+    expect(cy.$id("flint->knife").hasClass("live")).toBe(true);
+    expect(cy.$id("knife->spear").hasClass("live")).toBe(false);
   });
 
   it("clears everything when there is no result", () => {
     const cy = headlessGraph();
     applyStatuses(cy, exploreWith({ knife: "selected" }, { knap: "yes" }));
     applyStatuses(cy, null);
-    expect(cy.$(".status-selected, .route-yes, .live")).toHaveLength(0);
+    expect(cy.$(".status-selected, .live")).toHaveLength(0);
   });
 });

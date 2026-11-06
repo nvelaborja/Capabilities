@@ -34,7 +34,9 @@ cd web && npm ci && npm run build && cd ..
 uv run capabilities serve                 # then open http://127.0.0.1:8000
 ```
 
-Try http://127.0.0.1:8000/?preset=middle-kingdom-egypt to see a preset's selections, what they imply, and what was within reach. The graph reads as a technology tree, primitives on the left. Colour shows what each node is, and its border shows where it stands. Click a node to highlight what makes it and what it leads to. Pick Auto, Light or Dark in the header. The preset picker and selection lists are coming next.
+Pick a preset such as Middle Kingdom Egypt on the right. **Selected** lists what they had: your choices plus everything those certainly needed (marked *implied*). **Reachable** lists what they could have made, and what is one step away. Click any node on the graph, or any row in a list, to see it and add it to (or remove it from) the selection. Undo and redo cover every change, and the address bar always holds a link to the current selection, such as `?preset=middle-kingdom-egypt&add=hematite`.
+
+The graph reads as a technology tree, primitives on the left. A coloured strip with an emoji shows what each node is, and its border shows where it stands. Pick Auto, Light or Dark in the header.
 
 To work on the web app with live reload, run the API and the Vite dev server side by side:
 

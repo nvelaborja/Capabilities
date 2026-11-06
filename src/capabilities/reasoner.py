@@ -540,12 +540,14 @@ def _regional_warnings(graph: Graph, chosen: Selection, implied: Necessity) -> l
     for thing in sorted(implied.things - chosen.things):
         if graph.is_regional(thing):
             regions = "; ".join(graph.things[thing].get("regions", [])) or "unknown regions"
-            warnings.append(f"Implies access to {thing}, which is only found in some places ({regions}). It may have been traded.")
+            name = graph.label(thing).lower()
+            warnings.append(f"Implies access to {name}, which is only found in some places ({regions}). It may have been traded.")
     for category in sorted(implied.categories):
         members = graph.members(category)
         if members and all(graph.is_regional(m) or graph.kind(m) != "material" for m in members) and not (members & chosen.things):
-            sources = ", ".join(sorted(m for m in members if graph.is_regional(m)))
-            warnings.append(f"Implies access to some {category} ({sources}); all known sources are regional, so it may have been traded.")
+            sources = ", ".join(sorted(graph.label(m).lower() for m in members if graph.is_regional(m)))
+            name = graph.label(category).lower()
+            warnings.append(f"Implies access to some {name} ({sources}); all known sources are regional, so it may have been traded.")
     return warnings
 
 

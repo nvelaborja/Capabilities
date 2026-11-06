@@ -1,4 +1,4 @@
-import type { ExploreResponse, GraphResponse, Profile, SelectionRequest } from "./types";
+import type { ExploreResponse, GraphResponse, Profile, ProfileDetail, SelectionRequest } from "./types";
 
 export class ApiError extends Error {
   readonly status: number;
@@ -35,6 +35,10 @@ export const api = {
 
   profiles(signal?: AbortSignal): Promise<Profile[]> {
     return request<Profile[]>("/api/profiles", { signal });
+  },
+
+  profile(id: string, signal?: AbortSignal): Promise<ProfileDetail> {
+    return request<ProfileDetail>(`/api/profiles/${encodeURIComponent(id)}`, { signal });
   },
 
   explore(selection: SelectionRequest, signal?: AbortSignal): Promise<ExploreResponse> {
