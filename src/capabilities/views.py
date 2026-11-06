@@ -293,17 +293,13 @@ def implied_effects(graph: Graph, implied: Necessity) -> list[dict]:
 
 
 def near_view(graph: Graph, result: ExploreResult) -> list[dict]:
-    """Things one requirement away, grouped by thing, each route naming what it is missing."""
-    reach = result.reach
+    """Things one raw ingredient away, grouped by thing: each route that would work, and what to add for it."""
     grouped: dict[str, list[dict]] = defaultdict(list)
     for miss in result.near_misses:
         route = graph.routes[miss["route"]]
-        missing = next(r for r in route["requires"] if reach.requirement_status(r, None) == Tri.NO)
-        key = requirement_node(missing)
         grouped[miss["thing"]].append({
             "id": miss["route"], "label": route.get("label", miss["route"]),
-            "missing": {"id": key, "label": node_label(graph, key) + (" (any)" if "category" in missing else ""),
-                        "kind": "action" if ":" in key else graph.kind(key)},
+            "missing": {"id": miss["missing"], "label": graph.label(miss["missing"]), "kind": graph.kind(miss["missing"])},
         })
     return [{"id": thing, "label": graph.label(thing), "routes": routes} for thing, routes in sorted(grouped.items())]
 

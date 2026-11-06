@@ -21,7 +21,7 @@ from .views import StatusContext, UnknownNode, explain, explain_edge, explore_vi
 
 class SelectionRequest(BaseModel):
     profile: str | None = Field(None, description="Start from a profile, e.g. middle-kingdom-egypt.")
-    select: list[str] = Field(default_factory=list, description="Things they made or had, or actions they did (verb:target).")
+    select: list[str] = Field(default_factory=list, description="Things made or had, or actions done (verb:target).")
     deselect: list[str] = Field(default_factory=list, description="Items to remove from the profile.")
     hypothetical: list[str] = Field(default_factory=list, description="What-if additions, reported separately.")
 
@@ -63,7 +63,7 @@ def create_app(root: Path | None = None, web_dist: Path | None = None) -> FastAP
     app = FastAPI(
         title="Capabilities",
         version=__version__,
-        description="What would it take to make X? What else could they do? Could this job have been done this way?",
+        description="What would it take to make X? What else is within reach? Could this job have been done this way?",
     )
 
     def selection(request: SelectionRequest) -> tuple[Selection, Selection]:

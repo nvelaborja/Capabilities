@@ -16,7 +16,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Iterable
 
-from .graph import Graph, achieved_id
+from .graph import Graph
 from .tristate import Tri, as_range, compare
 
 Action = tuple[str, str]  # (verb, target)
@@ -510,15 +510,7 @@ def explore(graph: Graph, selected: Selection, hypothetical: Selection = Selecti
         if found:
             actions[verb] = found
 
-    near_misses = []
-    for route_id in graph.thing_routes():
-        thing = achieved_id(graph.routes[route_id])
-        if reach.status[thing] != Tri.NO:
-            continue
-        missing = [reach.requirement_label(r) for r in graph.routes[route_id]["requires"] if reach.requirement_status(r, None) == Tri.NO]
-        if len(missing) == 1:
-            near_misses.append({"thing": thing, "route": route_id, "missing": missing[0]})
-
+    near_misses = one_step_away(graph, reach)
     warnings = _regional_warnings(graph, selected | hypothetical, implied)
     return ExploreResult(selected, hypothetical, implied, reachable, maybe, actions, near_misses, warnings, reach)
 
@@ -721,6 +713,36 @@ def _assess_route(graph: Graph, reach: Reachability, route_id: str, step: dict, 
     elif uncertain:
         assessment.verdict = "uncertain"
     return assessment
+
+
+def one_step_away(graph: Graph, reach: Reachability) -> list[dict]:
+    """Things that one more raw ingredient would make reachable, however deep the chain to them (ADR 0027).
+
+    A raw ingredient is something no route makes: a natural material, or a thing with no known route. Adding a made
+    thing directly doesn't count, since that would hide everything still missing beneath it: hardened steel is one
+    step away only if a single ore unlocks the whole chain through bloom iron and steel.
+    """
+    misses = []
+    for ingredient in raw_ingredients(graph, reach):
+        trial = Reachability(graph, reach.base | Selection(frozenset({ingredient})), reach.asserted_effects)
+        for thing in sorted(trial.status):
+            if thing == ingredient or reach.status[thing] != Tri.NO or trial.status[thing] == Tri.NO:
+                continue
+            if graph.kind(thing) not in ("material", "artifact"):
+                continue
+            for route in graph.routes_producing.get(thing, []):
+                if trial.route_status(route, None) != Tri.NO:
+                    misses.append({"thing": thing, "route": route, "missing": ingredient})
+    return sorted(misses, key=lambda miss: (miss["thing"], miss["route"], miss["missing"]))
+
+
+def raw_ingredients(graph: Graph, reach: Reachability) -> list[str]:
+    """Materials and artifacts that no route makes and the selection doesn't reach: they can only be added."""
+    return sorted(
+        thing_id for thing_id, thing in graph.things.items()
+        if thing["kind"] in ("material", "artifact") and reach.status[thing_id] == Tri.NO
+        and not graph.routes_producing.get(thing_id) and not graph.routes_achieving.get(thing_id)
+    )
 
 
 def closure(graph: Graph, selected: Selection, hypothetical: Selection = Selection()) -> tuple[Necessity, Reachability]:

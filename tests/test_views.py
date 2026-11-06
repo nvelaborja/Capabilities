@@ -111,7 +111,8 @@ class TestExploreViewExtras:
 
     def test_near_misses_are_grouped_by_thing_and_name_what_is_missing(self, graph):
         near = {item["id"]: item for item in explore_view(graph, explore(graph, egypt(graph)))["near"]}
-        assert near["bloom-iron"]["routes"][0]["missing"] == {"id": "iron-ore", "label": "Iron ore (any)", "kind": "category"}
+        assert {r["missing"]["label"] for r in near["bloom-iron"]["routes"]} == {"Hematite", "Limonite (bog iron ore)"}
+        assert near["bloom-iron"]["routes"][0]["missing"] == {"id": "hematite", "label": "Hematite", "kind": "material"}
         assert {r["id"] for r in near["steel"]["routes"]} == {"steel-by-carburizing", "steel-by-crucible"}
 
     def test_warnings_use_names_not_ids(self, graph):
