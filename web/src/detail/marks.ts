@@ -44,7 +44,7 @@ export const KIND_NAMES: Record<string, { one: string; many: string }> = {
   material: { one: "Material", many: "Materials" },
   artifact: { one: "Tool or product", many: "Tools and products" },
   action: { one: "Action", many: "Actions" },
-  category: { one: "Any of a kind", many: "Any of a kind" },
+  category: { one: "Class", many: "Classes" },
   effect: { one: "Effect", many: "Conditions" },
   technique: { one: "Know-how", many: "Know-how" },
 };

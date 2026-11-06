@@ -9,7 +9,7 @@ export const TYPE_LABELS: Record<DrawnKind, string> = {
   material: "Material",
   artifact: "Tool or product",
   action: "Action (cut wood)",
-  category: "Any of a kind (iron ore)",
+  category: "Class (iron ore: any member will do)",
   effect: "Effect (heat)",
 };
 
@@ -17,7 +17,7 @@ export const STATUS_LABELS: Record<Status, string> = {
   selected: "Selected",
   hypothetical: "What-if",
   implied: "Implied (required by the selection)",
-  reachable: "Reachable (can be made from the selection)",
+  reachable: "Reachable (can be made or done from the selection)",
   maybe: "Maybe reachable",
   near: "One step away",
   out: "Out of reach",

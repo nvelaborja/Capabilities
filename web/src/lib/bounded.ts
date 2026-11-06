@@ -30,7 +30,7 @@ const NOUNS: Record<string, [string, string]> = {
   material: ["material", "materials"],
   artifact: ["tool or product", "tools and products"],
   action: ["action", "actions"],
-  category: ["kind of thing", "kinds of thing"],
+  category: ["class", "classes"],
   effect: ["effect", "effects"],
   technique: ["technique", "techniques"],
   route: ["way", "ways"],

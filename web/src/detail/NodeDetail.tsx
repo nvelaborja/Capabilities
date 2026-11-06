@@ -7,7 +7,7 @@ import { STATUS_LABELS } from "../legend/Legend";
 import { useExplain } from "../state/useExplain";
 import { DetailShell } from "./DetailShell";
 import { ExpandAllDialog } from "./ExpandAllDialog";
-import { ItemChips } from "./ItemChips";
+import { ItemChips, type QuickAdd } from "./ItemChips";
 import { chipStatus, kindName, statusTri, waysHeading } from "./marks";
 import { References } from "./References";
 import { Routes, type StatusOf } from "./Routes";
@@ -44,11 +44,15 @@ export function NodeDetail(props: NodeDetailProps) {
 
   const entry = catalog.get(id);
   const status = explore?.status[id] ?? data?.status;
-  const explicit = explore ? [...explore.selected, ...explore.hypothetical].includes(id) : false;
+  const chosen = new Set(explore ? [...explore.selected, ...explore.hypothetical] : []);
+  const explicit = chosen.has(id);
+  const quickAdd: QuickAdd = { isChosen: (member) => chosen.has(member), onAdd };
   const impliedBy = (explore?.implied_by[id] ?? []).map((source) => catalog.get(source).label.toLowerCase());
   const statusOf: StatusOf = (other, tri) => chipStatus(explore?.status[other], tri);
   const icon = CHIP_ICONS[entry.kind];
-  const onGraph = entry.kind !== "technique";
+  // "Move anything" stands for the verb on every target: it isn't drawn and can't be selected as such.
+  const anyTarget = id.endsWith(":(any)");
+  const onGraph = entry.kind !== "technique" && !anyTarget;
 
   return (
     <DetailShell
@@ -71,6 +75,7 @@ export function NodeDetail(props: NodeDetailProps) {
       actions={
         <>
           {SELECTABLE.has(entry.kind) &&
+            !anyTarget &&
             (explicit ? (
               <button type="button" onClick={() => onRemove(id)}>
                 Remove from selected
@@ -93,14 +98,22 @@ export function NodeDetail(props: NodeDetailProps) {
       {data && (
         <>
           <section className="detail-column" aria-labelledby="needs-title">
-            <Needs data={data} statusOf={statusOf} onDrill={onDrill} onExpandAll={canExpand(data) ? () => setExpanding(id) : undefined} />
+            <Needs
+              data={data}
+              statusOf={statusOf}
+              onDrill={onDrill}
+              quickAdd={quickAdd}
+              onExpandAll={canExpand(data) ? () => setExpanding(id) : undefined}
+            />
           </section>
           <section className="detail-column" aria-labelledby="about-title">
             <h3 id="about-title">About</h3>
             {status === "implied" && impliedBy.length > 0 && (
               <p className="detail-note">Required by the selection: {impliedBy.join(", ")} needs it.</p>
             )}
-            {entry.kind === "category" && <p className="detail-note">Stands for any of its members; select a specific member instead.</p>}
+            {entry.kind === "category" && (
+              <p className="detail-note">A class stands for any one of its members, so it can't be selected itself. Add a member instead.</p>
+            )}
             {entry.kind === "effect" && <p className="detail-note">Effects follow from what is selected, so they can't be selected themselves.</p>}
             {entry.kind === "technique" && (
               <p className="detail-note">Know-how describes how something was done. It never decides whether it could be done.</p>
@@ -144,16 +157,18 @@ interface NeedsProps {
   data: ExplainResponse;
   statusOf: StatusOf;
   onDrill: (id: string) => void;
+  /** For a class: add a member to the selection in one click. */
+  quickAdd: QuickAdd;
   onExpandAll?: () => void;
 }
 
 /** The left column: what it takes to get this (or, for know-how, where it is used). */
-function Needs({ data, statusOf, onDrill, onExpandAll }: NeedsProps) {
+function Needs({ data, statusOf, onDrill, quickAdd, onExpandAll }: NeedsProps) {
   if (data.members) {
     return (
       <>
-        <h3 id="needs-title">Any of these would do</h3>
-        <ItemChips items={data.members} onDrill={onDrill} />
+        <h3 id="needs-title">Class members</h3>
+        <ItemChips items={data.members} onDrill={onDrill} quickAdd={quickAdd} />
       </>
     );
   }
@@ -201,10 +216,9 @@ function Needs({ data, statusOf, onDrill, onExpandAll }: NeedsProps) {
 
 function AboutSection({ about, statusOf, onDrill }: { about: About; statusOf: StatusOf; onDrill: (id: string) => void }) {
   const facts: [string, string][] = (about.quantities ?? []).map((q) => [q.label, q.value]);
-  if (about.origin === "natural") {
-    const where = about.availability === "ubiquitous" ? "Found almost everywhere" : (about.regions ?? []).join("; ") || "Some regions";
-    facts.push(["Found", where]);
-  }
+  const natural = about.origin === "natural";
+  const everywhere = about.availability === "ubiquitous";
+  if (natural) facts.push(["Found", everywhere ? "Almost everywhere" : (about.regions ?? []).join("; ") || "Some regions"]);
   return (
     <div className="about">
       {about.description && <p className="description">{about.description}</p>}
@@ -224,9 +238,16 @@ function AboutSection({ about, statusOf, onDrill }: { about: About; statusOf: St
           ))}
         </dl>
       )}
+      {natural && (
+        <p className="detail-note">
+          {everywhere
+            ? "Always available: found almost everywhere, so every selection has it."
+            : "Not assumed: found only in some regions, so add it, or select something that needs it."}
+        </p>
+      )}
       {about.member_of && about.member_of.length > 0 && (
         <p className="member-of">
-          A kind of{" "}
+          Member of{" "}
           {about.member_of.map((category) => (
             <NodeChip key={category.id} id={category.id} label={category.label} kind="category" status={statusOf(category.id, "no")} onPick={onDrill} />
           ))}

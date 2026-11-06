@@ -19,7 +19,7 @@ const ROLE_LINES: Record<RequirementRole, LineStyle> = {
  * same two nodes, so one line can stand for several roles; then it is drawn solid.
  */
 export function lineStyle(kind: "requires" | "is_a", roles: readonly RequirementRole[], byproduct: boolean): LineStyle {
-  if (kind === "is_a") return { look: "Thin dashed line, no arrow", meaning: "is a kind of: any route that needs the kind can use it" };
+  if (kind === "is_a") return { look: "Thin dashed line, no arrow", meaning: "member of a class: any route that needs the class can use it" };
   if (byproduct) return { look: "Dotted line", meaning: "made as a byproduct, not the route's goal" };
   const distinct = [...new Set(roles)];
   const only = distinct.length === 1 ? distinct[0] : undefined;

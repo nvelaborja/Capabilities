@@ -163,7 +163,7 @@ export function buildStylesheet(t: GraphTokens): StylesheetJson {
       },
     },
     ...typeRules,
-    // Italic as a second cue for "any of a kind", besides colour.
+    // Italic as a second cue for a class (any member will do), besides colour.
     { selector: "node.category", style: { "font-style": "italic" } },
     { selector: "node.ubiquitous", style: { "font-size": 11 } },
     {

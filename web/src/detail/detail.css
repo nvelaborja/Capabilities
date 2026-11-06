@@ -519,6 +519,27 @@
   flex-wrap: wrap;
 }
 
+/* Selecting a class member in one click (ADR 0031). */
+.quick-add {
+  padding: 0.05rem 0.5rem;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: none;
+  color: var(--accent);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.quick-add:hover {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.quick-added {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
 .item .via {
   flex-basis: 100%;
   padding-left: 1.45rem;

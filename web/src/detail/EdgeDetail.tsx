@@ -35,7 +35,7 @@ export function EdgeDetail(props: EdgeDetailProps) {
           {from} <span aria-label="to">→</span> {to}
         </>
       }
-      meta={data && <span className="kind-chip">{data.kind === "is_a" ? "Is a kind of" : `Needed to make ${to.toLowerCase()}`}</span>}
+      meta={data && <span className="kind-chip">{data.kind === "is_a" ? "Class member" : `Needed to make ${to.toLowerCase()}`}</span>}
     >
       {error && <p className="error">Couldn't explain this line.</p>}
       {!data && !error && loading && <p className="muted">Loading…</p>}
@@ -46,7 +46,7 @@ export function EdgeDetail(props: EdgeDetailProps) {
             <EndChip item={data.source} onDrill={onDrill} />
             {data.kind === "is_a" ? (
               <p>
-                {data.source.label} is a kind of {data.target.label.toLowerCase()}.
+                {data.source.label} is a member of the {data.target.label.toLowerCase()} class.
               </p>
             ) : (
               <HowUsed routes={data.routes} statusOf={statusOf} onDrill={onDrill} />
@@ -108,10 +108,10 @@ function Through({ data, statusOf, onDrill }: { data: EdgeResponse; statusOf: St
         </p>
         {data.used_by.length > 0 ? (
           <p>
-            Routes that need any {data.target.label.toLowerCase()}: {data.used_by.join(", ")}.
+            Routes that can use any member of the class: {data.used_by.join(", ")}.
           </p>
         ) : (
-          <p className="muted">No route needs this kind directly.</p>
+          <p className="muted">No route needs this class directly.</p>
         )}
       </>
     );

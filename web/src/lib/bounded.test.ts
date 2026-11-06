@@ -44,7 +44,7 @@ describe("summaryLabel", () => {
     ["material", 1, "1 other material"],
     ["artifact", 12, "12 other tools and products"],
     ["artifact", 1, "1 other tool or product"],
-    ["category", 2, "2 other kinds of thing"],
+    ["category", 2, "2 other classes"],
     ["route", 3, "3 other ways"],
     ["mystery", 2, "2 other items"],
   ])("names %s × %i as %s", (kind, count, label) => {
