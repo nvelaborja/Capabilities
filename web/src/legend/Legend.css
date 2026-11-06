@@ -44,8 +44,31 @@
   gap: 0.5rem;
 }
 
-.legend-swatch {
+.mini-node {
   flex: none;
+  display: inline-flex;
+  width: 2.4rem;
+  height: 1.25rem;
+  overflow: hidden;
+  border-radius: 5px;
+  background: var(--node-bg);
+}
+
+.mini-node-strip {
+  display: grid;
+  place-items: center;
+  width: 1.1rem;
+  font-size: 0.65rem;
+  line-height: 1;
+}
+
+.mini-route {
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin: 0 0.95rem;
+  border-radius: 50%;
+  background: var(--edge);
 }
 
 .legend-note {

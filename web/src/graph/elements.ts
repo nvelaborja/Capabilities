@@ -7,13 +7,15 @@ const CHAR_WIDTH = 7;
 const MIN_WIDTH = 56;
 const MAX_WIDTH = 168;
 const ROUTE_SIZE = 10;
+/** Width of the coloured type strip on the left of every node (graph/styles.ts draws it). */
+export const STRIP_WIDTH = 24;
 
 export interface NodeSize {
   width: number;
   height: number;
 }
 
-/** Route junctions are small dots; everything else is sized to its label (wrapping past MAX_WIDTH). */
+/** Route junctions are small dots; everything else is sized to its label (wrapping past MAX_WIDTH) plus the strip. */
 export function nodeSize(node: GraphNode): NodeSize {
   if (node.kind === "route") {
     return { width: ROUTE_SIZE, height: ROUTE_SIZE };
@@ -22,7 +24,7 @@ export function nodeSize(node: GraphNode): NodeSize {
   const width = Math.round(Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, textWidth)));
   const lines = Math.ceil(textWidth / MAX_WIDTH);
   const base = isUbiquitous(node) ? 24 : 30;
-  return { width, height: base + (lines - 1) * 13 };
+  return { width: width + STRIP_WIDTH, height: base + (lines - 1) * 13 };
 }
 
 export function isUbiquitous(node: GraphNode): boolean {

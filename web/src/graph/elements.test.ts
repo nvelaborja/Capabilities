@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { sampleGraph } from "../test/sampleGraph";
-import { edgeClasses, layoutRank, nodeClasses, nodeSize, toElements } from "./elements";
+import { edgeClasses, layoutRank, nodeClasses, nodeSize, STRIP_WIDTH, toElements } from "./elements";
 
 const node = (id: string) => {
   const found = sampleGraph.nodes.find((n) => n.id === id);
@@ -17,8 +17,8 @@ describe("nodeSize", () => {
   it("caps the width of long labels and adds lines instead", () => {
     // given: a label far wider than one line
     const size = nodeSize(node("spear"));
-    // then: the width stops at the maximum and the node grows taller
-    expect(size.width).toBe(168);
+    // then: the width stops at the maximum (plus the type strip) and the node grows taller
+    expect(size.width).toBe(168 + STRIP_WIDTH);
     expect(size.height).toBeGreaterThan(nodeSize(node("knife")).height);
   });
 
