@@ -68,6 +68,10 @@ class TestServer:
         assert [row["id"] for row in full["all"]["missing"]] == ["bloom-iron", "iron-ore"]
         assert brief["about"]["description"] and brief["leads_to"]
 
+    def test_explain_edge(self, client):
+        body = client.post("/api/explain-edge", json={"profile": "middle-kingdom-egypt", "source": "heat", "target": "steel"}).json()
+        assert body["kind"] == "requires" and len(body["routes"]) == 2
+
     def test_interactive_docs_stay_at_the_root(self, client):
         assert client.get("/docs").status_code == 200
 
@@ -80,8 +84,10 @@ class TestServer:
             ("post", "/api/explore", {"select": ["unobtainium"]}, 422),
             ("post", "/api/check", {}, 422),
             ("post", "/api/explain", {"node": "unobtainium"}, 404),
-            ("post", "/api/explain", {"node": "iron-smelting"}, 404),
+            ("post", "/api/explain", {"node": "bloomery-smelting"}, 404),
             ("post", "/api/explain", {}, 422),
+            ("post", "/api/explain-edge", {"source": "wood", "target": "steel"}, 404),
+            ("post", "/api/explain-edge", {"source": "wood"}, 422),
             ("get", "/api/graph?action=bogus", None, 422),
             ("get", "/api/graph?action=fly:granite", None, 422),
             ("post", "/explore", {}, 404),

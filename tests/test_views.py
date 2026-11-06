@@ -2,7 +2,7 @@ import pytest
 
 from capabilities.levels import compute_levels
 from capabilities.reasoner import Selection, explore
-from capabilities.views import StatusContext, UnknownNode, explain, explore_view, graph_view, implied_by
+from capabilities.views import StatusContext, UnknownNode, explain, explain_edge, explore_view, graph_view, implied_by
 
 
 def egypt(graph) -> Selection:
@@ -80,6 +80,9 @@ class TestStatuses:
         ("bloom-iron", "near"),          # one ingredient (iron ore) away
         ("iron-ore", "out"),
         ("diamond-saw", "out"),
+        ("casting", "implied"),          # know-how every route to a selected thing shares
+        ("iron-smelting", "reachable"),  # describes building a bloomery furnace, which they could do
+        ("quenching", "out"),            # only describes routes they can't take
     ])
     def test_middle_kingdom_egypt(self, graph, node_id, status):
         assert context_for(graph, egypt(graph)).status(node_id) == status
@@ -239,7 +242,42 @@ class TestExplain:
         assert "cut:granite" in {r["id"] for r in rows}
         assert all(r["kind"] == "action" for r in rows)
 
-    @pytest.mark.parametrize("node", ["iron-smelting", "unobtainium", "fly:granite", "cut:moonrock"])
+    def test_explains_know_how_by_the_routes_it_describes(self, graph, levels):
+        view = explain(graph, levels, context_for(graph, egypt(graph)), "quenching")
+        assert view["kind"] == "technique" and view["about"]["description"]
+        assert {r["id"]: [m["id"] for m in r["makes"]] for r in view["used_in"]} == {
+            "forge-steel-chisel": ["steel-chisel"], "hardening-by-quenching": ["hardened-steel"],
+        }
+        assert {row["id"] for row in view["leads_to"]} == {"steel-chisel", "hardened-steel"}
+
+    @pytest.mark.parametrize("node", ["unobtainium", "fly:granite", "cut:moonrock", "bloomery-smelting"])
     def test_rejects_what_it_cannot_explain(self, graph, levels, node):
         with pytest.raises(UnknownNode):
             explain(graph, levels, context_for(graph, Selection()), node)
+
+
+class TestExplainEdge:
+    def test_a_requirement_line_lists_each_route_with_the_sources_role_and_threshold(self, graph, levels):
+        # given: heat feeds steel through two routes, at different temperatures
+        view = explain_edge(graph, levels, context_for(graph, egypt(graph)), "heat", "steel")
+        # then: both routes, the one that works first, each saying how heat is needed and whether it is met
+        assert view["kind"] == "requires"
+        assert [r["id"] for r in view["routes"]] == ["steel-by-carburizing", "steel-by-crucible"]
+        links = [r["link"][0] for r in view["routes"]]
+        assert [(link["role"], link["status"]) for link in links] == [("effect", "yes"), ("effect", "maybe")]
+        assert links[1]["conditions"] == ["Temperature ≥ 1200 °C", "Duration ≥ 24 hours"]
+        assert view["routes"][0]["requirements"]  # the rest of the route, for context
+
+    def test_an_is_a_line_names_the_category_and_what_uses_it(self, graph, levels):
+        view = explain_edge(graph, levels, context_for(graph, egypt(graph)), "hematite", "iron-ore")
+        assert (view["kind"], view["used_by"]) == ("is_a", ["Bloomery smelting"])
+        assert view["source"]["label"] == "Hematite"
+
+    def test_a_byproduct_line_says_so(self, graph, levels):
+        view = explain_edge(graph, levels, context_for(graph, egypt(graph)), "iron-ore", "slag")
+        assert [(r["id"], r["byproduct"]) for r in view["routes"]] == [("bloomery-smelting", True)]
+
+    @pytest.mark.parametrize(("source", "target"), [("wood", "steel"), ("unobtainium", "steel"), ("heat", "nowhere")])
+    def test_rejects_pairs_no_line_joins(self, graph, levels, source, target):
+        with pytest.raises(UnknownNode):
+            explain_edge(graph, levels, context_for(graph, egypt(graph)), source, target)
