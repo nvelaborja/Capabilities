@@ -1,6 +1,6 @@
 # 0021. Colour shows type, border shows status; lay the graph out as a tech tree
 
-- **Status:** Accepted; node colouring superseded by [0022](0022-type-strip-with-emoji-on-neutral-nodes.md)
+- **Status:** Accepted; node colouring superseded by [0022](0022-type-strip-with-emoji-on-neutral-nodes.md), column ordering by [0023](0023-draw-requirements-straight-to-products.md)
 - **Date:** 2026-11-05
 
 ## Context

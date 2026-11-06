@@ -1,6 +1,6 @@
 # 0015. Build the web front end with React, TypeScript, Vite and Cytoscape.js
 
-- **Status:** Accepted
+- **Status:** Accepted; route junctions and the dagre layout superseded by [0023](0023-draw-requirements-straight-to-products.md)
 - **Date:** 2026-11-05
 
 ## Context
