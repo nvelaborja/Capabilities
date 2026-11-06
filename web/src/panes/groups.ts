@@ -57,8 +57,8 @@ export function selectedChips(explore: ExploreResponse, catalog: Catalog): Chip[
 }
 
 /**
- * The bottom list: what the selection implies they had, what they could have made or done, and what is one step
- * away. Nothing already chosen appears here.
+ * The bottom list: what the selection requires, what could be made or done from it, and what one more raw ingredient
+ * would unlock. Nothing already chosen appears here.
  */
 export function withinReach(explore: ExploreResponse, catalog: Catalog): Section[] {
   const chosen = new Set([...explore.selected, ...explore.hypothetical]);
@@ -88,14 +88,14 @@ export function withinReach(explore: ExploreResponse, catalog: Catalog): Section
     .filter(({ id }) => !have.has(id))
     .map(({ id, tri }) => chip(id, tri === "maybe" ? "maybe" : "reachable", tri === "maybe" ? { note: "maybe" } : {}));
   const near = explore.near.map((item) =>
-    chip(item.id, "near", { note: `needs ${[...new Set(item.routes.map((route) => route.missing.label.toLowerCase()))].join(" or ")}` }),
+    chip(item.id, "near", { note: `add ${[...new Set(item.routes.map((route) => route.missing.label.toLowerCase()))].join(" or ")}` }),
   );
 
   const sections: Section[] = [
-    { key: "implied", title: "Implied", hint: "They must have had these", chips: implied.sort(byTypeThenLabel) },
+    { key: "implied", title: "Implied", hint: "Required by the selection", chips: implied.sort(byTypeThenLabel) },
     { key: "reachable", title: "Could make", chips: things.sort(byTypeThenLabel) },
     { key: "actions", title: "Could do", chips: actions.sort(byTypeThenLabel) },
-    { key: "near", title: "One step away", chips: near.sort(byTypeThenLabel) },
+    { key: "near", title: "One step away", hint: "One more raw ingredient would unlock these", chips: near.sort(byTypeThenLabel) },
   ];
   return sections.filter((section) => section.chips.length > 0);
 }

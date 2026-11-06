@@ -7,6 +7,8 @@ import { DetailPane } from "./detail/DetailPane";
 import { edgeSubject } from "./detail/subjects";
 import { type GraphFocus, GraphView } from "./graph/GraphView";
 import type { Summary } from "./graph/summaries";
+import { Splitter } from "./layout/Splitter";
+import { usePaneSizes } from "./layout/usePaneSizes";
 import { Legend } from "./legend/Legend";
 import { ConfirmDialog } from "./panes/ConfirmDialog";
 import { SidePane } from "./panes/SidePane";
@@ -37,6 +39,7 @@ export function App() {
   const request = useMemo(() => toRequest(selection), [selection]);
   const explore = useExplore(request);
   const { preference, choose, theme } = useTheme();
+  const { ref: appRef, layout } = usePaneSizes();
   const [trail, navigate] = useReducer(trailReducer, []);
   const [centerSeq, setCenterSeq] = useState({ center: false, seq: 0 });
   const [isolated, setIsolated] = useState<string | null>(null);
@@ -122,7 +125,7 @@ export function App() {
   const editedCount = selection.added.length + selection.removed.length;
 
   return (
-    <div className={`app${shown ? " has-detail" : ""}`}>
+    <div ref={appRef} style={layout.style} className={`app${shown ? " has-detail" : ""}`}>
       <header className="app-header">
         <h1>Capabilities</h1>
         <span className="app-tagline">What it takes to make things, and what else was within reach.</span>
@@ -140,6 +143,7 @@ export function App() {
         </div>
         <ThemeSwitch preference={preference} onChoose={choose} />
       </header>
+      {shown && catalog && <Splitter pane="detail" layout={layout} />}
       {shown && catalog && (
         <DetailPane
           trail={trail}
@@ -183,6 +187,7 @@ export function App() {
           </div>
         )}
       </main>
+      {catalog && <Splitter pane="side" layout={layout} />}
       {catalog && (
         <SidePane
           profiles={profiles}

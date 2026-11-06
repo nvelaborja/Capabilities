@@ -1,0 +1,64 @@
+/* The gaps between panes are splitters (ADR 0028). A short grip always shows where to drag; it turns into a full
+   accent line while hovered, focused or dragged. */
+.splitter {
+  position: relative;
+  z-index: 6;
+  touch-action: none;
+}
+
+.splitter-side {
+  grid-area: vsplit;
+  cursor: col-resize;
+}
+
+.splitter-detail {
+  grid-area: hsplit;
+  cursor: row-resize;
+}
+
+.splitter::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  border-radius: 2px;
+  background: var(--grip);
+  transform: translate(-50%, -50%);
+  transition: background-color 120ms, width 120ms, height 120ms;
+}
+
+.splitter-side::after {
+  width: 4px;
+  height: 2.5rem;
+}
+
+.splitter-detail::after {
+  width: 2.5rem;
+  height: 4px;
+}
+
+.splitter:hover::after,
+.splitter:focus-visible::after,
+.splitter.dragging::after {
+  background: var(--accent);
+}
+
+.splitter-side:is(:hover, :focus-visible, .dragging)::after {
+  width: 2px;
+  height: calc(100% - 1rem);
+}
+
+.splitter-detail:is(:hover, :focus-visible, .dragging)::after {
+  width: calc(100% - 1rem);
+  height: 2px;
+}
+
+.splitter:focus-visible {
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .splitter::after {
+    transition: none;
+  }
+}

@@ -98,7 +98,7 @@ export function NodeDetail(props: NodeDetailProps) {
           <section className="detail-column" aria-labelledby="about-title">
             <h3 id="about-title">About</h3>
             {status === "implied" && impliedBy.length > 0 && (
-              <p className="detail-note">They must have had this: it is needed by {impliedBy.join(", ")}.</p>
+              <p className="detail-note">Required by the selection: {impliedBy.join(", ")} needs it.</p>
             )}
             {entry.kind === "category" && <p className="detail-note">Stands for any of its members; select a specific member instead.</p>}
             {entry.kind === "effect" && <p className="detail-note">Effects follow from what is selected, so they can't be selected themselves.</p>}

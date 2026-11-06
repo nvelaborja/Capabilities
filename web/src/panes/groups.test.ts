@@ -51,7 +51,7 @@ describe("withinReach", () => {
   it("marks maybes, leaves out actions already chosen, and says what a near miss needs", () => {
     expect(section("reachable")?.chips[1]).toMatchObject({ id: "laser", status: "maybe", note: "maybe" });
     expect(section("actions")?.chips.map((c) => [c.label, c.status])).toEqual([["Cut flint", "maybe"]]);
-    expect(section("near")?.chips[0]).toMatchObject({ status: "near", note: "needs flint" });
+    expect(section("near")?.chips[0]).toMatchObject({ status: "near", note: "add flint" });
     expect(countChips(sections)).toBe(7);
   });
 

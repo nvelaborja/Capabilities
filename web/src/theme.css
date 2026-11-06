@@ -14,6 +14,9 @@
 :root {
   color-scheme: light;
   --bg: #f6f6f3;
+  /* Behind the floating panes, and the grip on the gaps between them (ADR 0028). */
+  --backdrop: #e4e4de;
+  --grip: #7b828a;
   --surface: #ffffff;
   --surface-raised: #ffffff;
   --text: #1f2328;
@@ -62,6 +65,8 @@
   :root:not([data-theme="light"]) {
     color-scheme: dark;
     --bg: #14171b;
+    --backdrop: #0b0d10;
+    --grip: #6b737d;
     --surface: #1c2026;
     --surface-raised: #232831;
     --text: #e5e8eb;
@@ -107,6 +112,8 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
   --bg: #14171b;
+    --backdrop: #0b0d10;
+    --grip: #6b737d;
   --surface: #1c2026;
   --surface-raised: #232831;
   --text: #e5e8eb;
@@ -162,7 +169,7 @@ body,
 }
 
 body {
-  background: var(--bg);
+  background: var(--backdrop);
   color: var(--text);
   font-family: var(--font);
   font-size: 0.875rem;
@@ -173,17 +180,46 @@ button {
   font: inherit;
 }
 
-/* Grid areas let later phases add the side and detail panes, and let a phone layout restack them (ADR 0019). */
+/*
+ * Floating panes on a backdrop, with gaps between them (ADR 0028). The gaps beside the side and detail panes are
+ * splitters (layout/Splitter.tsx), which set --side-width and --detail-height. min() keeps a remembered size sensible
+ * when the window shrinks. The detail rows take no space while the detail pane is closed (ADR 0025).
+ * Grid areas let a phone layout restack the panes (ADR 0019).
+ */
 .app {
+  --gutter: 8px;
+  --pane-radius: 6px;
   display: grid;
   height: 100dvh;
-  /* The detail row sizes to the detail pane under the graph, and takes no space while it is closed (ADR 0025). */
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  grid-template-columns: minmax(0, 1fr) clamp(18rem, 26vw, 24rem);
+  padding: var(--gutter);
+  background: var(--backdrop);
+  grid-template-columns: minmax(0, 1fr) var(--gutter) min(var(--side-width, clamp(18rem, 26vw, 24rem)), calc(100vw - 20rem));
+  grid-template-rows: auto var(--gutter) minmax(0, 1fr) 0 0;
   grid-template-areas:
-    "header header"
-    "graph side"
-    "detail side";
+    "header header header"
+    ".      .      .     "
+    "graph  vsplit side"
+    "hsplit vsplit side"
+    "detail vsplit side";
+}
+
+.app.has-detail {
+  grid-template-rows: auto var(--gutter) minmax(0, 1fr) var(--gutter) min(var(--detail-height, clamp(15rem, 42vh, 30rem)), calc(100dvh - 15rem));
+}
+
+.app-header,
+.app-graph,
+.side-pane,
+.detail-pane {
+  border: 1px solid var(--border);
+  border-radius: var(--pane-radius);
+}
+
+/* The header keeps overflow visible, so search results can drop down over the graph. */
+.app-graph,
+.side-pane,
+.detail-pane {
+  overflow: hidden;
 }
 
 /* The tagline gives way to search on narrower screens. */
@@ -199,7 +235,6 @@ button {
   align-items: center;
   gap: 1rem;
   padding: 0.6rem 1rem;
-  border-bottom: 1px solid var(--border);
   background: var(--surface);
 }
 
@@ -276,6 +311,7 @@ button {
   grid-area: graph;
   position: relative;
   min-height: 0;
+  background: var(--bg);
 }
 
 .notice {

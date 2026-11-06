@@ -16,8 +16,8 @@ export const TYPE_LABELS: Record<DrawnKind, string> = {
 export const STATUS_LABELS: Record<Status, string> = {
   selected: "Selected",
   hypothetical: "What-if",
-  implied: "Implied (they must have had it)",
-  reachable: "Reachable (they could have made it)",
+  implied: "Implied (required by the selection)",
+  reachable: "Reachable (can be made from the selection)",
   maybe: "Maybe reachable",
   near: "One step away",
   out: "Out of reach",

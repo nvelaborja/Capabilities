@@ -4,10 +4,11 @@
   grid-area: detail;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  height: clamp(15rem, 42vh, 30rem);
   min-width: 0;
-  border-top: 1px solid var(--border);
+  min-height: 0;
   background: var(--surface);
+  /* The pane is resizable (ADR 0028), so its columns respond to its own width, not the window's. */
+  container: detail / inline-size;
 }
 
 .detail-bar {
@@ -74,10 +75,11 @@
   padding: 0.6rem 1rem;
 }
 
-/* Narrow screens: one column, scrolling as a whole. */
-@media (max-width: 60rem) {
+/* A narrow pane: one column, scrolling as a whole. */
+@container detail (max-width: 52rem) {
   .detail-columns {
     grid-template-columns: minmax(0, 1fr);
+    grid-auto-rows: max-content;
     overflow-y: auto;
   }
 
@@ -203,9 +205,19 @@
 }
 
 .facts div {
-  display: grid;
-  grid-template-columns: 9rem 1fr;
-  gap: 0.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 0.5rem;
+}
+
+/* Label and value side by side, or the value under its label when the column is narrow. */
+.facts dt {
+  flex: 1 1 6rem;
+  max-width: 9rem;
+}
+
+.facts dd {
+  flex: 999 1 6rem;
 }
 
 .facts dt {
