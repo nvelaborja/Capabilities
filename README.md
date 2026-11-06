@@ -34,9 +34,9 @@ cd web && npm ci && npm run build && cd ..
 uv run capabilities serve                 # then open http://127.0.0.1:8000
 ```
 
-Pick a preset such as Middle Kingdom Egypt on the right. **Selected** lists what they had: your choices plus everything those certainly needed (marked *implied*). **Reachable** lists what they could have made, and what is one step away. Click any node on the graph, or any row in a list, to see it and add it to (or remove it from) the selection. Undo and redo cover every change, and the address bar always holds a link to the current selection, such as `?preset=middle-kingdom-egypt&add=hematite`.
+Pick a preset such as Middle Kingdom Egypt on the right. **Selected** lists what they had: your choices plus everything those certainly needed (marked *implied*). **Reachable** lists what they could have made, and what is one step away. Click any node on the graph, or any row in a list, to open its details on the left: what it is, each way to make it with what is met (✓), missing (✗) or unknown (?) and why, what it leads to, and the sources. Click a requirement to see what *it* needs; the breadcrumb leads back. **Expand all dependencies** lists everything it needs at every depth, and **Focus** shows only that part of the graph. Search (press `/`) finds any thing or action, including actions not drawn yet. Undo and redo cover every change, and the address bar always holds a link to the current selection, such as `?preset=middle-kingdom-egypt&add=hematite`.
 
-The graph reads as a technology tree, primitives on the left. A coloured strip with an emoji shows what each node is, and its border shows where it stands. Pick Auto, Light or Dark in the header.
+The graph reads as a technology tree, primitives on the left. A coloured strip with an emoji shows what each node is, and its border shows where it stands. Busy nodes show their 8 most advanced links; the rest fold into a dashed “4 other materials” node that expands when clicked, or use **Expand all**. Pick Auto, Light or Dark in the header.
 
 To work on the web app with live reload, run the API and the Vite dev server side by side:
 
