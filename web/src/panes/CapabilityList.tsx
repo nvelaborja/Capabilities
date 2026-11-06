@@ -13,7 +13,7 @@ interface CapabilityListProps {
   headerAction?: ReactNode;
 }
 
-/** One half of the right-hand pane: an independently scrolling set of chips, each type starting on its own line. */
+/** A titled, independently scrolling set of chips, each type starting on its own line. */
 export function CapabilityList({ id, title, sections, emptyText, onPick, onRemove, headerAction }: CapabilityListProps) {
   return (
     <section className="capability-list" aria-labelledby={`${id}-title`}>

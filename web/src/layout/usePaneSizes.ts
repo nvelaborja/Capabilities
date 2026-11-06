@@ -7,7 +7,7 @@ export interface PaneLayout {
   /** Custom properties for the app grid. */
   style: CSSProperties;
   sizes: PaneSizes;
-  /** The pane's size as drawn now, in pixels (the grid's last column or row). */
+  /** The pane's size as drawn now, in pixels: the side column's width, or a pane's height. */
   measure: (pane: Pane) => number;
   /** Show a size while dragging without re-rendering the app on every pointer move. */
   preview: (pane: Pane, size: number) => void;
@@ -15,17 +15,17 @@ export interface PaneLayout {
   commit: (pane: Pane, size: number | null) => void;
 }
 
+const PANE_ELEMENTS: Record<Pane, string> = { side: ".side-column", detail: ".detail-pane", selected: ".selection-pane" };
+
 /** Pane sizes the user has set, remembered in this browser. Attach `ref` to the app grid. */
 export function usePaneSizes(): { ref: React.RefObject<HTMLDivElement | null>; layout: PaneLayout } {
   const ref = useRef<HTMLDivElement | null>(null);
   const [sizes, setSizes] = useState<PaneSizes>(readSizes);
 
   const measure = useCallback((pane: Pane) => {
-    const element = ref.current;
-    if (!element) return 0;
-    const style = getComputedStyle(element);
-    const tracks = (pane === "side" ? style.gridTemplateColumns : style.gridTemplateRows).split(" ");
-    return parseFloat(tracks.at(-1) ?? "0") || 0;
+    const box = ref.current?.querySelector(PANE_ELEMENTS[pane])?.getBoundingClientRect();
+    if (!box) return 0;
+    return pane === "side" ? box.width : box.height;
   }, []);
 
   const preview = useCallback((pane: Pane, size: number) => {

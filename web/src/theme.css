@@ -209,7 +209,8 @@ button {
 
 .app-header,
 .app-graph,
-.side-pane,
+.selection-pane,
+.reach-pane,
 .detail-pane {
   border: 1px solid var(--border);
   border-radius: var(--pane-radius);
@@ -217,7 +218,8 @@ button {
 
 /* The header keeps overflow visible, so search results can drop down over the graph. */
 .app-graph,
-.side-pane,
+.selection-pane,
+.reach-pane,
 .detail-pane {
   overflow: hidden;
 }

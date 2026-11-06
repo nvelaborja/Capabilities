@@ -6,14 +6,20 @@
   touch-action: none;
 }
 
+.splitter-vertical {
+  cursor: col-resize;
+}
+
+.splitter-horizontal {
+  cursor: row-resize;
+}
+
 .splitter-side {
   grid-area: vsplit;
-  cursor: col-resize;
 }
 
 .splitter-detail {
   grid-area: hsplit;
-  cursor: row-resize;
 }
 
 .splitter::after {
@@ -27,12 +33,12 @@
   transition: background-color 120ms, width 120ms, height 120ms;
 }
 
-.splitter-side::after {
+.splitter-vertical::after {
   width: 4px;
   height: 2.5rem;
 }
 
-.splitter-detail::after {
+.splitter-horizontal::after {
   width: 2.5rem;
   height: 4px;
 }
@@ -43,12 +49,12 @@
   background: var(--accent);
 }
 
-.splitter-side:is(:hover, :focus-visible, .dragging)::after {
+.splitter-vertical:is(:hover, :focus-visible, .dragging)::after {
   width: 2px;
   height: calc(100% - 1rem);
 }
 
-.splitter-detail:is(:hover, :focus-visible, .dragging)::after {
+.splitter-horizontal:is(:hover, :focus-visible, .dragging)::after {
   width: calc(100% - 1rem);
   height: 2px;
 }

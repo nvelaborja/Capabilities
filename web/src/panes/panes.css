@@ -1,11 +1,38 @@
 /* ---------------------------------------------------------------- side pane */
 
-.side-pane {
+/*
+ * Two panes in one column (ADR 0029). By default the Selected pane fits its content up to half the column, and the
+ * Implied and reachable pane takes the rest. Once the user drags the gap, --selected-height takes over; min() keeps
+ * room for the pane below when the window shrinks.
+ */
+.side-column {
   grid-area: side;
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: fit-content(50%) var(--gutter) minmax(0, 1fr);
+  min-height: 0;
+}
+
+.app.selected-sized .side-column {
+  grid-template-rows: min(var(--selected-height), calc(100% - 9rem)) var(--gutter) minmax(0, 1fr);
+}
+
+/* Flex, not grid rows, so the optional warning can come and go without shifting the other rows. */
+.selection-pane,
+.reach-pane {
+  display: flex;
+  flex-direction: column;
   min-height: 0;
   background: var(--surface);
+}
+
+.selection-pane > *,
+.reach-pane > * {
+  flex: none;
+}
+
+.selection-pane > .capability-list,
+.reach-pane > .capability-list {
+  flex: 1 1 auto;
 }
 
 .preset-picker {
@@ -68,10 +95,6 @@
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   min-height: 0;
-}
-
-.capability-list + .capability-list {
-  border-top: 1px solid var(--border);
 }
 
 .capability-header {

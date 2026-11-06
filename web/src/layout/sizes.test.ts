@@ -21,15 +21,19 @@ describe("bounds", () => {
 
 describe("dragging", () => {
   it("grows the side pane as the gap moves left, towards the graph", () => {
-    expect(dragResize({ pointer: 1000, size: 300 }, 900, bounds)).toBe(400);
+    expect(dragResize("side", { pointer: 1000, size: 300 }, 900, bounds)).toBe(400);
   });
 
   it("shrinks the detail pane as the gap moves down", () => {
-    expect(dragResize({ pointer: 500, size: 300 }, 550, bounds)).toBe(250);
+    expect(dragResize("detail", { pointer: 500, size: 300 }, 550, bounds)).toBe(250);
+  });
+
+  it("grows the Selected pane as the gap moves down, since it sits on top", () => {
+    expect(dragResize("selected", { pointer: 300, size: 200 }, 380, bounds)).toBe(280);
   });
 
   it("stops at the bounds", () => {
-    expect(dragResize({ pointer: 1000, size: 300 }, 0, bounds)).toBe(600);
+    expect(dragResize("side", { pointer: 1000, size: 300 }, 0, bounds)).toBe(600);
   });
 });
 
@@ -40,6 +44,8 @@ describe("keyboard", () => {
     ["side", "ArrowLeft", true, 300 + BIG_STEP],
     ["detail", "ArrowUp", false, 300 + STEP],
     ["detail", "ArrowDown", true, 300 - BIG_STEP],
+    ["selected", "ArrowDown", false, 300 + STEP],
+    ["selected", "ArrowUp", false, 300 - STEP],
     ["side", "Home", false, 200],
     ["detail", "End", false, 600],
   ] as const)("resizes the %s pane with %s (shift: %s)", (pane, key, shift, expected) => {

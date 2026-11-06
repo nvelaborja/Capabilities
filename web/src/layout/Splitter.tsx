@@ -4,7 +4,11 @@ import "./layout.css";
 import { boundsFor, type Bounds, dragResize, keyResize, type Pane } from "./sizes";
 import type { PaneLayout } from "./usePaneSizes";
 
-const LABELS: Record<Pane, string> = { side: "Resize the side pane", detail: "Resize the detail pane" };
+const LABELS: Record<Pane, string> = {
+  side: "Resize the side panes",
+  detail: "Resize the detail pane",
+  selected: "Resize the Selected pane",
+};
 
 const viewport = () => ({ width: window.innerWidth, height: window.innerHeight });
 
@@ -31,7 +35,7 @@ export function Splitter({ pane, layout }: { pane: Pane; layout: PaneLayout }) {
   const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
     const current = drag.current;
     if (!current) return;
-    current.last = dragResize(current, position(event), current.bounds);
+    current.last = dragResize(pane, current, position(event), current.bounds);
     layout.preview(pane, current.last);
   };
   const onPointerEnd = () => {
@@ -58,7 +62,7 @@ export function Splitter({ pane, layout }: { pane: Pane; layout: PaneLayout }) {
       aria-valuemax={bounds.max}
       aria-valuenow={size}
       title="Drag to resize. Double-click to reset."
-      className={`splitter splitter-${pane}${dragging ? " dragging" : ""}`}
+      className={`splitter splitter-${vertical ? "vertical" : "horizontal"} splitter-${pane}${dragging ? " dragging" : ""}`}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerEnd}

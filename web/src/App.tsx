@@ -125,7 +125,7 @@ export function App() {
   const editedCount = selection.added.length + selection.removed.length;
 
   return (
-    <div ref={appRef} style={layout.style} className={`app${shown ? " has-detail" : ""}`}>
+    <div ref={appRef} style={layout.style} className={`app${shown ? " has-detail" : ""}${layout.sizes.selected ? " selected-sized" : ""}`}>
       <header className="app-header">
         <h1>Capabilities</h1>
         <span className="app-tagline">What it takes to make things, and what else was within reach.</span>
@@ -199,6 +199,7 @@ export function App() {
           onClear={() => dispatch({ type: "clear" })}
           onRemove={remove}
           onPick={(id) => open(id, true)}
+          splitter={<Splitter pane="selected" layout={layout} />}
         />
       )}
       <ConfirmDialog
