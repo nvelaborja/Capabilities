@@ -3,90 +3,75 @@ import { describe, expect, it } from "vitest";
 
 import { sampleGraph } from "../test/sampleGraph";
 import { toElements } from "./elements";
-import {
-  COLUMN_GAP,
-  minimumLength,
-  orderByBarycentre,
-  READABLE_ZOOM,
-  resolveRanks,
-  runLayout,
-  showInitialView,
-  stackColumn,
-} from "./layout";
+import { COLUMN_GAP, READABLE_ZOOM, resolveRanks, runLayout, showInitialView, sortColumn, stackColumn } from "./layout";
 
 const headless = () => cytoscape({ headless: true, styleEnabled: false, elements: toElements(sampleGraph) });
 
-describe("minimumLength", () => {
-  it("asks for the gap between the two columns", () => {
-    expect(minimumLength(0, 3)).toBe(3);
+describe("resolveRanks", () => {
+  it("uses tech levels", () => {
+    expect(resolveRanks(headless()).get("knife")).toBe(1);
   });
 
-  it.each([
-    [5, 2],
-    [null, 4],
-    [4, null],
-  ])("falls back to one column for backward or unranked edges (%s → %s)", (source, target) => {
-    expect(minimumLength(source, target)).toBe(1);
+  it("places things without a level next to what they connect to, or in the first column", () => {
+    // given: a modern saw with no level that cuts granite (level 5), and an unconnected laser
+    const cy = cytoscape({
+      headless: true,
+      styleEnabled: false,
+      elements: [
+        { data: { id: "saw", rank: null } },
+        { data: { id: "cut-granite", rank: 5 } },
+        { data: { id: "laser", rank: null } },
+        { data: { id: "saw->cut-granite", source: "saw", target: "cut-granite" } },
+      ],
+    });
+    const ranks = resolveRanks(cy);
+    expect(ranks.get("saw")).toBe(4);
+    expect(ranks.get("laser")).toBe(0);
   });
 });
 
-describe("resolveRanks", () => {
-  it("uses tech levels and places unranked routes right of what feeds them", () => {
-    // given: knife is level 1 (rank 2); the chopping route has no level and is fed by the blade category (rank 2)
-    const ranks = resolveRanks(headless());
-    expect(ranks.get("knife")).toBe(2);
-    expect(ranks.get("chop")).toBe(3);
-  });
+const item = (id: string, kind: string, label = id, height = 30) => ({ id, kind, label, height });
 
-  it("places unranked things left of what they feed, or in the first column", () => {
-    const ranks = resolveRanks(headless());
-    expect(ranks.get("laser")).toBe(0); // feeds nothing and is fed by nothing
+describe("sortColumn", () => {
+  it("sorts by type, then alphabetically ignoring case", () => {
+    const sorted = sortColumn([
+      item("heat", "effect", "Heat"),
+      item("saw", "artifact", "saw"),
+      item("axe", "artifact", "Axe"),
+      item("cut", "action", "Cut wood"),
+      item("wood", "material", "Wood"),
+    ]);
+    expect(sorted.map((i) => i.id)).toEqual(["wood", "axe", "saw", "cut", "heat"]);
   });
 });
 
 describe("stackColumn", () => {
-  it("stacks nodes in order, a gap apart, centred on zero", () => {
-    const placed = stackColumn(
-      [
-        { id: "a", height: 30 },
-        { id: "b", height: 50 },
-      ],
-      10,
-    );
-    // total height 90: a spans -45..-15, b spans -5..45
-    expect(placed.get("a")).toBe(-30);
-    expect(placed.get("b")).toBe(20);
-  });
-});
-
-describe("orderByBarycentre", () => {
-  it("lines nodes up with their neighbours to reduce crossings", () => {
-    // given: column 0 has top, bottom; column 1 has x (fed by bottom) above y (fed by top), so the links cross
-    const columns = new Map([
-      [0, ["top", "bottom"]],
-      [1, ["x", "y"]],
-    ]);
-    const ranks = new Map([["top", 0], ["bottom", 0], ["x", 1], ["y", 1]]);
-    const links: [string, string][] = [
-      ["bottom", "x"],
-      ["top", "y"],
-    ];
-    // when: reordering
-    const ordered = orderByBarycentre(columns, ranks, links);
-    // then: the crossing is gone
-    const column0 = ordered.get(0) ?? [];
-    const column1 = ordered.get(1) ?? [];
-    expect(column0.indexOf("top") < column0.indexOf("bottom")).toBe(column1.indexOf("y") < column1.indexOf("x"));
+  it("stacks in order, centred on zero, with extra space where the type changes", () => {
+    const placed = stackColumn([item("a", "material"), item("b", "material"), item("c", "artifact")]);
+    const at = (id: string) => placed.get(id) ?? Number.NaN;
+    const [a, b, c] = [at("a"), at("b"), at("c")];
+    expect(b - a).toBe(30 + 14);
+    expect(c - b).toBe(30 + 14 + 18);
+    // centred: the top of a and the bottom of c are equally far from zero
+    expect((a - 15 + (c + 15)) / 2).toBeCloseTo(0);
   });
 });
 
 describe("runLayout", () => {
+  it("orders each column by type, then name", () => {
+    // given: level 0 holds two materials (flint, wood); level 1 holds a knife (tool) and a blade (category)
+    const cy = headless();
+    runLayout(cy);
+    expect(cy.$id("flint").position("y")).toBeLessThan(cy.$id("wood").position("y"));
+    expect(cy.$id("knife").position("y")).toBeLessThan(cy.$id("blade").position("y"));
+  });
+
   it("puts each node in its tech-level column, primitives on the left", () => {
     const cy = headless();
     runLayout(cy);
     expect(cy.$id("flint").position("x")).toBe(0);
-    expect(cy.$id("knife").position("x")).toBe(2 * COLUMN_GAP);
-    expect(cy.$id("spear").position("x")).toBe(6 * COLUMN_GAP);
+    expect(cy.$id("knife").position("x")).toBe(COLUMN_GAP);
+    expect(cy.$id("spear").position("x")).toBe(3 * COLUMN_GAP);
   });
 
   it("labels each level's column", () => {

@@ -47,10 +47,6 @@ export function App() {
   }, []);
 
   const catalog = useMemo(() => (graph.status === "ready" ? createCatalog(graph.value) : null), [graph]);
-  const nodes = useMemo(
-    () => new Map(graph.status === "ready" ? graph.value.nodes.map((node) => [node.id, node]) : []),
-    [graph],
-  );
 
   const showNode = useCallback((id: string | null, center: boolean) => {
     setFocus((previous) => ({ id, center, seq: previous.seq + 1 }));
@@ -102,7 +98,6 @@ export function App() {
         {focus.id && catalog && (
           <NodeCard
             id={focus.id}
-            node={nodes.get(focus.id)}
             catalog={catalog}
             explore={explore.data}
             onAdd={add}

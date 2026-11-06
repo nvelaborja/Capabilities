@@ -1,124 +1,81 @@
-import cytoscape, { type Core, type EdgeSingular, type NodeCollection } from "cytoscape";
-import dagre from "cytoscape-dagre";
+import type { Core, NodeCollection } from "cytoscape";
 
-cytoscape.use(dagre);
+import { TYPED_KINDS } from "./styles";
 
 /** Below this zoom, node labels are too small to read, so the first view zooms in to it instead of fitting all. */
 export const READABLE_ZOOM = 0.8;
-/** Horizontal distance between layout columns. Things are two columns apart, with route dots in between. */
-export const COLUMN_GAP = 110;
+/** Horizontal distance between tech-level columns. */
+export const COLUMN_GAP = 230;
 const ROW_GAP = 14;
+/** Extra space between type groups within a column (materials, then tools, then actions...). */
+const GROUP_GAP = 18;
 const PADDING = 24;
-const LABEL_OFFSET = 56;
+const LABEL_OFFSET = 28;
 
-/**
- * The shortest an edge may be, in layout columns. Asking dagre for at least the tech-level gap gives it a vertical
- * order that suits the columns the nodes are then snapped to. Backward edges (cycles) fall back to the minimum.
- */
-export function minimumLength(sourceRank: number | null, targetRank: number | null): number {
-  if (sourceRank === null || targetRank === null) return 1;
-  return Math.max(1, targetRank - sourceRank);
+export interface ColumnItem {
+  id: string;
+  label: string;
+  kind: string;
+  height: number;
 }
 
-const DAGRE: dagre.DagreLayoutOptions = {
-  name: "dagre",
-  rankDir: "LR",
-  nodeSep: 14,
-  rankSep: 56,
-  edgeSep: 6,
-  padding: PADDING,
-  animate: false,
-  fit: false,
-  minLen: (edge: EdgeSingular) =>
-    minimumLength(edge.source().data("rank") as number | null, edge.target().data("rank") as number | null),
-};
-
 /**
- * Lay the graph out as a technology tree (ADR 0018): one column per tech level, primitives on the left. Dagre gives
- * a first top-to-bottom order; a few barycentre sweeps then pull each node towards its neighbours in nearby columns,
- * and each column is stacked tightly around the middle.
+ * Lay the graph out as a technology tree (ADR 0018, 0023): one column per tech level, primitives on the left.
+ * Within a column, nodes are sorted by type, then alphabetically, like the lists in the side pane.
  */
 export function runLayout(cy: Core): void {
   cy.remove(".level-label");
-  cy.elements().not("edge.is_a").layout(DAGRE).run();
   const ranks = resolveRanks(cy);
-  const columns = new Map<number, string[]>();
-  const byDagre = cy.nodes().sort((a, b) => a.position("y") - b.position("y"));
-  byDagre.forEach((node) => {
+  const columns = new Map<number, ColumnItem[]>();
+  cy.nodes().forEach((node) => {
     const rank = ranks.get(node.id()) ?? 0;
-    columns.set(rank, [...(columns.get(rank) ?? []), node.id()]);
+    const item = { id: node.id(), label: node.data("label") as string, kind: node.data("kind") as string, height: node.data("height") as number };
+    columns.set(rank, [...(columns.get(rank) ?? []), item]);
   });
-  // "Is a" links are left out: they would pull categories towards their members.
-  const links: [string, string][] = [];
-  cy.edges().forEach((edge) => {
-    if (!edge.hasClass("is_a")) links.push([edge.source().id(), edge.target().id()]);
-  });
-  const ordered = orderByBarycentre(columns, ranks, links);
   cy.batch(() => {
-    for (const [rank, ids] of ordered) {
-      const items = ids.map((id) => ({ id, height: cy.getElementById(id).data("height") as number }));
-      for (const [id, y] of stackColumn(items, ROW_GAP)) {
+    for (const [rank, items] of columns) {
+      for (const [id, y] of stackColumn(sortColumn(items))) {
         cy.getElementById(id).position({ x: rank * COLUMN_GAP, y });
       }
     }
   });
-  addLevelLabels(cy, [...ordered.keys()]);
+  addLevelLabels(cy, [...columns.keys()]);
 }
 
-/**
- * Reorder each column so nodes sit near the average position of their neighbours: left to right using links from
- * earlier columns, then right to left using links to later ones. The classic way to reduce crossings in layered
- * drawings. Nodes without neighbours in that direction keep their place.
- */
-export function orderByBarycentre(
-  columns: Map<number, string[]>,
-  ranks: Map<string, number>,
-  links: [string, string][],
-  sweeps = 3,
-): Map<number, string[]> {
-  const result = new Map([...columns].map(([rank, ids]) => [rank, [...ids]]));
-  const position = new Map<string, number>();
-  const placeColumn = (ids: string[]) => ids.forEach((id, index) => position.set(id, index - (ids.length - 1) / 2));
-  result.forEach(placeColumn);
-  const order = [...result.keys()].sort((a, b) => a - b);
+const typeIndex = (kind: string) => {
+  const index = (TYPED_KINDS as readonly string[]).indexOf(kind);
+  return index === -1 ? TYPED_KINDS.length : index;
+};
 
-  const reorder = (rank: number, neighbourOf: (id: string) => string[]) => {
-    const ids = result.get(rank) ?? [];
-    const key = (id: string) => {
-      const ys = neighbourOf(id).map((n) => position.get(n)).filter((y): y is number => y !== undefined);
-      return ys.length > 0 ? mean(ys) : (position.get(id) ?? 0);
-    };
-    const keys = new Map(ids.map((id) => [id, key(id)]));
-    const sorted = [...ids].sort((a, b) => (keys.get(a) ?? 0) - (keys.get(b) ?? 0));
-    result.set(rank, sorted);
-    placeColumn(sorted);
-  };
-
-  const rankOf = (id: string) => ranks.get(id) ?? 0;
-  const fromLeft = (id: string) => links.filter(([, t]) => t === id).map(([s]) => s).filter((s) => rankOf(s) < rankOf(id));
-  const toRight = (id: string) => links.filter(([s]) => s === id).map(([, t]) => t).filter((t) => rankOf(t) > rankOf(id));
-  for (let sweep = 0; sweep < sweeps; sweep++) {
-    order.forEach((rank) => reorder(rank, fromLeft));
-    [...order].reverse().forEach((rank) => reorder(rank, toRight));
-  }
-  return result;
+/** Type first (materials, tools and products, actions, categories, effects), then alphabetically by label. */
+export function sortColumn(items: ColumnItem[]): ColumnItem[] {
+  return [...items].sort(
+    (a, b) => typeIndex(a.kind) - typeIndex(b.kind) || a.label.localeCompare(b.label, undefined, { sensitivity: "base" }),
+  );
 }
 
-/** Stack a column's nodes in order, a fixed gap apart, centred on y = 0. */
-export function stackColumn(items: { id: string; height: number }[], gap: number): Map<string, number> {
-  const total = items.reduce((sum, item) => sum + item.height, 0) + gap * Math.max(0, items.length - 1);
+/** Stack a column's nodes in order, centred on y = 0, with a little more space where the type changes. */
+export function stackColumn(items: ColumnItem[]): Map<string, number> {
+  const gaps = items.map((item, index) => {
+    const previous = items[index - 1];
+    if (!previous) return 0;
+    return previous.kind === item.kind ? ROW_GAP : ROW_GAP + GROUP_GAP;
+  });
+  const total = items.reduce((sum, item, index) => sum + item.height + (gaps[index] ?? 0), 0);
   const placed = new Map<string, number>();
   let top = -total / 2;
-  for (const item of items) {
+  items.forEach((item, index) => {
+    top += gaps[index] ?? 0;
     placed.set(item.id, top + item.height / 2);
-    top += item.height + gap;
-  }
+    top += item.height;
+  });
   return placed;
 }
 
 /**
- * Each node's column. Things and actions come from their tech level; nodes without one (verb routes, things with
- * no known route) go one column right of what feeds them, else one column left of what they feed.
+ * Each node's column. Things and actions come from their tech level; nodes without one (things with no known
+ * route, such as the modern diamond saw) go one column right of what feeds them, else one column left of what they
+ * feed.
  */
 export function resolveRanks(cy: Core): Map<string, number> {
   const ranks = new Map<string, number>();
@@ -129,7 +86,7 @@ export function resolveRanks(cy: Core): Map<string, number> {
   });
   const known = (collection: NodeCollection) =>
     collection.map((n) => ranks.get(n.id())).filter((rank): rank is number => rank !== undefined);
-  // Unranked nodes can depend on each other (a verb route fed only by an unranked thing), hence a few passes.
+  // Unranked nodes can depend on each other, hence a few passes.
   for (let pass = 0; pass < 3; pass++) {
     nodes.forEach((node) => {
       if (ranks.has(node.id())) return;
@@ -145,20 +102,16 @@ export function resolveRanks(cy: Core): Map<string, number> {
   return ranks;
 }
 
-function mean(values: number[]): number {
-  return values.length === 0 ? 0 : values.reduce((sum, value) => sum + value, 0) / values.length;
-}
-
-/** A "Level N" heading just above each column of things (even ranks), so the tree reads left to right. */
+/** A "Level N" heading just above each column, so the tree reads left to right. */
 function addLevelLabels(cy: Core, ranks: number[]): void {
-  const levels = ranks.filter((rank) => rank % 2 === 0).sort((a, b) => a - b);
+  const levels = [...ranks].sort((a, b) => a - b);
   cy.add(
     levels.map((rank) => {
       const column = cy.nodes().filter((node) => node.position("x") === rank * COLUMN_GAP);
       return {
         group: "nodes" as const,
-        data: { id: `level-label-${rank / 2}`, label: `Level ${rank / 2}`, width: 80, height: 24 },
-        position: { x: rank * COLUMN_GAP, y: column.boundingBox().y1 - LABEL_OFFSET / 2 },
+        data: { id: `level-label-${rank}`, label: `Level ${rank}`, width: 80, height: 24 },
+        position: { x: rank * COLUMN_GAP, y: column.boundingBox().y1 - LABEL_OFFSET },
         classes: ["level-label"],
         selectable: false,
         grabbable: false,

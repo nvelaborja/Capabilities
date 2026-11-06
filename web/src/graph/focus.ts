@@ -1,14 +1,11 @@
 import type { CollectionReturnValue, Core, NodeSingular } from "cytoscape";
 
 /**
- * A node, everything adjacent to it (including the categories it belongs to, or a category's members), and one
- * route further in each direction: what the routes that make it require, and what the routes it feeds produce.
- * This is "one level deep" (ADR 0020).
+ * A node and everything one step away: what it needs, what it helps make, and the categories it belongs to (or a
+ * category's members). This is "one level deep" (ADR 0020).
  */
 export function neighbourhood(node: NodeSingular): CollectionReturnValue {
-  const makers = node.incomers("node.route");
-  const uses = node.outgoers("node.route");
-  return node.closedNeighborhood().union(makers.incomers()).union(uses.outgoers());
+  return node.closedNeighborhood();
 }
 
 const FOCUS_CLASSES = "faded focused highlighted";

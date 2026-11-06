@@ -1,10 +1,9 @@
-import type { DrawnKind, ExploreResponse, GraphNode, Status } from "../api/types";
+import type { DrawnKind, ExploreResponse, Status } from "../api/types";
 import type { Catalog } from "../catalog";
 import { STATUS_LABELS, TYPE_LABELS } from "../legend/Legend";
 
 interface NodeCardProps {
   id: string;
-  node: GraphNode | undefined;
   catalog: Catalog;
   explore: ExploreResponse | null;
   onAdd: (id: string) => void;
@@ -18,13 +17,13 @@ const SELECTABLE = new Set(["material", "artifact", "action"]);
  * A small card for the clicked node, with the button that adds it to (or removes it from) the selection. The
  * detail pane (phase 4) grows out of this.
  */
-export function NodeCard({ id, node, catalog, explore, onAdd, onRemove, onClose }: NodeCardProps) {
+export function NodeCard({ id, catalog, explore, onAdd, onRemove, onClose }: NodeCardProps) {
   const entry = catalog.get(id);
   const status = explore?.status[id] as Status | undefined;
   const explicit = explore ? [...explore.selected, ...explore.hypothetical].includes(id) : false;
   const neededBy = (explore?.implied_by[id] ?? []).map((source) => catalog.get(source).label.toLowerCase());
   const near = explore?.near.find((item) => item.id === id);
-  const kindLabel = entry.kind === "route" ? "A way to make something" : TYPE_LABELS[entry.kind as DrawnKind] ?? entry.kind;
+  const kindLabel = TYPE_LABELS[entry.kind as DrawnKind] ?? entry.kind;
 
   return (
     <section className="node-card" aria-label={`${entry.label} details`}>
@@ -49,7 +48,6 @@ export function NodeCard({ id, node, catalog, explore, onAdd, onRemove, onClose 
       )}
       {entry.kind === "category" && <p>This stands for any of its members. Select a specific member instead.</p>}
       {entry.kind === "effect" && <p>Effects follow from what is selected; they can't be selected themselves.</p>}
-      {entry.kind === "route" && node?.achieves && <p>One way to make {catalog.get(node.achieves.id).label.toLowerCase()}.</p>}
       {SELECTABLE.has(entry.kind) && (
         <div className="node-card-actions">
           {explicit ? (

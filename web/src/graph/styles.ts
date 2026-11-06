@@ -92,8 +92,8 @@ export function iconImage(icon: string): string {
 }
 
 /**
- * Edges stay in the background until a node is clicked: faint when idle, a little stronger for routes that work
- * (live), clear for the clicked node's neighbourhood, and nearly gone for everything else while focused.
+ * Edges stay in the background until a node is clicked: faint when idle, a little stronger where a route that
+ * works runs through them (live), clear for the clicked node's neighbourhood, and nearly gone for everything else while focused.
  */
 export const EDGE_OPACITY = { idle: 0.12, live: 0.3, highlighted: 0.95, faded: 0.04 } as const;
 
@@ -152,22 +152,6 @@ export function buildStylesheet(t: GraphTokens): StylesheetJson {
     { selector: "node.category", style: { "font-style": "italic" } },
     { selector: "node.ubiquitous", style: { "font-size": 11 } },
     {
-      // Route junctions stay small dots: they are connectors, not things.
-      selector: "node.route",
-      style: {
-        shape: "ellipse",
-        "background-color": t.edge,
-        "border-width": 0,
-        "font-size": 8,
-        color: t.muted,
-        "text-valign": "bottom",
-        "text-margin-x": 0,
-        "text-margin-y": 3,
-        // Route names only appear once zoomed in, to keep the overview readable.
-        "min-zoomed-font-size": 12,
-      },
-    },
-    {
       selector: "node.level-label",
       style: {
         shape: "round-rectangle",
@@ -211,9 +195,6 @@ export function buildStylesheet(t: GraphTokens): StylesheetJson {
     ...statusRules,
     { selector: "node.status-selected, node.status-hypothetical", style: { "font-weight": "bold" } },
     { selector: "node.status-out", style: { "border-color": t.out, color: t.muted } },
-    { selector: "node.route.route-yes", style: { "background-color": t.accent } },
-    { selector: "node.route.route-maybe", style: { "background-color": t.surface, "border-width": 1.5, "border-color": t.accent } },
-    { selector: "node.route.route-no", style: { "background-color": t.out } },
 
     // ---------------------------------------------------------------- focus (clicking a node)
     { selector: "node.focused", style: { "underlay-color": t.accent, "underlay-opacity": 0.25, "underlay-padding": 6 } },

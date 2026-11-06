@@ -75,9 +75,6 @@ export function Legend() {
                 {TYPE_LABELS[kind]}
               </li>
             ))}
-            <li>
-              <span className="mini-route" aria-hidden="true" />A way to make it
-            </li>
           </ul>
         </section>
         <section aria-label="Statuses">
@@ -92,9 +89,9 @@ export function Legend() {
           </ul>
         </section>
         <p className="legend-note">
-          Columns are tech levels: primitive things on the left, advanced ones on the right. Several dots into a thing
-          mean <em>any one</em> of these ways works. Lines into one dot mean that way needs <em>all</em> of them. Dashed
-          lines are tools; dotted lines are actions.
+          Columns are tech levels: primitive things on the left, advanced ones on the right. Lines run from what a thing
+          needs to the thing. Dashed lines are tools; dotted lines are actions. When there are several ways to make
+          something, click it to see each one.
         </p>
       </div>
     </details>
