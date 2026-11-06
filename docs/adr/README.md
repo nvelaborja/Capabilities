@@ -11,7 +11,7 @@ Each file records one significant design decision: the context, what we decided,
 | [0003](0003-model-timeless-kinds-of-things.md) | Model timeless kinds of things, not history | Accepted |
 | [0004](0004-store-the-graph-as-yaml-in-git.md) | Store the graph as YAML files in git, validated by JSON Schema | Accepted |
 | [0005](0005-know-how-never-gates-reachability.md) | Know-how never gates reachability | Accepted |
-| [0006](0006-separate-selected-implied-and-reachable.md) | Separate selected, hypothetical, implied and reachable | Accepted |
+| [0006](0006-separate-selected-implied-and-reachable.md) | Separate selected, hypothetical, implied and reachable | Accepted; near-miss definition superseded by 0027 |
 | [0007](0007-compare-ranges-with-three-answers.md) | Compare ranges with three answers; missing data is "maybe" | Accepted |
 | [0008](0008-record-the-basis-of-every-number.md) | Record the basis of every number and the status of every reference | Accepted |
 | [0009](0009-check-feasibility-with-performance-envelopes.md) | Check feasibility with performance envelopes and ballpark bands | Accepted |
@@ -30,5 +30,7 @@ Each file records one significant design decision: the context, what we decided,
 | [0022](0022-type-strip-with-emoji-on-neutral-nodes.md) | Show type with a coloured strip and emoji on neutral nodes | Accepted |
 | [0023](0023-draw-requirements-straight-to-products.md) | Draw requirements straight to products, and order columns by type and name | Accepted |
 | [0024](0024-fold-busy-nodes-links-into-summary-nodes.md) | Fold a busy node's extra links into summary nodes | Accepted; click behaviour superseded by 0026 |
-| [0025](0025-detail-pane-below-graph-and-chip-lists.md) | Put the detail pane under the graph, and show the side pane as chips | Accepted |
+| [0025](0025-detail-pane-below-graph-and-chip-lists.md) | Put the detail pane under the graph, and show the side pane as chips | Accepted; status wording superseded by 0028 |
 | [0026](0026-explain-lines-and-summaries-in-the-detail-pane.md) | Explain lines, summary nodes and know-how in the detail pane | Accepted |
+| [0027](0027-count-one-step-away-as-one-raw-ingredient.md) | Count "one step away" as one raw ingredient, however deep | Accepted |
+| [0028](0028-floating-resizable-panes-and-neutral-wording.md) | Float the panes with resizable gaps, and word statuses without assuming a group | Accepted |

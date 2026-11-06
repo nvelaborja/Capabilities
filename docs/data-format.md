@@ -135,11 +135,11 @@ The reasoner in `src/capabilities/reasoner.py` follows these rules.
 
 ### Selected, implied, reachable
 
-- **Selected:** what the user says a group made or did (from a profile, plus or minus their own choices).
+- **Selected:** what the user says was made or done (from a profile, plus or minus their own choices).
 - **Hypothetical:** what-if additions. They are treated like selections but reported separately.
 - **Implied:** what every route to a selected item needs, recursively. For example, anyone who had tin bronze had copper, a crucible, and heat of at least 1085 °C. Having something also implies the capability of making it: the techniques shared by all its routes are listed as implied.
 - **Reachable:** everything that can be made from selected + implied + ubiquitous materials, repeating until nothing new appears. Cycles (heat needs charcoal, charcoal needs a fire) are fine.
-- **Near misses:** things one requirement away.
+- **One step away (near misses):** things that adding one raw ingredient would make reachable, however long the chain from it. A raw ingredient is something no route makes: a natural material, or a thing with no known route. Adding a made thing directly doesn't count ([ADR 0027](adr/0027-count-one-step-away-as-one-raw-ingredient.md)).
 
 ### Core rules
 

@@ -1,6 +1,6 @@
 # 0006. Separate selected, hypothetical, implied and reachable
 
-- **Status:** Accepted
+- **Status:** Accepted; the definition of near misses superseded by [0027](0027-count-one-step-away-as-one-raw-ingredient.md)
 - **Date:** 2026-11-04 (recorded 2026-11-05)
 
 ## Context
