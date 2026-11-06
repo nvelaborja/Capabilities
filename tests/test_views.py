@@ -284,6 +284,22 @@ class TestExplain:
             explain(graph, levels, context_for(graph, Selection()), node)
 
 
+class TestExplainAnyTarget:
+    """Actions whose answer doesn't depend on the target show up as "move:(any)", and must explain like any other."""
+
+    def test_explains_moving_anything(self, graph, levels):
+        # given: Egypt, where moving needs no particular load
+        view = explain(graph, levels, context_for(graph, egypt(graph)), "move:(any)")
+        # then: it is named for any target, has the verb's routes, and no particular target
+        assert view["label"] == "Move anything"
+        assert view["routes"] and "target" not in view["about"]
+        assert view["status"] in ("reachable", "maybe")
+
+    def test_rejects_an_unknown_verb_with_any_target(self, graph, levels):
+        with pytest.raises(UnknownNode):
+            explain(graph, levels, context_for(graph, egypt(graph)), "fly:(any)")
+
+
 class TestExplainEdge:
     def test_a_requirement_line_lists_each_route_with_the_sources_role_and_threshold(self, graph, levels):
         # given: heat feeds steel through two routes, at different temperatures

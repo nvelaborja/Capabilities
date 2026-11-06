@@ -22,6 +22,9 @@ from .tristate import Tri, as_range, compare
 Action = tuple[str, str]  # (verb, target)
 Bound = tuple[str, float]  # (operator, value), e.g. (">=", 1100)
 
+# The target of an action whose answer doesn't depend on its target ("move:(any)": moving needs no particular load).
+ANY_TARGET = "(any)"
+
 LOWER_BOUND_OPS = (">=", ">")
 UPPER_BOUND_OPS = ("<=", "<")
 
@@ -502,7 +505,7 @@ def explore(graph: Graph, selected: Selection, hypothetical: Selection = Selecti
             # No route depends on the target (e.g. move), so one answer covers every target.
             status = next(iter(statuses.values()))
             if status != Tri.NO:
-                actions[verb] = {"(any)": status.label}
+                actions[verb] = {ANY_TARGET: status.label}
             continue
         target_quantities = _target_quantities(graph, verb)
         found = {}

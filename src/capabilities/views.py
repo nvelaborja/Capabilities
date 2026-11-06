@@ -12,7 +12,7 @@ from typing import Iterable
 
 from .graph import Graph
 from .levels import Levels, action_key
-from .reasoner import Action, Backward, ExploreResult, Necessity, Reachability, Selection, condition_rhs
+from .reasoner import ANY_TARGET, Action, Backward, ExploreResult, Necessity, Reachability, Selection, condition_rhs
 from .tristate import Tri, as_range, compare
 
 # Kinds drawn on the graph. Techniques never gate anything (ADR 0005), so they appear only in details and lists.
@@ -30,12 +30,19 @@ class UnknownNode(KeyError):
 
 def action_label(graph: Graph, action: Action) -> str:
     verb, target = action
+    if target == ANY_TARGET:
+        return f"{graph.label(verb)} anything"
     return f"{graph.label(verb)} {graph.label(target).lower()}"
 
 
 def parse_action(key: str) -> Action:
     verb, target = key.split(":", 1)
     return verb, target
+
+
+def specific_target(target: str) -> str | None:
+    """The target to reason about: none for "(any)", so every route of the verb counts."""
+    return None if target == ANY_TARGET else target
 
 
 def node_label(graph: Graph, key: str) -> str:
@@ -248,6 +255,8 @@ class StatusContext:
         return _tri_status(self.reach.status.get(key, Tri.NO), near=key in self.near)
 
     def _action_status(self, action: Action) -> str:
+        if action[1] == ANY_TARGET:
+            return _tri_status(self.reach.action_status(action[0], None))
         if action in self.hypothetical.actions:
             return "hypothetical"
         if action in self.selected.actions:
@@ -358,7 +367,7 @@ def explain(graph: Graph, levels: Levels, context: StatusContext, key: str, ever
     if kind == "category":
         view["members"] = _ranked(levels, [_member_row(graph, levels, context, m) for m in graph.members(key)])
         return view
-    target = parse_action(key)[1] if kind == "action" else None
+    target = specific_target(parse_action(key)[1]) if kind == "action" else None
     explainer = _Explainer(graph, levels, context.reach, target)
     view["routes"] = sorted((explainer.route_row(rid) for rid in _routes_for(graph, key, kind)),
                             key=lambda r: (r["missing"], r["uncertain"], r["label"].lower()))
@@ -370,7 +379,7 @@ def explain(graph: Graph, levels: Levels, context: StatusContext, key: str, ever
 def _explainable_kind(graph: Graph, key: str) -> str:
     if ":" in key:
         verb, target = parse_action(key)
-        if verb not in graph.verbs or target not in graph.things:
+        if verb not in graph.verbs or (target not in graph.things and target != ANY_TARGET):
             raise UnknownNode(key)
         return "action"
     kind = graph.kind(key)
@@ -427,8 +436,10 @@ def about(graph: Graph, key: str) -> dict:
     """What the node is: description, numbers, where it is found, what kinds it belongs to, and its sources."""
     if ":" in key:
         verb, target = parse_action(key)
-        return {"description": graph.verbs[verb].get("description"), "target": {"id": target, "label": graph.label(target)},
-                "references": []}
+        view = {"description": graph.verbs[verb].get("description"), "references": []}
+        if target != ANY_TARGET:
+            view["target"] = {"id": target, "label": graph.label(target)}
+        return view
     thing = graph.things[key]
     view = {
         "description": thing.get("description"),
@@ -453,12 +464,19 @@ def leads_to(graph: Graph, levels: Levels, context: StatusContext, key: str) -> 
     actions = sorted(referenced_actions(graph))
     via: dict[str, list[str]] = defaultdict(list)
     for route_id, route in sorted(graph.routes.items()):
-        if any(requirement_node(r) == key for r in route["requires"]):
+        if any(_is_requirement(r, key) for r in route["requires"]):
             for product in _main_products(graph, route_id, actions):
                 via[product].append(route.get("label", route_id))
     rows = [{"id": p, "label": node_label(graph, p), "kind": "action" if ":" in p else graph.kind(p), "status": context.status(p),
              "level": levels.of(p), "via": routes} for p, routes in via.items() if p != key]
     return _ranked(levels, rows)
+
+
+def _is_requirement(requirement: dict, key: str) -> bool:
+    """Whether a requirement names this node; "move:(any)" stands for moving any target."""
+    if key.endswith(f":{ANY_TARGET}"):
+        return requirement["role"] == "action" and requirement["verb"] == parse_action(key)[0]
+    return requirement_node(requirement) == key
 
 
 def _main_products(graph: Graph, route_id: str, actions: list[Action]) -> list[str]:
@@ -467,7 +485,8 @@ def _main_products(graph: Graph, route_id: str, actions: list[Action]) -> list[s
 
 def _routes_for(graph: Graph, key: str, kind: str) -> list[str]:
     if kind == "action":
-        return graph.verb_routes(*parse_action(key))
+        verb, target = parse_action(key)
+        return graph.verb_routes(verb, specific_target(target))
     if kind == "effect":
         return graph.routes_achieving.get(key, [])
     return graph.routes_producing.get(key, [])
