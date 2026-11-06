@@ -36,7 +36,7 @@ uv run capabilities serve                 # then open http://127.0.0.1:8000
 
 Pick a preset such as Middle Kingdom Egypt on the right. **Selected** shows your choices. **Implied and reachable** shows what follows: what they must have had (*implied*), what they could have made or done, and what is one step away. Each item is a chip drawn like a graph node. Click any node on the graph, or any chip in a list, to open its details under the graph, reading left to right like the graph: each way to make it with what is met (✓), missing (✗) or unknown (?) and why; what it is and the sources; and what it leads to. Click a requirement to see what *it* needs; the breadcrumb leads back. **Expand all dependencies** lists everything it needs at every depth, and **Focus** shows only that part of the graph. Search (press `/`) finds any thing or action, including actions not drawn yet. Undo and redo cover every change, and the address bar always holds a link to the current selection, such as `?preset=middle-kingdom-egypt&add=hematite`.
 
-The graph reads as a technology tree, primitives on the left. A coloured strip with an emoji shows what each node is, and its border shows where it stands. Busy nodes show their 8 most advanced links; the rest fold into a dashed “4 other materials” node that expands when clicked, or use **Expand all**. **Legend** in the graph toolbar explains the strips and borders. Pick Auto, Light or Dark in the header.
+The graph reads as a technology tree, primitives on the left. A coloured strip with an emoji shows what each node is, and its border shows where it stands. Busy nodes show their 8 most advanced links; the rest fold into a dashed “Heat → 4 more materials” node, which you can click to see and unfold, or use **Expand all**. Click any line to see why it is there: the routes behind it, the role and threshold of what it joins, and what its style and label mean. **Legend** in the graph toolbar explains the strips and borders. Pick Auto, Light or Dark in the header.
 
 To work on the web app with live reload, run the API and the Vite dev server side by side:
 
@@ -62,7 +62,8 @@ The server hosts the web app at `/` (if built), the API under `/api`, and intera
 | `GET /api/graph` | Every drawable node and edge, with tech levels, plus every possible action for search. Add `?action=cut:limestone` to draw extra actions |
 | `GET /api/need/{id}` | Q1: the full tree of what it would take, plus what is certain |
 | `POST /api/explore` | Q2: `{"profile": "...", "select": [], "deselect": [], "hypothetical": []}`. Includes a status for every node and what implies each implied item |
-| `POST /api/explain` | What a node needs, one level deep, each requirement met / missing / unknown with a reason: the same body plus `"node": "<id>"`. Also what the node is (description, numbers, sources), each route's references, and what it leads to. Add `"all": true` for every certain need at every depth |
+| `POST /api/explain` | What a node needs, one level deep, each requirement met / missing / unknown with a reason: the same body plus `"node": "<id>"`. Also what the node is (description, numbers, sources), each route's references, and what it leads to. Add `"all": true` for every certain need at every depth. Know-how ids work too |
+| `POST /api/explain-edge` | Why a line joins two nodes: the same body plus `"source"` and `"target"`. Each route behind it, the source's role and threshold, met or not and why; or the "is a" link |
 | `POST /api/check` | Q3: the same body plus `"job": "<id>"` or an inline `"job_spec"` |
 
 ### Tests

@@ -29,5 +29,6 @@ Each file records one significant design decision: the context, what we decided,
 | [0021](0021-colour-for-type-border-for-status-tech-tree-layout.md) | Colour shows type, border shows status; lay the graph out as a tech tree | Accepted; node colouring superseded by 0022, ordering by 0023 |
 | [0022](0022-type-strip-with-emoji-on-neutral-nodes.md) | Show type with a coloured strip and emoji on neutral nodes | Accepted |
 | [0023](0023-draw-requirements-straight-to-products.md) | Draw requirements straight to products, and order columns by type and name | Accepted |
-| [0024](0024-fold-busy-nodes-links-into-summary-nodes.md) | Fold a busy node's extra links into summary nodes | Accepted |
+| [0024](0024-fold-busy-nodes-links-into-summary-nodes.md) | Fold a busy node's extra links into summary nodes | Accepted; click behaviour superseded by 0026 |
 | [0025](0025-detail-pane-below-graph-and-chip-lists.md) | Put the detail pane under the graph, and show the side pane as chips | Accepted |
+| [0026](0026-explain-lines-and-summaries-in-the-detail-pane.md) | Explain lines, summary nodes and know-how in the detail pane | Accepted |

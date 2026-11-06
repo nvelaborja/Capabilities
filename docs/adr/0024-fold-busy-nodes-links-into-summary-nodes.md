@@ -1,6 +1,6 @@
 # 0024. Fold a busy node's extra links into summary nodes
 
-- **Status:** Accepted
+- **Status:** Accepted; what clicking a summary does superseded by [0026](0026-explain-lines-and-summaries-in-the-detail-pane.md)
 - **Date:** 2026-11-05
 - **Refines:** the graph half of [0020](0020-show-a-bounded-number-of-items.md)
 
