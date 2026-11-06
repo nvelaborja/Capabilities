@@ -184,6 +184,10 @@ class Backward:
     def of_action(self, verb: str, target: str, stack: frozenset = frozenset()) -> Necessity:
         return self._of_routes(("action", verb, target), self.g.verb_routes(verb, target), target, stack)
 
+    def of_effect(self, effect: str) -> Necessity:
+        """What every way of producing an effect needs (heat by any furnace or fire)."""
+        return self._of_routes(("effect", effect), self.g.routes_achieving.get(effect, []), None, frozenset())
+
     def _of_routes(self, key: tuple, route_ids: list[str], target: str | None, stack: frozenset) -> Necessity:
         if not route_ids or key in stack:
             return Necessity()

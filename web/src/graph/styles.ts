@@ -2,7 +2,7 @@ import type { StylesheetJson } from "cytoscape";
 
 import type { DrawnKind, Status } from "../api/types";
 import { STRIP_WIDTH } from "./elements";
-import { FOLDED, OUTSIDE } from "./focus";
+import { FOLDED, OUTSIDE, REVEALED } from "./focus";
 
 export const TYPED_KINDS: readonly DrawnKind[] = ["material", "artifact", "action", "category", "effect"];
 
@@ -179,21 +179,6 @@ export function buildStylesheet(t: GraphTokens): StylesheetJson {
         "min-zoomed-font-size": 6,
       },
     },
-    // "8 other materials": no type strip, since it stands for several things; clicking it expands it in place.
-    {
-      selector: "node.summary",
-      style: {
-        "background-color": t.surface,
-        "border-color": t.muted,
-        "border-style": "dashed",
-        "border-width": 1,
-        color: t.muted,
-        "font-size": 11,
-        "font-style": "italic",
-        "text-margin-x": 0,
-        "text-max-width": "190px",
-      },
-    },
     {
       selector: "edge",
       style: {
@@ -220,10 +205,11 @@ export function buildStylesheet(t: GraphTokens): StylesheetJson {
     { selector: "edge.byproduct", style: { "line-style": "dotted" } },
     { selector: "edge.is_a", style: { width: 0.75, "line-style": "dashed", "target-arrow-shape": "none" } },
     { selector: "edge.live", style: { "line-color": t.edgeLive, "target-arrow-color": t.edgeLive, opacity: EDGE_OPACITY.live } },
-    // Stronger than ordinary idle lines, so it is clear which node a summary belongs to.
-    { selector: "edge.summary-edge", style: { "line-style": "dashed", "line-color": t.muted, "target-arrow-color": t.muted, opacity: 0.55 } },
-    // Folded into a summary, or outside focus mode.
-    { selector: `.${FOLDED}, .${OUTSIDE}`, style: { display: "none" } },
+    // A busy node's extra lines hide until it, or the node at the other end, is clicked (ADR 0030). Outside focus mode
+    // comes last, so it hides even a revealed line.
+    { selector: `.${FOLDED}`, style: { display: "none" } },
+    { selector: `edge.${REVEALED}`, style: { display: "element" } },
+    { selector: `.${OUTSIDE}`, style: { display: "none" } },
 
     // ---------------------------------------------------------------- statuses
     ...statusRules,

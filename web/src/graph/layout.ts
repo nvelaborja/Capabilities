@@ -22,8 +22,8 @@ export interface ColumnItem {
 
 /**
  * Lay the graph out as a technology tree (ADR 0018, 0023): one column per tech level, primitives on the left.
- * Within a column, nodes are sorted by type, then alphabetically, like the lists in the side pane; summary nodes go
- * last. Only nodes that are showing are placed, so focus mode closes up the gaps.
+ * Within a column, nodes are sorted by type, then alphabetically, like the lists in the side pane. Only nodes that
+ * are showing are placed, so focus mode closes up the gaps.
  */
 export function runLayout(cy: Core): void {
   cy.remove(".level-label");

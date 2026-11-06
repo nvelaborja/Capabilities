@@ -7,8 +7,7 @@ describe("detail subjects", () => {
     expect(parseSubject(edgeSubject("cut:wood", "steel-spear"))).toEqual({ type: "edge", source: "cut:wood", target: "steel-spear" });
   });
 
-  it("tells summaries and nodes apart", () => {
-    expect(parseSubject("summary:out:heat:material")).toEqual({ type: "summary", id: "summary:out:heat:material" });
+  it("reads anything else as a node, including actions", () => {
     expect(parseSubject("cut:granite")).toEqual({ type: "node", id: "cut:granite" });
   });
 });

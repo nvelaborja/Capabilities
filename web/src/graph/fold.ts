@@ -2,27 +2,56 @@ import type { Core } from "cytoscape";
 
 import { LIMIT } from "../lib/bounded";
 import { FOLDED, OUTSIDE } from "./focus";
-import { foldedEdges, type HubNode, summarise, type Summary } from "./summaries";
 
-const SUMMARY_HEIGHT = 26;
-const LINE_HEIGHT = 13;
-const CHAR_WIDTH = 6.5;
-const MAX_WIDTH = 210;
+export interface HubNode {
+  id: string;
+  kind: string;
+  label: string;
+  level: number | null;
+  prerequisites: number;
+}
 
-/** Sized to the label, wrapping past MAX_WIDTH ("Charcoal furnace with forced draft → 4 more materials"). */
-function summarySize(label: string): { width: number; height: number } {
-  const text = label.length * CHAR_WIDTH;
-  const lines = Math.ceil(text / (MAX_WIDTH - 24));
-  return { width: Math.round(Math.min(MAX_WIDTH, text + 24)), height: SUMMARY_HEIGHT + (lines - 1) * LINE_HEIGHT };
+export interface HubEdge {
+  id: string;
+  source: string;
+  target: string;
+}
+
+/** Highest tech level first, then the most certain prerequisites, then by name; no level last (ADR 0018). */
+export function compareRank(a: HubNode, b: HubNode): number {
+  const level = (node: HubNode) => (node.level === null ? -Infinity : node.level);
+  return level(b) - level(a) || b.prerequisites - a.prerequisites || a.label.localeCompare(b.label);
 }
 
 /**
- * Replace the graph's summary nodes: fold each hub's extra edges into "8 other materials" nodes (ADR 0024). Only
- * what is showing counts, so focus mode summarises its own subgraph. Returns the summaries now drawn.
+ * The lines a busy node doesn't draw (ADR 0030): a node linked to more than `limit` others in one direction keeps
+ * lines to its `limit` most advanced neighbours, and the rest are hidden until the node, or the one at the other end,
+ * is clicked. A line either end hides stays hidden. Nodes are never hidden, only lines.
  */
-export function applySummaries(cy: Core, expanded: ReadonlySet<string>, limit = LIMIT): Summary[] {
-  cy.remove(".summary");
-  cy.edges().removeClass(FOLDED);
+export function extraLines(nodes: readonly HubNode[], edges: readonly HubEdge[], limit = LIMIT): Set<string> {
+  const byId = new Map(nodes.map((node) => [node.id, node]));
+  const hidden = new Set<string>();
+  for (const direction of ["out", "in"] as const) {
+    const links = new Map<string, Map<string, string[]>>();
+    for (const edge of edges) {
+      const [hub, other] = direction === "out" ? [edge.source, edge.target] : [edge.target, edge.source];
+      if (!byId.has(hub) || !byId.has(other)) continue;
+      const neighbours = links.get(hub) ?? new Map<string, string[]>();
+      neighbours.set(other, [...(neighbours.get(other) ?? []), edge.id]);
+      links.set(hub, neighbours);
+    }
+    for (const neighbours of links.values()) {
+      const ranked = [...neighbours.keys()].map((id) => byId.get(id) as HubNode).sort(compareRank);
+      for (const extra of ranked.slice(limit)) {
+        for (const edge of neighbours.get(extra.id) ?? []) hidden.add(edge);
+      }
+    }
+  }
+  return hidden;
+}
+
+/** Hide busy nodes' extra lines among what is showing, so focus mode bounds its own subgraph. */
+export function applyFolding(cy: Core, limit = LIMIT): void {
   const showing = cy.nodes().not(`.level-label, .${OUTSIDE}`);
   const nodes: HubNode[] = showing.map((node) => ({
     id: node.id(),
@@ -35,47 +64,15 @@ export function applySummaries(cy: Core, expanded: ReadonlySet<string>, limit = 
     .edges()
     .filter((edge) => !edge.hasClass(OUTSIDE))
     .map((edge) => ({ id: edge.id(), source: edge.data("source") as string, target: edge.data("target") as string }));
-  const summaries = summarise(nodes, edges, limit).filter((summary) => !expanded.has(summary.id));
+  const hidden = extraLines(nodes, edges, limit);
   cy.batch(() => {
-    cy.add(
-      summaries.flatMap((summary) => [
-        {
-          group: "nodes" as const,
-          data: {
-            id: summary.id, label: summary.label, kind: "summary", rank: null, members: summary.members,
-            ...summarySize(summary.label),
-          },
-          classes: ["summary"],
-        },
-        {
-          group: "edges" as const,
-          data: {
-            id: `${summary.id}/edge`,
-            label: "",
-            source: summary.direction === "out" ? summary.hub : summary.id,
-            target: summary.direction === "out" ? summary.id : summary.hub,
-          },
-          classes: ["summary-edge"],
-        },
-      ]),
-    );
-    refold(cy, summaries, expanded);
-  });
-  return summaries;
-}
-
-/** Expand one summary in place: its edges come back and nothing else moves. */
-export function expandSummary(cy: Core, summaries: readonly Summary[], expanded: Set<string>, id: string): void {
-  expanded.add(id);
-  cy.batch(() => {
-    cy.getElementById(id).remove();
-    refold(cy, summaries, expanded);
+    cy.edges().forEach((edge) => {
+      edge.toggleClass(FOLDED, hidden.has(edge.id()));
+    });
   });
 }
 
-function refold(cy: Core, summaries: readonly Summary[], expanded: ReadonlySet<string>): void {
-  const folded = foldedEdges(summaries, expanded);
-  cy.edges().forEach((edge) => {
-    edge.toggleClass(FOLDED, folded.has(edge.id()));
-  });
+/** Expand all: every line showing. */
+export function unfoldAll(cy: Core): void {
+  cy.batch(() => cy.edges().removeClass(FOLDED));
 }

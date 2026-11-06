@@ -44,6 +44,8 @@ export interface GraphResponse {
   techniques: Named[];
   /** Every verb and target pair the data allows, drawn or not, for search. */
   actions: Named[];
+  /** For focus mode: what each drawn node needs whichever way it is made, at every depth (ADR 0030). */
+  needs: Record<string, string[]>;
 }
 
 export interface Named {

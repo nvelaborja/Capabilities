@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { sampleGraph } from "../test/sampleGraph";
 import { toElements } from "./elements";
-import { clearFocus, findEdge, focusOn, focusOnEdge, FOLDED, isolate, lineage, neighbourhood, OUTSIDE } from "./focus";
+import { clearFocus, findEdge, focusOn, focusOnEdge, FOLDED, isolate, lineage, neighbourhood, OUTSIDE, REVEALED } from "./focus";
 
 function headlessGraph() {
   return cytoscape({ headless: true, styleEnabled: false, elements: toElements(sampleGraph) });
@@ -24,24 +24,32 @@ describe("neighbourhood", () => {
     expect(ids(neighbourhood(cy.$id("blade")))).toContain("knife");
   });
 
-  it("leaves out neighbours whose edge is folded into a summary", () => {
+  it("includes neighbours whose line is folded, since clicking the node draws it", () => {
     const cy = headlessGraph();
     cy.$id("knife->spear").addClass(FOLDED);
-    expect(ids(neighbourhood(cy.$id("knife")))).not.toContain("spear");
+    expect(ids(neighbourhood(cy.$id("knife")))).toContain("spear");
   });
 });
 
 describe("lineage (focus mode)", () => {
-  it("holds everything that feeds a node at every depth, plus what it directly helps make", () => {
-    // given: cut wood needs a blade, which a knife is, which is knapped from flint; cut wood helps make the spear
+  it("holds the node, what it certainly needs, and what it directly helps make", () => {
+    // given: cut wood certainly needs a blade (any blade will do) and helps make the spear
     const cy = headlessGraph();
-    // then: wood (which only the spear needs) is left out
-    expect(ids(lineage(cy.$id("cut:wood")))).toEqual(["blade", "cut:wood", "flint", "knife", "spear"]);
+    // then: the knife and flint (one way to have a blade) are left out, and so is wood (only the spear needs it)
+    expect(ids(lineage(cy.$id("cut:wood"), ["blade"]))).toEqual(["blade", "cut:wood", "spear"]);
+  });
+
+  it("keeps only the lines between what it shows", () => {
+    const cy = headlessGraph();
+    const lines = lineage(cy.$id("cut:wood"), ["blade"]).edges().map((edge) => edge.id());
+    expect(lines).toContain("blade->cut:wood");
+    expect(lines).not.toContain("knife/is_a/blade");
   });
 
   it("hides everything else, and showing the whole graph brings it back", () => {
     const cy = headlessGraph();
-    isolate(cy, "cut:wood");
+    isolate(cy, "cut:wood", ["blade"]);
+    expect(cy.$id("knife").hasClass(OUTSIDE)).toBe(true);
     expect(cy.$id("wood").hasClass(OUTSIDE)).toBe(true);
     expect(cy.$id("wood->spear").hasClass(OUTSIDE)).toBe(true);
     expect(cy.$id("blade->cut:wood").hasClass(OUTSIDE)).toBe(false);
@@ -67,6 +75,18 @@ describe("focus", () => {
     expect(cy.$id("knife->spear").hasClass("highlighted")).toBe(true);
     expect(cy.$id("blade->cut:wood").hasClass("highlighted")).toBe(false);
     expect(cy.$id("blade->cut:wood").hasClass("faded")).toBe(true);
+  });
+
+  it("draws a busy node's hidden lines while it is clicked, and hides them again after", () => {
+    // given: the knife's line to the spear is folded away
+    const cy = headlessGraph();
+    cy.$id("knife->spear").addClass(FOLDED);
+    // when: the knife is clicked
+    focusOn(cy.$id("knife"));
+    // then: the line is drawn, and only until the focus clears
+    expect(cy.$id("knife->spear").hasClass(REVEALED)).toBe(true);
+    clearFocus(cy);
+    expect(cy.$id("knife->spear").hasClass(REVEALED)).toBe(false);
   });
 });
 

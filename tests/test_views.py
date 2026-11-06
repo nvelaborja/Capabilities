@@ -69,6 +69,33 @@ class TestGraphView:
         assert len(actions) == sum(len(graph.targets_for(verb)) for verb in graph.verbs)
 
 
+class TestCertainNeeds:
+    """What focus mode shows (ADR 0030): everything a node needs whichever way it is made."""
+
+    def test_lists_what_every_route_to_steel_needs_at_every_depth(self, graph, levels):
+        # given: steel made by carburizing or in a crucible, both from bloom iron
+        # when: listing its certain needs
+        needs = graph_view(graph, levels)["needs"]["steel"]
+        # then: the shared chain is there, down to the ore and the fuel, but not steel itself
+        assert {"bloom-iron", "iron-ore", "charcoal", "heat"} <= set(needs)
+        assert "steel" not in needs
+
+    def test_leaves_out_what_only_one_route_needs(self, graph, levels):
+        # given: only the crucible route needs a crucible
+        needs = graph_view(graph, levels)["needs"]["steel"]
+        # then: it isn't a certain need
+        assert "crucible" not in needs
+
+    def test_a_category_needs_its_members(self, graph, levels):
+        assert graph_view(graph, levels)["needs"]["iron-ore"] == ["hematite", "limonite"]
+
+    def test_only_drawn_nodes_are_listed(self, graph, levels):
+        view = graph_view(graph, levels)
+        drawn = {node["id"] for node in view["nodes"] if node["kind"] != "route"}
+        assert set(view["needs"]) == drawn
+        assert all(set(needs) <= drawn for needs in view["needs"].values())
+
+
 class TestStatuses:
     @pytest.mark.parametrize(("node_id", "status"), [
         ("copper", "selected"),          # in the profile

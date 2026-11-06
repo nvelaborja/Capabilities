@@ -3,52 +3,75 @@ import { describe, expect, it } from "vitest";
 
 import { sampleGraph } from "../test/sampleGraph";
 import { toElements } from "./elements";
-import { applySummaries, expandSummary } from "./fold";
+import { applyFolding, extraLines, type HubEdge, type HubNode, unfoldAll } from "./fold";
 import { FOLDED, isolate } from "./focus";
+
+const node = (id: string, kind: string, level: number | null, prerequisites = 0): HubNode => ({ id, label: id, kind, level, prerequisites });
+
+/** A hub (heat) that helps make `count` things at rising levels. */
+function hub(count: number) {
+  const products = Array.from({ length: count }, (_, index) => node(`p${index}`, "material", index));
+  const nodes = [node("heat", "effect", 2), ...products];
+  const edges: HubEdge[] = products.map((p) => ({ id: `heat->${p.id}`, source: "heat", target: p.id }));
+  return { nodes, edges };
+}
+
+describe("extraLines", () => {
+  it("hides nothing when a neighbourhood fits", () => {
+    const { nodes, edges } = hub(4);
+    expect(extraLines(nodes, edges, 4).size).toBe(0);
+  });
+
+  it("keeps lines to the most advanced neighbours and hides the rest", () => {
+    // given: heat helps make six things at levels 0–5, with a limit of three
+    const { nodes, edges } = hub(6);
+    // then: lines to p5, p4 and p3 stay
+    expect([...extraLines(nodes, edges, 3)].sort()).toEqual(["heat->p0", "heat->p1", "heat->p2"]);
+  });
+
+  it("bounds what a node needs separately from what it helps make", () => {
+    // given: steel needs three things and helps make one
+    const nodes = [node("steel", "material", 8), node("a", "material", 1), node("b", "material", 2), node("c", "material", 3), node("spear", "artifact", 9)];
+    const edges = ["a", "b", "c"].map((id) => ({ id: `${id}->steel`, source: id, target: "steel" }));
+    edges.push({ id: "steel->spear", source: "steel", target: "spear" });
+    // then: only the inputs are over a limit of two
+    expect([...extraLines(nodes, edges, 2)]).toEqual(["a->steel"]);
+  });
+
+  it("breaks level ties by certain prerequisites, then name, and puts unknown levels last", () => {
+    const nodes = [node("hub", "effect", 0), node("zeta", "material", 3, 9), node("alpha", "material", 3, 1), node("beta", "material", 3, 1), node("laser", "material", null)];
+    const edges = nodes.slice(1).map((n) => ({ id: `hub->${n.id}`, source: "hub", target: n.id }));
+    expect([...extraLines(nodes, edges, 1)].sort()).toEqual(["hub->alpha", "hub->beta", "hub->laser"]);
+  });
+});
 
 const headless = () => cytoscape({ headless: true, styleEnabled: false, elements: toElements(sampleGraph) });
 
-describe("summary nodes on the graph", () => {
-  it("folds a hub's extra edges into a summary node linked to the hub, and never removes a real node", () => {
-    // given: the knife helps make the spear and is a blade; with a limit of one, one of those folds away
+describe("folding on the graph", () => {
+  it("hides extra lines but never a node, and Expand all shows them again", () => {
+    // given: the knife helps make the spear (level 2) and is a blade; with a limit of one, the line to the blade hides
     const cy = headless();
-    const before = cy.nodes().length;
-    const summaries = applySummaries(cy, new Set(), 1);
-    const knife = summaries.find((s) => s.hub === "knife" && s.direction === "out");
-    // then: the spear (higher level) stays linked; the blade's edge folds into "1 other kind of thing"
-    expect(knife?.label).toBe("Knife → 1 more kind of thing");
+    applyFolding(cy, 1);
     expect(cy.$id("knife/is_a/blade").hasClass(FOLDED)).toBe(true);
-    expect(knife?.edges).toEqual(["knife/is_a/blade"]);
-    expect(cy.$id(`${knife?.id}/edge`).source().id()).toBe("knife");
-    expect(cy.nodes().not(".summary")).toHaveLength(before);
+    expect(cy.edges(`.${FOLDED}`).length).toBeLessThan(cy.edges().length);
+    expect(cy.nodes(`.${FOLDED}`)).toHaveLength(0);
+    unfoldAll(cy);
+    expect(cy.$(`.${FOLDED}`)).toHaveLength(0);
   });
 
-  it("expands one summary in place and leaves the others", () => {
+  it("re-applying with room for everything unfolds what was hidden", () => {
     const cy = headless();
-    const expanded = new Set<string>();
-    const summaries = applySummaries(cy, expanded, 1);
-    const knife = summaries.find((s) => s.hub === "knife" && s.direction === "out");
-    if (!knife) throw new Error("expected a knife summary");
-    expandSummary(cy, summaries, expanded, knife.id);
-    expect(cy.$id(knife.id).empty()).toBe(true);
-    expect(cy.$id("knife/is_a/blade").hasClass(FOLDED)).toBe(false);
-    expect(cy.$(".summary").length).toBe(summaries.length - 1);
+    applyFolding(cy, 1);
+    applyFolding(cy);
+    expect(cy.$(`.${FOLDED}`)).toHaveLength(0);
   });
 
-  it("draws nothing extra when every neighbourhood fits, and re-applying replaces the old summaries", () => {
+  it("counts only what focus mode shows", () => {
+    // given: focus on the spear, which needs the knife, cut wood and wood
     const cy = headless();
-    applySummaries(cy, new Set(), 1);
-    expect(applySummaries(cy, new Set())).toEqual([]);
-    expect(cy.$(".summary, .folded")).toHaveLength(0);
-  });
-
-  it("summarises only what focus mode shows", () => {
-    // given: focus on cut wood hides wood and its edge to the spear
-    const cy = headless();
-    isolate(cy, "cut:wood");
-    const hubs = applySummaries(cy, new Set(), 1).map((s) => s.hub);
-    // then: the spear's inputs are only knife and cut wood (wood is hidden), so with a limit of one, it folds one
-    expect(hubs).not.toContain("wood");
-    expect(cy.$(".summary").every((node) => node.data("members").every((id: string) => id !== "wood"))).toBe(true);
+    isolate(cy, "spear", ["knife", "cut:wood"]);
+    applyFolding(cy, 1);
+    // then: wood is hidden by focus, so the spear's two showing inputs fold one line, not two
+    expect(cy.edges(`.${FOLDED}`).filter((edge) => edge.target().id() === "spear")).toHaveLength(1);
   });
 });

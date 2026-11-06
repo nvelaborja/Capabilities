@@ -104,7 +104,8 @@ export function Legend() {
         <p className="legend-note">
           Columns are tech levels: primitive things on the left, advanced ones on the right. Lines run from what a thing
           needs to the thing. Dashed lines are tools; dotted lines are actions. When there are several ways to make
-          something, click it to see each one. A dashed “Heat → 4 more materials” node stands for a busy node's remaining links; click it to see them. Click any line to see why it is there.
+          something, click it to see each one. Busy nodes draw lines only to their 8 most advanced neighbours; click one to
+          see all its lines, or use Expand all. Click any line to see why it is there.
         </p>
       </div>
     </details>

@@ -106,7 +106,33 @@ def graph_view(graph: Graph, levels: Levels, extra_actions: Iterable[Action] = (
         "verbs": [{"id": verb_id, "label": verb["label"]} for verb_id, verb in sorted(graph.verbs.items())],
         "techniques": [{"id": tid, "label": t["label"]} for tid, t in sorted(graph.things.items()) if t["kind"] == "technique"],
         "actions": [{"id": action_key(a), "label": action_label(graph, a)} for a in all_actions(graph)],
+        "needs": certain_needs(graph, [node["id"] for node in nodes if node["kind"] != "route"]),
     }
+
+
+def certain_needs(graph: Graph, keys: Iterable[str]) -> dict[str, list[str]]:
+    """For focus mode (ADR 0030): what each node needs whichever way it is made, at every depth.
+
+    A category stands for any of its members, so its members are listed too. Only nodes in `keys` are kept, since
+    focus mode shows nothing else.
+    """
+    drawn = set(keys)
+    backward = Backward(graph)
+    needs = {}
+    for key in drawn:
+        if ":" in key:
+            need = backward.of_action(*parse_action(key))
+        elif graph.kind(key) == "category":
+            members = sorted(graph.members(key))
+            need = Necessity.common([backward.of_thing(member) for member in members])
+            need.things |= set(members)
+        elif graph.kind(key) == "effect":
+            need = backward.of_effect(key)
+        else:
+            need = backward.of_thing(key)
+        found = need.things | need.categories | set(need.effects) | {action_key(action) for action in need.actions}
+        needs[key] = sorted(found & drawn - {key})
+    return dict(sorted(needs.items()))
 
 
 def all_actions(graph: Graph) -> list[Action]:

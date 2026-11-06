@@ -6,7 +6,7 @@ import { STATUS_LABELS } from "../legend/Legend";
 import "./chips.css";
 
 // Know-how isn't drawn on the graph, so it has no type colour; it still gets an emoji.
-export const CHIP_ICONS: Record<string, string> = { ...TYPE_ICONS, technique: "📖", summary: "…" };
+export const CHIP_ICONS: Record<string, string> = { ...TYPE_ICONS, technique: "📖" };
 
 export interface ChipProps {
   id: string;
@@ -17,12 +17,14 @@ export interface ChipProps {
   note?: string;
   /** Extra detail for the tooltip; the same information is always reachable by clicking (ADR 0019). */
   title?: string;
+  /** Set for a chip that folds others (ADR 0030): clicking opens or closes them instead of showing details. */
+  expanded?: boolean;
   onPick: (id: string) => void;
   onRemove?: (id: string) => void;
 }
 
 /** An item drawn like a graph node: emoji strip for the type, border for the status (ADR 0022, 0025). */
-export function NodeChip({ id, label, kind, status, note, title, onPick, onRemove }: ChipProps) {
+export function NodeChip({ id, label, kind, status, note, title, expanded, onPick, onRemove }: ChipProps) {
   const look = status ? STATUS_LOOK[status] : STATUS_LOOK.reachable;
   const style: CSSProperties = { borderWidth: look["border-width"], borderStyle: look["border-style"], opacity: look.opacity };
   const statusText = status ? ` (${STATUS_LABELS[status].toLowerCase()})` : "";
@@ -31,9 +33,21 @@ export function NodeChip({ id, label, kind, status, note, title, onPick, onRemov
       <span className="chip-strip" aria-hidden="true">
         {CHIP_ICONS[kind] ?? "•"}
       </span>
-      <button type="button" className="chip-label" onClick={() => onPick(id)} title={title} aria-label={`${label}${note ? `, ${note}` : ""}${statusText}`}>
+      <button
+        type="button"
+        className="chip-label"
+        onClick={() => onPick(id)}
+        title={title}
+        aria-label={`${label}${note ? `, ${note}` : ""}${statusText}`}
+        aria-expanded={expanded}
+      >
         {label}
         {note && <span className="chip-note">{note}</span>}
+        {expanded !== undefined && (
+          <span className="chip-fold" aria-hidden="true">
+            {expanded ? "▾" : "▸"}
+          </span>
+        )}
       </button>
       {onRemove && (
         <button type="button" className="chip-remove" onClick={() => onRemove(id)} aria-label={`Remove ${label}`} title="Remove">

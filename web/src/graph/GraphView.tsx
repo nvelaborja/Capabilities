@@ -4,14 +4,13 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { ExploreResponse, GraphResponse } from "../api/types";
 import type { Theme } from "../state/theme";
 import { toElements } from "./elements";
-import { applySummaries, expandSummary } from "./fold";
+import { applyFolding, unfoldAll } from "./fold";
 import { parseSubject } from "../detail/subjects";
 import { clearFocus, findEdge, focusOn, focusOnEdge, isolate, OUTSIDE } from "./focus";
 import "./GraphView.css";
 import { READABLE_ZOOM, runLayout, showInitialView } from "./layout";
 import { applyStatuses } from "./statuses";
 import { buildStylesheet, readTokens } from "./styles";
-import type { Summary } from "./summaries";
 
 const ZOOM_STEP = 1.25;
 const PADDING = 24;
@@ -29,17 +28,13 @@ interface GraphViewProps {
   /** The theme showing; the graph re-reads its colours from theme.css when it changes. */
   theme: Theme;
   focus: GraphFocus;
-  /** Focus mode: show only this node's lineage (what feeds it, and what it directly makes). */
+  /** Focus mode: show only this node, what it certainly needs, and what it directly makes. */
   isolated: string | null;
-  /** Called with a node's id (or a summary node's) when it is clicked, or null when the background is. */
+  /** Called with a node's id when it is clicked, or null when the background is. */
   onSelectNode: (id: string | null) => void;
   /** Called when a line is clicked, with the nodes it joins. */
   onSelectEdge: (source: string, target: string) => void;
   onShowWholeGraph: () => void;
-  /** The summary nodes drawn now, so the detail pane can explain them. */
-  onSummaries: (summaries: Summary[]) => void;
-  /** Unfold one summary's links; `seq` changes on every request. */
-  expandRequest: { id: string; seq: number } | null;
   /** More toolbar items after the graph's own buttons (the legend). */
   toolbarExtra?: ReactNode;
 }
@@ -59,16 +54,13 @@ function isInView(cy: Core, box: { x1: number; x2: number; y1: number; y2: numbe
 }
 
 export function GraphView(props: GraphViewProps) {
-  const { graph, explore, theme, focus, isolated, onSelectNode, onSelectEdge, onShowWholeGraph, onSummaries, expandRequest, toolbarExtra } = props;
+  const { graph, explore, theme, focus, isolated, onSelectNode, onSelectEdge, onShowWholeGraph, toolbarExtra } = props;
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<Core | null>(null);
   const exploreRef = useRef<ExploreResponse | null>(explore);
   const onSelectRef = useRef(onSelectNode);
   const onSelectEdgeRef = useRef(onSelectEdge);
-  const onSummariesRef = useRef(onSummaries);
   const focusIdRef = useRef<string | null>(focus.id);
-  const summariesRef = useRef<Summary[]>([]);
-  const expandedRef = useRef(new Set<string>());
   // The first view after building the graph frames the selection; later re-layouts keep the user's place.
   const freshRef = useRef(true);
   const [expandAll, setExpandAll] = useState(false);
@@ -76,8 +68,7 @@ export function GraphView(props: GraphViewProps) {
   useEffect(() => {
     onSelectRef.current = onSelectNode;
     onSelectEdgeRef.current = onSelectEdge;
-    onSummariesRef.current = onSummaries;
-  }, [onSelectNode, onSelectEdge, onSummaries]);
+  }, [onSelectNode, onSelectEdge]);
 
   // Declared before the graph effect so a freshly built graph picks up the latest statuses.
   useEffect(() => {
@@ -103,11 +94,6 @@ export function GraphView(props: GraphViewProps) {
     });
     cy.on("tap", "edge", (event) => {
       const edge = event.target;
-      // A summary's dashed link stands for the summary itself.
-      if (edge.hasClass("summary-edge")) {
-        onSelectRef.current(edge.source().hasClass("summary") ? edge.source().id() : edge.target().id());
-        return;
-      }
       onSelectEdgeRef.current(edge.source().id(), edge.target().id());
     });
     cy.on("tap", (event) => {
@@ -136,15 +122,13 @@ export function GraphView(props: GraphViewProps) {
     };
   }, [graph]);
 
-  // What is showing: focus mode, then summaries over what remains, then the columns.
+  // What is showing: focus mode, then busy nodes' extra lines folded among what remains (ADR 0030), then the columns.
   useEffect(() => {
     const cy = cyRef.current;
     if (!cy) return;
-    expandedRef.current = new Set();
-    isolate(cy, isolated);
-    summariesRef.current = expandAll ? [] : applySummaries(cy, expandedRef.current);
-    if (expandAll) cy.remove(".summary");
-    onSummariesRef.current(summariesRef.current);
+    isolate(cy, isolated, isolated ? (graph.needs[isolated] ?? []) : []);
+    if (expandAll) unfoldAll(cy);
+    else applyFolding(cy);
     runLayout(cy);
     applyStatuses(cy, exploreRef.current);
     const showing = cy.nodes().not(`.${OUTSIDE}`);
@@ -167,14 +151,6 @@ export function GraphView(props: GraphViewProps) {
   useEffect(() => {
     cyRef.current?.style(buildStylesheet(readTokens()));
   }, [theme]);
-
-  // Unfold one summary in place: its links come back and nothing moves.
-  useEffect(() => {
-    const cy = cyRef.current;
-    if (!cy || !expandRequest) return;
-    expandSummary(cy, summariesRef.current, expandedRef.current, expandRequest.id);
-    onSummariesRef.current(summariesRef.current.filter((summary) => !expandedRef.current.has(summary.id)));
-  }, [expandRequest]);
 
   useEffect(() => {
     focusIdRef.current = focus.id;
@@ -217,16 +193,16 @@ export function GraphView(props: GraphViewProps) {
           type="button"
           aria-pressed={expandAll}
           onClick={() => setExpandAll((value) => !value)}
-          title={expandAll ? "Fold busy nodes' extra links into summaries again" : "Show every link, including those folded into “other …” summaries"}
+          title={expandAll ? "Hide busy nodes' extra lines again" : "Draw every line, including busy nodes' extra lines"}
         >
-          {expandAll ? "Summarise" : "Expand all"}
+          {expandAll ? "Fewer lines" : "Expand all"}
         </button>
         {toolbarExtra}
       </div>
       {isolatedLabel && (
         <div className="graph-banner" role="status">
           <span>
-            Focus: what <strong>{isolatedLabel}</strong> needs, and what it leads to.
+            Focus: what <strong>{isolatedLabel}</strong> certainly needs, and what it leads to.
           </span>
           <button type="button" onClick={onShowWholeGraph}>
             Show whole graph

@@ -34,4 +34,5 @@ export const sampleGraph: GraphResponse = {
     { id: "cut:flint", label: "Cut flint" },
     { id: "cut:wood", label: "Cut wood" },
   ],
+  needs: { spear: ["cut:wood", "flint", "knife", "wood"], knife: ["flint"], "cut:wood": ["blade"] },
 };

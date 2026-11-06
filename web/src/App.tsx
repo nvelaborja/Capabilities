@@ -6,7 +6,6 @@ import { createCatalog } from "./catalog";
 import { DetailPane } from "./detail/DetailPane";
 import { edgeSubject } from "./detail/subjects";
 import { type GraphFocus, GraphView } from "./graph/GraphView";
-import type { Summary } from "./graph/summaries";
 import { Splitter } from "./layout/Splitter";
 import { usePaneSizes } from "./layout/usePaneSizes";
 import { Legend } from "./legend/Legend";
@@ -18,7 +17,7 @@ import { isEdited, toRequest } from "./state/selection";
 import { ThemeSwitch } from "./state/ThemeSwitch";
 import { useTheme } from "./state/theme";
 import { current, trailReducer } from "./state/trail";
-import { decodeSelection } from "./state/url";
+import { decodeSelection, encodeSelection } from "./state/url";
 import { useExplore } from "./state/useExplore";
 import { usePresetItems } from "./state/usePresetItems";
 import { useSelectionHistory } from "./state/useSelectionHistory";
@@ -39,12 +38,10 @@ export function App() {
   const request = useMemo(() => toRequest(selection), [selection]);
   const explore = useExplore(request);
   const { preference, choose, theme } = useTheme();
-  const { ref: appRef, layout } = usePaneSizes();
+  const { ref: appRef, layout } = usePaneSizes(encodeSelection(selection));
   const [trail, navigate] = useReducer(trailReducer, []);
   const [centerSeq, setCenterSeq] = useState({ center: false, seq: 0 });
   const [isolated, setIsolated] = useState<string | null>(null);
-  const [summaries, setSummaries] = useState<Summary[]>([]);
-  const [expandRequest, setExpandRequest] = useState<{ id: string; seq: number } | null>(null);
   // undefined: no confirmation pending. null or an id: the preset waiting to replace an edited selection.
   const [pendingPreset, setPendingPreset] = useState<string | null | undefined>(undefined);
 
@@ -83,11 +80,6 @@ export function App() {
   }, []);
   const onSelectNode = useCallback((id: string | null) => open(id, false), [open]);
   const onSelectEdge = useCallback((source: string, target: string) => open(edgeSubject(source, target), false), [open]);
-  /** Unfold a summary's links, then show the node they belong to. */
-  const expandSummary = (summary: Summary) => {
-    setExpandRequest((previous) => ({ id: summary.id, seq: (previous?.seq ?? 0) + 1 }));
-    open(summary.hub, true);
-  };
   const drill = (id: string) => {
     navigate({ type: "drill", id });
     setCenterSeq((previous) => ({ center: true, seq: previous.seq + 1 }));
@@ -151,8 +143,6 @@ export function App() {
           explore={explore.data}
           selection={request}
           isolated={isolated}
-          summaries={summaries}
-          onExpandSummary={expandSummary}
           onDrill={drill}
           onBack={back}
           onClose={() => open(null, false)}
@@ -171,8 +161,6 @@ export function App() {
             isolated={isolated}
             onSelectNode={onSelectNode}
             onSelectEdge={onSelectEdge}
-            onSummaries={setSummaries}
-            expandRequest={expandRequest}
             onShowWholeGraph={() => setIsolated(null)}
             toolbarExtra={<Legend />}
           />
