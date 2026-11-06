@@ -33,6 +33,14 @@ describe("focus", () => {
     expect(cy.$id("spear").hasClass("faded")).toBe(false);
     expect(cy.$id("knife").hasClass("focused")).toBe(true);
     clearFocus(cy);
-    expect(cy.$(".faded, .focused")).toHaveLength(0);
+    expect(cy.$(".faded, .focused, .highlighted")).toHaveLength(0);
+  });
+
+  it("brings the neighbourhood's edges forward and fades the rest", () => {
+    const cy = headlessGraph();
+    focusOn(cy.$id("knife"));
+    expect(cy.$id("make-spear/requires/1").hasClass("highlighted")).toBe(true);
+    expect(cy.$id("chop/performs/cut:wood").hasClass("highlighted")).toBe(false);
+    expect(cy.$id("chop/performs/cut:wood").hasClass("faded")).toBe(true);
   });
 });

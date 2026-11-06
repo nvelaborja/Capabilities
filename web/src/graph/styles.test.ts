@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { DrawnKind } from "../api/types";
 import { STATUS_LABELS, TYPE_LABELS } from "../legend/Legend";
 import { STATUSES } from "./statuses";
-import { buildStylesheet, type GraphTokens, STATUS_LOOK, TYPED_KINDS, type TypeColours } from "./styles";
+import { buildStylesheet, EDGE_OPACITY, type GraphTokens, STATUS_LOOK, TYPED_KINDS, type TypeColours } from "./styles";
 
 const colours = (seed: string): TypeColours => ({ fill: `${seed}1`, ink: `${seed}2`, tint: `${seed}3`, line: `${seed}4` });
 const tokens: GraphTokens = {
@@ -41,6 +41,16 @@ describe("graph stylesheet", () => {
     expect(Object.entries(STATUS_LOOK).filter(([, look]) => look.hadIt).map(([status]) => status)).toEqual([
       "selected", "hypothetical", "implied",
     ]);
+  });
+
+  it("keeps edges in the background until a node is clicked", () => {
+    expect(styleOf("edge")?.opacity).toBe(EDGE_OPACITY.idle);
+    expect(EDGE_OPACITY.faded).toBeLessThan(EDGE_OPACITY.idle);
+    expect(EDGE_OPACITY.idle).toBeLessThan(EDGE_OPACITY.live);
+    expect(EDGE_OPACITY.live).toBeLessThan(EDGE_OPACITY.highlighted);
+    // Highlighting must come after "live", or working routes would stay dim when clicked.
+    const live = sheet.findIndex((b) => b.selector === "edge.live");
+    expect(sheet.findIndex((b) => b.selector === "edge.highlighted")).toBeGreaterThan(live);
   });
 
   it("puts status rules after type rules so they win", () => {

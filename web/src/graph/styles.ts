@@ -59,6 +59,12 @@ export const STATUS_LOOK = {
   out: { "border-width": 1, "border-style": "solid", opacity: 0.45, hadIt: false },
 } as const;
 
+/**
+ * Edges stay in the background until a node is clicked: faint when idle, a little stronger for routes that work
+ * (live), clear for the clicked node's neighbourhood, and nearly gone for everything else while focused.
+ */
+export const EDGE_OPACITY = { idle: 0.12, live: 0.3, highlighted: 0.95, faded: 0.04 } as const;
+
 const FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
 
 /** Every node is a rounded rectangle; its colour says what it is and its border says where it stands. */
@@ -147,15 +153,14 @@ export function buildStylesheet(t: GraphTokens): StylesheetJson {
         "text-background-opacity": 0.85,
         "text-background-padding": "1px",
         "min-zoomed-font-size": 10,
-        // Quiet by default so the routes that work (live edges) stand out.
-        opacity: 0.55,
+        opacity: EDGE_OPACITY.idle,
       },
     },
     { selector: "edge.role-tool", style: { "line-style": "dashed" } },
     { selector: "edge.role-action", style: { "line-style": "dotted" } },
     { selector: "edge.byproduct", style: { "line-style": "dotted" } },
-    { selector: "edge.is_a", style: { width: 0.75, "line-style": "dashed", "target-arrow-shape": "none", opacity: 0.6 } },
-    { selector: "edge.live", style: { "line-color": t.edgeLive, "target-arrow-color": t.edgeLive, width: 1.5, opacity: 0.9 } },
+    { selector: "edge.is_a", style: { width: 0.75, "line-style": "dashed", "target-arrow-shape": "none" } },
+    { selector: "edge.live", style: { "line-color": t.edgeLive, "target-arrow-color": t.edgeLive, opacity: EDGE_OPACITY.live } },
 
     // ---------------------------------------------------------------- statuses
     ...statusRules,
@@ -168,7 +173,10 @@ export function buildStylesheet(t: GraphTokens): StylesheetJson {
 
     // ---------------------------------------------------------------- focus (clicking a node)
     { selector: "node.focused", style: { "underlay-color": t.accent, "underlay-opacity": 0.25, "underlay-padding": 6 } },
-    { selector: ".faded", style: { opacity: 0.12 } },
+    { selector: "node.faded", style: { opacity: 0.12 } },
+    { selector: "edge.faded", style: { opacity: EDGE_OPACITY.faded } },
+    // Edge labels (heat thresholds) show for the clicked node's edges at any zoom.
+    { selector: "edge.highlighted", style: { opacity: EDGE_OPACITY.highlighted, width: 1.5, "min-zoomed-font-size": 0 } },
     { selector: "node:selected", style: { "overlay-opacity": 0 } },
   ];
 }
