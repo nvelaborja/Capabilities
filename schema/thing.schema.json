@@ -2,18 +2,21 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:capabilities:schema:thing",
   "title": "Thing",
-  "description": "A node in the graph: a material, artifact, technique, piece of knowledge, effect, or category.",
+  "description": "A node in the graph: a material, artifact, technique, piece of knowledge, effect, category, or source.",
   "type": "object",
   "unevaluatedProperties": false,
   "properties": {
-    "kind": { "enum": ["material", "artifact", "technique", "knowledge", "effect", "category"] },
+    "kind": { "enum": ["material", "artifact", "technique", "knowledge", "effect", "category", "source"] },
     "is_a": {
       "description": "Categories this thing belongs to.",
       "$ref": "urn:capabilities:schema:defs#/$defs/ids"
     },
-    "origin": { "enum": ["natural", "produced"] },
+    "origin": {
+      "description": "Materials only. natural = gathered by hand as it is; extracted = taken from a source by a route (felled, quarried, mined); produced = made from other things.",
+      "enum": ["natural", "extracted", "produced"]
+    },
     "availability": {
-      "description": "Natural materials only. ubiquitous = assumed available everywhere; regional = only some places have it (used for warnings, not reasoning).",
+      "description": "Natural materials and sources only. ubiquitous = assumed available everywhere; regional = only some places have it, so it must be selected or implied.",
       "enum": ["ubiquitous", "regional"]
     },
     "regions": { "type": "array", "items": { "type": "string" } },
@@ -43,7 +46,11 @@
       "then": { "required": ["dimensions"] }
     },
     {
-      "if": { "properties": { "kind": { "not": { "const": "material" } } } },
+      "if": { "properties": { "kind": { "const": "source" } } },
+      "then": { "required": ["availability"], "not": { "required": ["origin"] } }
+    },
+    {
+      "if": { "properties": { "kind": { "not": { "enum": ["material", "source"] } } } },
       "then": { "not": { "anyOf": [{ "required": ["origin"] }, { "required": ["availability"] }] } }
     }
   ]

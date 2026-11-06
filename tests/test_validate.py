@@ -72,6 +72,9 @@ class TestBrokenData:
                 "does not belong in artifacts/",
             ),
             ("data/things/materials/not-yaml.yaml", "id: [unclosed\n", "YAML parse error"),
+            # A source says where a resource is found, so it must say how widely (ADR 0032).
+            ("data/things/sources/nowhere.yaml", "id: nowhere\nkind: source\nlabel: X\n", "schema"),
+            ("data/things/sources/made.yaml", "id: made\nkind: source\nlabel: X\navailability: regional\norigin: produced\n", "schema"),
         ],
     )
     def test_each_mistake_is_reported(self, data_copy, relative_path, content, expected_message):
@@ -81,3 +84,16 @@ class TestBrokenData:
         messages = [f"{i.where}: {i.message}" for i in validate(data_copy) if i.severity == "error"]
         # then: the mistake is reported as an error
         assert any(expected_message in m for m in messages), messages
+
+    def test_warns_about_a_source_nothing_is_extracted_from(self, data_copy):
+        # given: a source that no route uses
+        (data_copy / "data/things/sources/lonely-outcrop.yaml").write_text("id: lonely-outcrop\nkind: source\nlabel: X\navailability: regional\n")
+        # when: validating
+        warnings = [f"{i.where}: {i.message}" for i in validate(data_copy) if i.severity == "warning"]
+        # then: it is flagged as a gap, not an error
+        assert "thing lonely-outcrop: no route extracts anything from this source" in warnings
+
+    def test_warns_about_an_extracted_material_with_no_route(self, data_copy):
+        (data_copy / "data/things/materials/stray-ore.yaml").write_text("id: stray-ore\nkind: material\nlabel: X\norigin: extracted\n")
+        warnings = [f"{i.where}: {i.message}" for i in validate(data_copy) if i.severity == "warning"]
+        assert "thing stray-ore: no route produces it" in warnings
