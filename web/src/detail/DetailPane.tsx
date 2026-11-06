@@ -50,26 +50,22 @@ export function DetailPane(props: DetailPaneProps) {
   const level = data?.level;
 
   return (
-    <aside className="detail-pane" aria-label={`${entry.label} details`}>
-      {trail.length > 1 && (
-        <nav className="breadcrumb" aria-label="Drill-down trail">
-          <ol>
-            {trail.map((crumb, index) => (
-              <li key={crumb}>
-                {index < trail.length - 1 ? (
-                  <button type="button" className="link-button" onClick={() => onBack(index)}>
-                    {catalog.get(crumb).label}
-                  </button>
-                ) : (
-                  <span aria-current="page">{catalog.get(crumb).label}</span>
-                )}
-              </li>
-            ))}
-          </ol>
-        </nav>
-      )}
-      <header className="detail-header">
-        <div>
+    <section className="detail-pane" aria-label={`${entry.label} details`}>
+      <header className="detail-bar">
+        <div className="detail-title">
+          {trail.length > 1 && (
+            <nav className="breadcrumb" aria-label="Drill-down trail">
+              <ol>
+                {trail.slice(0, -1).map((crumb, index) => (
+                  <li key={crumb}>
+                    <button type="button" className="link-button" onClick={() => onBack(index)}>
+                      {catalog.get(crumb).label}
+                    </button>
+                  </li>
+                ))}
+              </ol>
+            </nav>
+          )}
           <h2>{entry.label}</h2>
           <p className="detail-meta">
             <span className={`kind-chip kind-${entry.kind}`}>
@@ -81,40 +77,59 @@ export function DetailPane(props: DetailPaneProps) {
             {data?.about.era === "modern" && <span className="modern-chip">Modern, for comparison</span>}
           </p>
         </div>
-        <button type="button" className="icon-button" onClick={onClose} aria-label="Close details" title="Close (Esc)">
-          ×
-        </button>
+        <div className="detail-actions">
+          {SELECTABLE.has(entry.kind) &&
+            (explicit ? (
+              <button type="button" onClick={() => onRemove(id)}>
+                Remove from selected
+              </button>
+            ) : (
+              <button type="button" className="primary" onClick={() => onAdd(id)}>
+                Add to selected
+              </button>
+            ))}
+          <button type="button" aria-pressed={isolated === id} onClick={() => onIsolate(isolated === id ? null : id)}>
+            {isolated === id ? "Show whole graph" : "Focus"}
+          </button>
+          <button type="button" className="icon-button" onClick={onClose} aria-label="Close details" title="Close (Esc)">
+            ×
+          </button>
+        </div>
       </header>
-      <div className="detail-actions">
-        {SELECTABLE.has(entry.kind) &&
-          (explicit ? (
-            <button type="button" onClick={() => onRemove(id)}>
-              Remove from selected
-            </button>
-          ) : (
-            <button type="button" className="primary" onClick={() => onAdd(id)}>
-              Add to selected
-            </button>
-          ))}
-        <button type="button" aria-pressed={isolated === id} onClick={() => onIsolate(isolated === id ? null : id)}>
-          {isolated === id ? "Show whole graph" : "Focus"}
-        </button>
-      </div>
-      {status === "implied" && impliedBy.length > 0 && (
-        <p className="detail-note">They must have had this: it is needed by {impliedBy.join(", ")}.</p>
-      )}
-      {entry.kind === "category" && <p className="detail-note">Stands for any of its members; select a specific member instead.</p>}
-      {entry.kind === "effect" && <p className="detail-note">Effects follow from what is selected, so they can't be selected themselves.</p>}
 
-      <div className="detail-body" key={id}>
+      {/* Left to right, like the graph: what it needs, what it is, what it leads to. */}
+      <div className="detail-columns" key={id}>
         {error && <p className="error">Couldn't load the details.</p>}
-        {!data && loading && <p className="muted">Loading…</p>}
+        {!data && !error && loading && <p className="muted">Loading…</p>}
         {data && (
-          <Explanation
-            data={data}
-            onDrill={onDrill}
-            onExpandAll={EXPANDABLE.has(data.kind) && (data.routes?.length ?? 0) > 0 ? () => setExpanding(id) : undefined}
-          />
+          <>
+            <section className="detail-column" aria-labelledby="needs-title">
+              <Needs data={data} onDrill={onDrill} onExpandAll={canExpand(data) ? () => setExpanding(id) : undefined} />
+            </section>
+            <section className="detail-column" aria-labelledby="about-title">
+              <h3 id="about-title">About</h3>
+              {status === "implied" && impliedBy.length > 0 && (
+                <p className="detail-note">They must have had this: it is needed by {impliedBy.join(", ")}.</p>
+              )}
+              {entry.kind === "category" && <p className="detail-note">Stands for any of its members; select a specific member instead.</p>}
+              {entry.kind === "effect" && <p className="detail-note">Effects follow from what is selected, so they can't be selected themselves.</p>}
+              <AboutSection about={data.about} onDrill={onDrill} />
+              {data.about.references.length > 0 && (
+                <>
+                  <h4>Sources</h4>
+                  <References references={data.about.references} />
+                </>
+              )}
+            </section>
+            <section className="detail-column" aria-labelledby="leads-title">
+              <h3 id="leads-title">Leads to</h3>
+              {data.leads_to.length === 0 ? (
+                <p className="muted">Nothing on the graph uses it directly.</p>
+              ) : (
+                <ItemList items={data.leads_to} onDrill={onDrill} />
+              )}
+            </section>
+          </>
         )}
       </div>
       <ExpandAllDialog
@@ -127,40 +142,31 @@ export function DetailPane(props: DetailPaneProps) {
         }}
         onClose={() => setExpanding(null)}
       />
-    </aside>
+    </section>
   );
 }
 
-function Explanation({ data, onDrill, onExpandAll }: { data: ExplainResponse; onDrill: (id: string) => void; onExpandAll?: () => void }) {
+const canExpand = (data: ExplainResponse) => EXPANDABLE.has(data.kind) && (data.routes?.length ?? 0) > 0;
+
+/** The left column: what it takes to get this. */
+function Needs({ data, onDrill, onExpandAll }: { data: ExplainResponse; onDrill: (id: string) => void; onExpandAll?: () => void }) {
+  if (data.members) {
+    return (
+      <>
+        <h3 id="needs-title">Any of these would do</h3>
+        <ItemList items={data.members} onDrill={onDrill} />
+      </>
+    );
+  }
+  const natural = data.about.origin === "natural" && (data.routes?.length ?? 0) === 0;
   return (
     <>
-      <AboutSection about={data.about} onDrill={onDrill} />
-      {data.members && (
-        <section aria-labelledby="members-title">
-          <h3 id="members-title">Any of these would do</h3>
-          <ItemList items={data.members} onDrill={onDrill} />
-        </section>
-      )}
-      {data.routes && (
-        <section aria-labelledby="routes-title">
-          <h3 id="routes-title">{waysHeading(data.kind)}</h3>
-          <Routes routes={data.routes} onDrill={onDrill} />
-          {onExpandAll && (
-            <button type="button" className="expand-all" onClick={onExpandAll}>
-              Expand all dependencies
-            </button>
-          )}
-        </section>
-      )}
-      <section aria-labelledby="leads-title">
-        <h3 id="leads-title">Leads to</h3>
-        {data.leads_to.length === 0 ? <p className="muted">Nothing on the graph uses it directly.</p> : <ItemList items={data.leads_to} onDrill={onDrill} />}
-      </section>
-      {data.about.references.length > 0 && (
-        <section aria-labelledby="sources-title">
-          <h3 id="sources-title">Sources</h3>
-          <References references={data.about.references} />
-        </section>
+      <h3 id="needs-title">{waysHeading(data.kind)}</h3>
+      {natural ? <p className="muted">A natural material: gathered, not made.</p> : <Routes routes={data.routes ?? []} onDrill={onDrill} />}
+      {onExpandAll && (
+        <button type="button" className="expand-all" onClick={onExpandAll}>
+          Expand all dependencies
+        </button>
       )}
     </>
   );
@@ -173,7 +179,7 @@ function AboutSection({ about, onDrill }: { about: About; onDrill: (id: string) 
     facts.push(["Found", where]);
   }
   return (
-    <section aria-label="About">
+    <div className="about">
       {about.description && <p className="description">{about.description}</p>}
       {about.target && (
         <p>
@@ -207,7 +213,7 @@ function AboutSection({ about, onDrill }: { about: About; onDrill: (id: string) 
         </p>
       )}
       {about.notes && <p className="muted">{about.notes}</p>}
-    </section>
+    </div>
   );
 }
 

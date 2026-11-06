@@ -155,6 +155,7 @@ export function App() {
             isolated={isolated}
             onSelectNode={onSelectNode}
             onShowWholeGraph={() => setIsolated(null)}
+            toolbarExtra={<Legend />}
           />
         )}
         {graph.status === "loading" && <p className="notice">Loading the graph…</p>}
@@ -166,7 +167,6 @@ export function App() {
             </span>
           </div>
         )}
-        <Legend />
       </main>
       {catalog && (
         <SidePane

@@ -1,5 +1,5 @@
 import cytoscape, { type Core } from "cytoscape";
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import type { ExploreResponse, GraphResponse } from "../api/types";
 import type { Theme } from "../state/theme";
@@ -33,6 +33,8 @@ interface GraphViewProps {
   /** Called with a node's id when it is clicked, or null when the background is. */
   onSelectNode: (id: string | null) => void;
   onShowWholeGraph: () => void;
+  /** More toolbar items after the graph's own buttons (the legend). */
+  toolbarExtra?: ReactNode;
 }
 
 function isInView(cy: Core, box: { x1: number; x2: number; y1: number; y2: number }): boolean {
@@ -40,7 +42,7 @@ function isInView(cy: Core, box: { x1: number; x2: number; y1: number; y2: numbe
   return box.x1 >= view.x1 && box.x2 <= view.x2 && box.y1 >= view.y1 && box.y2 <= view.y2;
 }
 
-export function GraphView({ graph, explore, theme, focus, isolated, onSelectNode, onShowWholeGraph }: GraphViewProps) {
+export function GraphView({ graph, explore, theme, focus, isolated, onSelectNode, onShowWholeGraph, toolbarExtra }: GraphViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<Core | null>(null);
   const exploreRef = useRef<ExploreResponse | null>(explore);
@@ -186,6 +188,7 @@ export function GraphView({ graph, explore, theme, focus, isolated, onSelectNode
         >
           {expandAll ? "Summarise" : "Expand all"}
         </button>
+        {toolbarExtra}
       </div>
       {isolatedLabel && (
         <div className="graph-banner" role="status">

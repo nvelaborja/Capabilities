@@ -47,16 +47,12 @@
   font-size: 0.8rem;
 }
 
-.edited-badge,
-.badge {
+.edited-badge {
   flex: none;
   padding: 0 0.4rem;
   border-radius: 999px;
   font-size: 0.7rem;
   line-height: 1.3rem;
-}
-
-.edited-badge {
   border: 1px dashed var(--text-muted);
   color: var(--text-muted);
 }
@@ -107,67 +103,115 @@
   color: var(--text-muted);
 }
 
-.group summary {
-  padding: 0.3rem 0.5rem;
+.chip-section + .chip-section {
+  margin-top: 0.6rem;
+}
+
+.chip-section h3 {
+  margin: 0.3rem 0.25rem 0.35rem;
   font-size: 0.75rem;
   font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  cursor: pointer;
 }
 
-.group ul {
-  margin: 0;
+.section-hint {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* One type per line; the emoji on each chip names it, so no headings. */
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin: 0 0 0.45rem;
   padding: 0;
   list-style: none;
 }
 
-.row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.25rem 0.4rem;
-  padding: 0.15rem 0.5rem;
+/* Drawn like a graph node (ADR 0022): neutral surface, type strip with emoji, status in the border. */
+.chip {
+  display: inline-flex;
+  align-items: stretch;
+  max-width: 100%;
+  overflow: hidden;
+  border-color: var(--text-muted);
   border-radius: 6px;
+  background: var(--node-bg);
+  color: var(--node-text);
+  font-size: 0.8rem;
 }
 
-.row:hover {
-  background: var(--bg);
+.chip-strip {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 1.45rem;
+  background: var(--border);
+  font-size: 0.7rem;
 }
 
-.row-label {
-  flex: 1;
+.chip-material { border-color: var(--type-material-line); }
+.chip-material .chip-strip { background: var(--type-material-fill); }
+.chip-artifact { border-color: var(--type-artifact-line); }
+.chip-artifact .chip-strip { background: var(--type-artifact-fill); }
+.chip-action { border-color: var(--type-action-line); }
+.chip-action .chip-strip { background: var(--type-action-fill); }
+.chip-category { border-color: var(--type-category-line); }
+.chip-category .chip-strip { background: var(--type-category-fill); }
+.chip-effect { border-color: var(--type-effect-line); }
+.chip-effect .chip-strip { background: var(--type-effect-fill); }
+
+.chip-selected .chip-label,
+.chip-hypothetical .chip-label {
+  font-weight: 600;
+}
+
+.chip-category .chip-label {
+  font-style: italic;
+}
+
+.chip-label {
   min-width: 0;
-  padding: 0;
+  padding: 0.2rem 0.5rem;
   border: 0;
   background: none;
-  color: var(--text);
+  color: inherit;
+  font: inherit;
   text-align: left;
   cursor: pointer;
 }
 
-.row-label:hover {
+.chip-label:hover {
   text-decoration: underline;
 }
 
-.row-note {
-  flex-basis: 100%;
+.chip-note {
+  margin-left: 0.35rem;
   color: var(--text-muted);
   font-size: 0.75rem;
+  font-weight: 400;
 }
 
-.badge-implied {
-  border: 1px solid var(--accent);
-  color: var(--accent);
-}
-
-.badge-maybe {
-  border: 1px dotted var(--text-muted);
+.chip-remove {
+  flex: none;
+  width: 1.4rem;
+  padding: 0;
+  border: 0;
+  border-left: 1px solid var(--border);
+  background: none;
   color: var(--text-muted);
+  cursor: pointer;
 }
 
-.row-remove,
+.chip-remove:hover {
+  background: var(--border);
+  color: var(--text);
+}
+
 .icon-button {
   width: 1.5rem;
   height: 1.5rem;
@@ -181,7 +225,6 @@
   cursor: pointer;
 }
 
-.row-remove:hover,
 .icon-button:hover {
   background: var(--border);
   color: var(--text);

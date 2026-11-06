@@ -1,41 +1,94 @@
-/* ---------------------------------------------------------------- detail pane (left of the graph) */
+/* ---------------------------------------------------------------- detail pane (under the graph, ADR 0025) */
 
 .detail-pane {
   grid-area: detail;
-  display: flex;
-  flex-direction: column;
-  width: clamp(20rem, 26vw, 26rem);
-  min-height: 0;
-  border-right: 1px solid var(--border);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: clamp(15rem, 42vh, 30rem);
+  min-width: 0;
+  border-top: 1px solid var(--border);
   background: var(--surface);
 }
 
-.breadcrumb ol {
+.detail-bar {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.15rem 0.35rem;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  padding: 0.6rem 1rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.detail-title {
+  min-width: 0;
+}
+
+.detail-title h2 {
+  display: inline;
   margin: 0;
-  padding: 0.5rem 1rem 0;
+  font-size: 1.1rem;
+}
+
+/* The trail leads into the title: Steel › Bloom iron › Iron ore. */
+.breadcrumb,
+.breadcrumb ol,
+.breadcrumb li {
+  display: inline;
+}
+
+.breadcrumb ol {
+  margin: 0;
+  padding: 0;
   list-style: none;
-  font-size: 0.8rem;
+}
+
+.breadcrumb li::after {
+  content: " › ";
   color: var(--text-muted);
 }
 
-.breadcrumb li + li::before {
-  content: "›";
-  margin-right: 0.35rem;
+.breadcrumb .link-button {
+  font-size: 0.95rem;
 }
 
-.detail-header {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.5rem;
-  padding: 0.6rem 1rem 0;
+/* Left to right like the graph: what it needs, what it is, what it leads to. Each column scrolls on its own. */
+.detail-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr);
+  min-height: 0;
 }
 
-.detail-header h2 {
-  margin: 0;
-  font-size: 1.1rem;
+.detail-column {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0.6rem 1rem 1rem;
+}
+
+.detail-column + .detail-column {
+  border-left: 1px solid var(--border);
+}
+
+.detail-columns > .muted,
+.detail-columns > .error {
+  padding: 0.6rem 1rem;
+}
+
+/* Narrow screens: one column, scrolling as a whole. */
+@media (max-width: 60rem) {
+  .detail-columns {
+    grid-template-columns: minmax(0, 1fr);
+    overflow-y: auto;
+  }
+
+  .detail-column {
+    overflow: visible;
+  }
+
+  .detail-column + .detail-column {
+    border-top: 1px solid var(--border);
+    border-left: 0;
+  }
 }
 
 .detail-meta {
@@ -80,11 +133,11 @@
 .detail-actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 0.4rem;
-  padding: 0.6rem 1rem 0;
 }
 
-.detail-actions button,
+.detail-actions button:not(.icon-button),
 .expand-all {
   padding: 0.3rem 0.75rem;
   border: 1px solid var(--border);
@@ -94,7 +147,7 @@
   cursor: pointer;
 }
 
-.detail-actions button:hover,
+.detail-actions button:not(.icon-button):hover,
 .expand-all:hover {
   border-color: var(--accent);
 }
@@ -111,22 +164,12 @@
 }
 
 .detail-note {
-  margin: 0.5rem 1rem 0;
+  margin: 0 0 0.5rem;
   font-size: 0.85rem;
 }
 
-.detail-body {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 0.25rem 1rem 1rem;
-}
-
-.detail-body section {
-  margin-top: 0.9rem;
-}
-
-.detail-body h3 {
+.detail-column h3,
+.detail-column h4 {
   margin: 0 0 0.35rem;
   font-size: 0.75rem;
   font-weight: 600;
@@ -135,7 +178,11 @@
   letter-spacing: 0.04em;
 }
 
-.detail-body p {
+.detail-column h4 {
+  margin-top: 0.9rem;
+}
+
+.detail-column p {
   margin: 0.35rem 0;
 }
 
@@ -442,4 +489,14 @@
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+/* "via quench hardening" sits under the name, so long route names don't squeeze it. */
+.item {
+  flex-wrap: wrap;
+}
+
+.item .via {
+  flex-basis: 100%;
+  padding-left: 1.45rem;
 }

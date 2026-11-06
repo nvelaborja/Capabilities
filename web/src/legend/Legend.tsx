@@ -53,14 +53,15 @@ function DashedOutline({ width, dashes, colour }: { width: number; dashes: reado
   );
 }
 
-const OPEN_KEY = "capabilities.legend.open";
+// A new key: the old one remembered "open", which was the default before the legend moved into the toolbar.
+const OPEN_KEY = "capabilities.legend.shown";
 
-// Per-viewer convenience only: storage can be unavailable (private windows), so failures fall back to open.
+// Hidden by default. Per-viewer convenience only: storage can be unavailable (private windows), so failures keep it hidden.
 function readOpen(): boolean {
   try {
-    return window.localStorage.getItem(OPEN_KEY) !== "false";
+    return window.localStorage.getItem(OPEN_KEY) === "true";
   } catch {
-    return true;
+    return false;
   }
 }
 
