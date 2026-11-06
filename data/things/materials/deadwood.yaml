@@ -1,0 +1,7 @@
+id: deadwood
+kind: material
+label: Deadwood
+origin: natural
+availability: ubiquitous
+is_a: [fuel, plant-material]
+description: Fallen branches and dead wood, gathered by hand without tools. Good for a fire; too small or weak for most building.

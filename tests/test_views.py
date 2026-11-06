@@ -34,7 +34,7 @@ class TestGraphView:
         assert "iron-smelting" not in {node["id"] for node in view["nodes"]}
         assert "iron-smelting" in {technique["id"] for technique in view["techniques"]}
 
-    @pytest.mark.parametrize(("node_id", "selectable"), [("steel", True), ("cut:wood", True), ("iron-ore", False), ("heat", False)])
+    @pytest.mark.parametrize(("node_id", "selectable"), [("steel", True), ("cut:timber", True), ("iron-ore", False), ("heat", False)])
     def test_only_concrete_things_and_actions_are_selectable(self, graph, levels, node_id, selectable):
         nodes = {node["id"]: node for node in graph_view(graph, levels)["nodes"]}
         assert nodes[node_id]["selectable"] is selectable
@@ -101,10 +101,10 @@ class TestStatuses:
         ("copper", "selected"),          # in the profile
         ("cut:granite", "selected"),     # an action in the profile
         ("crucible", "implied"),         # every route to tin bronze needs one
-        ("cut:wood", "implied"),
+        ("cut:timber", "implied"),
         ("heat", "implied"),
         ("bellows", "reachable"),
-        ("bloom-iron", "near"),          # one ingredient (iron ore) away
+        ("bloom-iron", "near"),          # one source or ingredient (a hematite deposit, or limonite) away
         ("iron-ore", "out"),
         ("diamond-saw", "out"),
         ("casting", "implied"),          # know-how every route to a selected thing shares
@@ -138,8 +138,8 @@ class TestExploreViewExtras:
 
     def test_near_misses_are_grouped_by_thing_and_name_what_is_missing(self, graph):
         near = {item["id"]: item for item in explore_view(graph, explore(graph, egypt(graph)))["near"]}
-        assert {r["missing"]["label"] for r in near["bloom-iron"]["routes"]} == {"Hematite", "Limonite (bog iron ore)"}
-        assert near["bloom-iron"]["routes"][0]["missing"] == {"id": "hematite", "label": "Hematite", "kind": "material"}
+        assert {r["missing"]["label"] for r in near["bloom-iron"]["routes"]} == {"Hematite deposit", "Limonite (bog iron ore)"}
+        assert near["bloom-iron"]["routes"][0]["missing"] == {"id": "hematite-deposit", "label": "Hematite deposit", "kind": "source"}
         assert {r["id"] for r in near["steel"]["routes"]} == {"steel-by-carburizing", "steel-by-crucible"}
 
     def test_warnings_use_names_not_ids(self, graph):
@@ -155,7 +155,7 @@ class TestImpliedBy:
 
     def test_actions_can_imply_things(self, graph):
         found = implied_by(graph, Selection.parse(["drill:granite"]))
-        assert "drill:granite" in found["cut:wood"]
+        assert "drill:granite" in found["cut:timber"]
 
 
 class TestExplain:
@@ -172,7 +172,7 @@ class TestExplain:
 
     def test_routes_with_fewer_missing_requirements_come_first(self, graph, levels):
         # given: four ways to cut wood; only the diamond saw is missing something outright
-        view = explain(graph, levels, context_for(graph, egypt(graph)), "cut:wood")
+        view = explain(graph, levels, context_for(graph, egypt(graph)), "cut:timber")
         # then: fewest missing first, then fewest uncertain, then by name (not plain alphabetical order)
         assert [(r["id"], r["missing"], r["uncertain"]) for r in view["routes"]] == [
             ("cut-by-chopping", 0, 0), ("cut-abrasive-saw", 0, 1), ("cut-by-chiseling", 0, 1), ("cut-diamond-saw", 1, 0),
@@ -222,7 +222,7 @@ class TestExplain:
 
     def test_drill_down_works_on_categories(self, graph, levels):
         view = explain(graph, levels, context_for(graph, egypt(graph)), "iron-ore")
-        assert [(m["id"], m["status"]) for m in view["members"]] == [("hematite", "out"), ("limonite", "out")]
+        assert [(m["id"], m["status"]) for m in view["members"]] == [("hematite", "near"), ("limonite", "out")]
 
     def test_expand_all_lists_every_certain_need_by_level(self, graph, levels):
         view = explain(graph, levels, context_for(graph, egypt(graph)), "steel", everything=True)
@@ -235,9 +235,18 @@ class TestExplain:
         about = explain(graph, levels, context_for(graph, egypt(graph)), "granite")["about"]
         assert about["description"].startswith("A hard, coarse-grained igneous rock")
         assert {"id": "hardness_mohs", "label": "Hardness", "value": "6–7 Mohs"} in about["quantities"]
-        assert (about["availability"], about["regions"][0]) == ("regional", "Aswan (Egypt)")
+        assert about["origin"] == "extracted" and "availability" not in about
         assert about["member_of"] == [{"id": "stone", "label": "Stone"}]
         assert about["references"][0]["doi"] == "10.1007/3-7643-7712-7_2"
+
+    def test_where_a_resource_is_found_is_on_its_source(self, graph, levels):
+        about = explain(graph, levels, context_for(graph, egypt(graph)), "granite-outcrop")["about"]
+        assert (about["availability"], about["regions"][0]) == ("regional", "Aswan (Egypt)")
+
+    def test_a_source_leads_to_what_is_extracted_from_it(self, graph, levels):
+        view = explain(graph, levels, context_for(graph, egypt(graph)), "granite-outcrop")
+        assert [row["id"] for row in view["leads_to"]] == ["granite"]
+        assert view["routes"] == []
 
     def test_about_an_action_describes_the_verb_and_names_the_target(self, graph, levels):
         about = explain(graph, levels, context_for(graph, egypt(graph)), "cut:granite")["about"]

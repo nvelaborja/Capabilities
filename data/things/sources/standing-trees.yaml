@@ -1,0 +1,6 @@
+id: standing-trees
+kind: source
+label: Standing trees
+availability: ubiquitous
+description: Living or dead trees still standing. Felling them with an edged tool gives timber.
+notes: Treated as available everywhere for now, though big trees were scarce in some regions, such as Egypt.

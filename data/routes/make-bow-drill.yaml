@@ -4,9 +4,9 @@ label: Making a bow drill
 achieves: { thing: bow-drill }
 techniques: [woodworking]
 requires:
-  - { role: consumed, thing: wood }
+  - { role: consumed, thing: timber }
   - { role: consumed, thing: rope }
-  - { role: action, verb: cut, target: wood }
+  - { role: action, verb: cut, target: timber }
 outputs:
   - { thing: bow-drill }
 references:

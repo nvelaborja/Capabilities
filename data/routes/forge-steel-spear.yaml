@@ -5,13 +5,13 @@ achieves: { thing: steel-spear }
 techniques: [smithing, woodworking]
 requires:
   - { role: consumed, thing: steel }
-  - { role: consumed, thing: wood, notes: Shaft. }
+  - { role: consumed, thing: timber, notes: Shaft. }
   - role: effect
     effect: heat
     where:
       - { quantity: temperature_c, op: ">=", value: 800 }
     notes: Forging heat; approximate (TODO-source).
-  - { role: action, verb: cut, target: wood }
+  - { role: action, verb: cut, target: timber }
 outputs:
   - { thing: steel-spear }
 references:

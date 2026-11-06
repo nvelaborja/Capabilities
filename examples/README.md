@@ -12,15 +12,15 @@ Steel has two routes: **carburizing** (bloom iron + a carbon source + heat ≥ 9
 
 Needed by **every** route, so certain for anyone who had steel:
 
-- **Things:** bloom iron, a bloomery furnace, charcoal, clay, wood
-- **Any of:** a carbon source, an iron ore
-- **Actions:** cut wood
+- **Things:** bloom iron, a bloomery furnace, charcoal, clay, timber, and standing trees to fell it from
+- **Any of:** a carbon source, an iron ore, an edged tool (to fell the timber)
+- **Actions:** cut timber
 - **Heat:** ≥ 1100 °C for ≥ 24 h (the weakest bound shared by both routes; see "Merging effect thresholds" in `docs/data-format.md`)
-- **Implied techniques:** charcoal burning, fire-making, furnace building, iron smelting
+- **Implied techniques:** charcoal burning, fire-making, furnace building, iron smelting, woodworking
 
 No ancient route needs 1370 °C. Bloomery iron is never melted, and historical crucible steel was fired at about 1150–1250 °C, because carbon absorbed by the iron lowers its melting point.
 
-**Common ancestors:** cut(wood) appears in the tree of everything that needs heat or wooden parts. The one deeper root is knapping a stone tool from ordinary fieldstone, because cutting wood needs an edged tool. Only stone tools, clay furnaces, and rope (which needs cut(plant fiber)) don't depend on cutting wood.
+**Common ancestors:** felling and cutting timber appear in the tree of everything that needs charcoal or wooden parts. The one deeper root is knapping a stone tool from ordinary fieldstone, because felling and cutting timber need an edged tool. A fire's fuel no longer needs timber, since deadwood is gathered by hand, but lighting it still does: fire drills and fire pistons are cut from timber. Only stone tools, clay furnaces, and rope (which needs cut(plant fiber)) don't depend on timber.
 
 ## Q2: Middle Kingdom Egypt — what else could they do?
 
@@ -28,11 +28,11 @@ No ancient route needs 1370 °C. Bloomery iron is never melted, and historical c
 uv run capabilities explore --profile middle-kingdom-egypt
 ```
 
-- **Selected:** copper, tin bronze, blowpipes, copper saws, tube drills and chisels, bow drills, sledges, dolerite pounders; access to malachite, granite, limestone, flint, and dolerite; and the actions cut, drill, and shape granite.
-- **Implied:** crucibles, casting molds, rope, heat ≥ 1085 °C, and the actions cut wood, reeds, and plant fiber.
-- **Reachable:** charcoal, clay and bloomery furnaces, bellows, fire drills, fire pistons, flint blades, stone choppers, wooden rollers.
+- **Selected:** copper, tin bronze, blowpipes, copper saws, tube drills and chisels, bow drills, sledges, dolerite pounders; access to malachite, the Aswan granite outcrop, limestone, flint, and dolerite; and the actions cut, drill, and shape granite.
+- **Implied:** crucibles, casting molds, rope, timber (felled from standing trees), heat ≥ 1085 °C, and the actions cut timber, reeds, and plant fiber.
+- **Reachable:** granite (quarried from the outcrop by pounding), charcoal, clay and bloomery furnaces, bellows, fire drills, fire pistons, flint blades, stone choppers, wooden rollers.
 - **Actions:** cut and drill everything up to granite's hardness via sand abrasive; move any load; shape granite by pounding (limestone is a *maybe*, because dolerite's toughness hasn't been sourced yet).
-- **One step away:** iron is **one ingredient away**: hematite or limonite unlocks bloom iron, and with it steel, hardened steel, steel chisels and steel spears. Tin is one away (cassiterite).
+- **One step away:** iron is **one ingredient away**: a hematite deposit (mined with stone hammers) or limonite unlocks bloom iron, and with it steel, hardened steel, steel chisels and steel spears. Tin is one away (cassiterite).
 - **Warning:** implies access to some tin ore (cassiterite); all known sources are regional, so it may have been traded.
 
 **What-if:** `--hypothetical hematite` (iron ore) unlocks bloom iron, steel, hardened steel, steel chisels, and steel spears. No smelting know-how is needed, because the tool asks what was within reach of the ingredients.

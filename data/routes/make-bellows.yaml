@@ -5,8 +5,8 @@ achieves: { thing: bellows }
 techniques: [woodworking]
 requires:
   - { role: consumed, thing: hide }
-  - { role: consumed, thing: wood }
-  - { role: action, verb: cut, target: wood }
+  - { role: consumed, thing: timber }
+  - { role: action, verb: cut, target: timber }
 outputs:
   - { thing: bellows }
 references:

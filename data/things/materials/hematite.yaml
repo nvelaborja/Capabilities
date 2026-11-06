@@ -1,9 +1,7 @@
 id: hematite
 kind: material
 label: Hematite
-origin: natural
-availability: regional
-regions: ["Widespread"]
+origin: extracted
 is_a: [iron-ore]
 description: Iron oxide (Fe2O3), a common, rich iron ore.
 quantities:

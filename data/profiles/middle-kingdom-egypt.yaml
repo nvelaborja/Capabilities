@@ -7,7 +7,7 @@ description: Things Middle Kingdom Egypt is known to have made or done. In the t
 includes:
   # Resources they had access to
   - { id: malachite, notes: Mined in Sinai and the Eastern Desert. }
-  - { id: granite, notes: Quarried at Aswan. }
+  - { id: granite-outcrop, notes: Quarried at Aswan. }
   - { id: limestone }
   - { id: flint }
   - { id: dolerite }
