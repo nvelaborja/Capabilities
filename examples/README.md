@@ -32,7 +32,7 @@ uv run capabilities explore --profile middle-kingdom-egypt
 - **Implied:** crucibles, casting molds, rope, heat ≥ 1085 °C, and the actions cut wood, reeds, and plant fiber.
 - **Reachable:** charcoal, clay and bloomery furnaces, bellows, fire drills, fire pistons, flint blades, stone choppers, wooden rollers.
 - **Actions:** cut and drill everything up to granite's hardness via sand abrasive; move any load; shape granite by pounding (limestone is a *maybe*, because dolerite's toughness hasn't been sourced yet).
-- **Near misses:** iron is **one ingredient away** (any iron ore); tin is one away (tin ore).
+- **One step away:** iron is **one ingredient away**: hematite or limonite unlocks bloom iron, and with it steel, hardened steel, steel chisels and steel spears. Tin is one away (cassiterite).
 - **Warning:** implies access to some tin ore (cassiterite); all known sources are regional, so it may have been traded.
 
 **What-if:** `--hypothetical hematite` (iron ore) unlocks bloom iron, steel, hardened steel, steel chisels, and steel spears. No smelting know-how is needed, because the tool asks what was within reach of the ingredients.

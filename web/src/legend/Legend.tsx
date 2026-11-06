@@ -9,15 +9,15 @@ export const TYPE_LABELS: Record<DrawnKind, string> = {
   material: "Material",
   artifact: "Tool or product",
   action: "Action (cut wood)",
-  category: "Any of a kind (iron ore)",
+  category: "Class (iron ore: any member will do)",
   effect: "Effect (heat)",
 };
 
 export const STATUS_LABELS: Record<Status, string> = {
   selected: "Selected",
   hypothetical: "What-if",
-  implied: "Implied (they must have had it)",
-  reachable: "Reachable (they could have made it)",
+  implied: "Implied (required by the selection)",
+  reachable: "Reachable (can be made or done from the selection)",
   maybe: "Maybe reachable",
   near: "One step away",
   out: "Out of reach",
@@ -53,14 +53,15 @@ function DashedOutline({ width, dashes, colour }: { width: number; dashes: reado
   );
 }
 
-const OPEN_KEY = "capabilities.legend.open";
+// A new key: the old one remembered "open", which was the default before the legend moved into the toolbar.
+const OPEN_KEY = "capabilities.legend.shown";
 
-// Per-viewer convenience only: storage can be unavailable (private windows), so failures fall back to open.
+// Hidden by default. Per-viewer convenience only: storage can be unavailable (private windows), so failures keep it hidden.
 function readOpen(): boolean {
   try {
-    return window.localStorage.getItem(OPEN_KEY) !== "false";
+    return window.localStorage.getItem(OPEN_KEY) === "true";
   } catch {
-    return true;
+    return false;
   }
 }
 
@@ -103,7 +104,8 @@ export function Legend() {
         <p className="legend-note">
           Columns are tech levels: primitive things on the left, advanced ones on the right. Lines run from what a thing
           needs to the thing. Dashed lines are tools; dotted lines are actions. When there are several ways to make
-          something, click it to see each one.
+          something, click it to see each one. Busy nodes draw lines only to their 8 most advanced neighbours; click one to
+          see all its lines, or use Expand all. Click any line to see why it is there.
         </p>
       </div>
     </details>

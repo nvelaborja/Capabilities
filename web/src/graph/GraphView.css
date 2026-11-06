@@ -1,6 +1,8 @@
 .graph-view {
   position: absolute;
   inset: 0;
+  /* Lets the legend size itself to the graph area (cqh), which shrinks when the detail pane opens. */
+  container-type: size;
 }
 
 .graph-canvas {
@@ -10,6 +12,7 @@
 
 .graph-toolbar {
   position: absolute;
+  z-index: 5;
   top: 0.75rem;
   left: 0.75rem;
   display: flex;
@@ -35,4 +38,35 @@
 .graph-toolbar button:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+/* Focus mode: what the graph is showing, and the way back. */
+.graph-banner {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: calc(100% - 1.5rem);
+  padding: 0.35rem 0.5rem 0.35rem 0.85rem;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow);
+}
+
+.graph-banner button {
+  flex: none;
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: var(--on-accent);
+  cursor: pointer;
+}
+
+.graph-toolbar button[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
 }

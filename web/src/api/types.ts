@@ -40,8 +40,17 @@ export interface GraphEdge {
 export interface GraphResponse {
   nodes: GraphNode[];
   edges: GraphEdge[];
-  verbs: { id: string; label: string }[];
-  techniques: { id: string; label: string }[];
+  verbs: Named[];
+  techniques: Named[];
+  /** Every verb and target pair the data allows, drawn or not, for search. */
+  actions: Named[];
+  /** For focus mode: what each drawn node needs whichever way it is made, at every depth (ADR 0030). */
+  needs: Record<string, string[]>;
+}
+
+export interface Named {
+  id: string;
+  label: string;
 }
 
 export interface Profile {
@@ -97,4 +106,120 @@ export interface NearMiss {
   id: string;
   label: string;
   routes: { id: string; label: string; missing: { id: string; label: string; kind: string } }[];
+}
+
+// ---------------------------------------------------------------- /api/explain
+
+export interface Reference {
+  citation: string;
+  doi?: string;
+  url?: string;
+  supports?: string;
+  status?: "unverified" | "secondary" | "verified";
+}
+
+/** One direct requirement of a route, met / missing / unknown, with the reason when it isn't simply met. */
+export interface RequirementRow {
+  id: string;
+  label: string;
+  kind: string;
+  role: RequirementRole;
+  status: Tri;
+  level: number | null;
+  conditions?: string[];
+  reason?: string;
+  notes?: string;
+}
+
+/** One way to make a thing, reach an effect or perform an action. */
+export interface RouteRow {
+  id: string;
+  label: string;
+  techniques: Named[];
+  status: Tri;
+  missing: number;
+  uncertain: number;
+  requirements: RequirementRow[];
+  references: Reference[];
+  byproducts?: Named[];
+  /** Effect routes: how far the effect reaches ("Temperature up to 1100–1250 °C"). */
+  provides?: string[];
+}
+
+export interface ItemRow {
+  id: string;
+  label: string;
+  kind: string;
+  status: Status;
+  level: number | null;
+}
+
+export interface LeadsToRow extends ItemRow {
+  /** The routes that use the node to make this. */
+  via: string[];
+}
+
+export interface DependencyRow {
+  id: string;
+  label: string;
+  kind: string;
+  status: Tri;
+  level: number | null;
+  conditions?: string[];
+}
+
+export interface About {
+  description?: string | null;
+  notes?: string;
+  origin?: "natural" | "produced";
+  availability?: "ubiquitous" | "regional";
+  regions?: string[];
+  era?: string;
+  quantities?: { id: string; label: string; value: string }[];
+  member_of?: Named[];
+  /** Actions: what is being acted on. */
+  target?: Named;
+  references: Reference[];
+}
+
+export interface ExplainResponse {
+  id: string;
+  label: string;
+  kind: string;
+  status: Status;
+  level: number | null;
+  about: About;
+  leads_to: LeadsToRow[];
+  /** Things, effects and actions: each way to get it, with its direct requirements. */
+  routes?: RouteRow[];
+  /** Categories: the members, any of which would do. */
+  members?: ItemRow[];
+  /** With `all`: every certain need at every depth. */
+  all?: { missing: DependencyRow[]; uncertain: DependencyRow[]; have: DependencyRow[] };
+  /** Know-how: the routes it describes, and what each makes. */
+  used_in?: { id: string; label: string; makes: ItemRow[] }[];
+}
+
+// ---------------------------------------------------------------- /api/explain-edge
+
+export interface EdgeRoute extends RouteRow {
+  /** The source's own requirement rows in this route (its role, threshold and whether it is met). */
+  link: RequirementRow[];
+  /** The target is a byproduct of this route (slag), not its goal. */
+  byproduct: boolean;
+}
+
+/** Why a line joins two nodes: the routes behind it, or an "is a" link. */
+export type EdgeResponse =
+  | { kind: "requires"; source: ItemRow; target: ItemRow; routes: EdgeRoute[] }
+  | { kind: "is_a"; source: ItemRow; target: ItemRow; used_by: string[] };
+
+export interface EdgeRequest extends SelectionRequest {
+  source: string;
+  target: string;
+}
+
+export interface ExplainRequest extends SelectionRequest {
+  node: string;
+  all?: boolean;
 }

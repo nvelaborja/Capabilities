@@ -34,9 +34,9 @@ cd web && npm ci && npm run build && cd ..
 uv run capabilities serve                 # then open http://127.0.0.1:8000
 ```
 
-Pick a preset such as Middle Kingdom Egypt on the right. **Selected** lists what they had: your choices plus everything those certainly needed (marked *implied*). **Reachable** lists what they could have made, and what is one step away. Click any node on the graph, or any row in a list, to see it and add it to (or remove it from) the selection. Undo and redo cover every change, and the address bar always holds a link to the current selection, such as `?preset=middle-kingdom-egypt&add=hematite`.
+Pick a preset such as Middle Kingdom Egypt on the right. **Selected** shows your choices. **Implied and reachable** shows what follows: what the selection requires (*implied*), what can be made or done from it, and what is one step away: things that one more raw ingredient, such as an ore, would unlock, however long the chain. Each item is a chip drawn like a graph node. Click any node on the graph, or any chip in a list, to open its details under the graph, reading left to right like the graph: each way to make it with what is met (✓), missing (✗) or unknown (?) and why; what it is and the sources; and what it leads to. Click a requirement to see what *it* needs; the breadcrumb leads back. A class (such as iron ore) stands for any of its members; its details list them, each with an **Add** button. Common natural materials (wood, plant fiber, water…) are always available; regional ones (ores, flint, diamond) must be added or implied. **Expand all dependencies** lists everything it needs at every depth, and **Focus** shows only the node, what it certainly needs and what it directly makes. **Could do** groups actions by verb ("Cut · 15 materials"); click one to list them. Search (press `/`) finds any thing or action, including actions not drawn yet. Undo and redo cover every change, and the address bar always holds a link to the current selection, such as `?preset=middle-kingdom-egypt&add=hematite`.
 
-The graph reads as a technology tree, primitives on the left. A coloured strip with an emoji shows what each node is, and its border shows where it stands. Pick Auto, Light or Dark in the header.
+The graph reads as a technology tree, primitives on the left. A coloured strip with an emoji shows what each node is, and its border shows where it stands. Busy nodes draw lines only to their 8 most advanced neighbours; click one to see all its lines, or use **Expand all**. Click any line to see why it is there: the routes behind it, the role and threshold of what it joins, and what its style and label mean. **Legend** in the graph toolbar explains the strips and borders. Drag the gaps between panes (or focus one and use the arrow keys) to resize them; double-click a gap to reset. Selected fits its chips up to half the column, again after every change to the selection, and Implied and reachable takes the rest. Pick Auto, Light or Dark in the header.
 
 To work on the web app with live reload, run the API and the Vite dev server side by side:
 
@@ -59,10 +59,11 @@ The server hosts the web app at `/` (if built), the API under `/api`, and intera
 |---|---|
 | `GET /api/nodes`, `GET /api/nodes/{id}` | Browse things, verbs, and routes |
 | `GET /api/profiles`, `GET /api/jobs` | List presets and example jobs |
-| `GET /api/graph` | Every drawable node and edge, with tech levels. Add `?action=cut:limestone` to draw extra actions |
+| `GET /api/graph` | Every drawable node and edge, with tech levels, plus every possible action for search and what each node certainly needs (for focus mode). Add `?action=cut:limestone` to draw extra actions |
 | `GET /api/need/{id}` | Q1: the full tree of what it would take, plus what is certain |
 | `POST /api/explore` | Q2: `{"profile": "...", "select": [], "deselect": [], "hypothetical": []}`. Includes a status for every node and what implies each implied item |
-| `POST /api/explain` | What a node needs, one level deep, each requirement met / missing / unknown with a reason: the same body plus `"node": "<id>"`. Add `"all": true` for every certain need at every depth |
+| `POST /api/explain` | What a node needs, one level deep, each requirement met / missing / unknown with a reason: the same body plus `"node": "<id>"`. Also what the node is (description, numbers, sources), each route's references, and what it leads to. Add `"all": true` for every certain need at every depth. Know-how ids work too |
+| `POST /api/explain-edge` | Why a line joins two nodes: the same body plus `"source"` and `"target"`. Each route behind it, the source's role and threshold, met or not and why; or the "is a" link |
 | `POST /api/check` | Q3: the same body plus `"job": "<id>"` or an inline `"job_spec"` |
 
 ### Tests

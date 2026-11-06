@@ -45,7 +45,7 @@ npm run build                    # web/dist, which `capabilities serve` hosts at
 - `data/`: the graph (quantities, things, verbs, routes, profiles), licensed CC BY 4.0
 - `examples/jobs/`: feasibility-check jobs; `examples/README.md` holds worked results that tests check
 - `src/capabilities/`: `graph.py` (loading), `validate.py`, `tristate.py`, `reasoner.py` (the three questions), `levels.py` (tech levels), `views.py` (display-ready shapes for the web UI), `cli.py`, `server.py` (API under `/api`)
-- `web/src/`: `api/` (typed client), `graph/` (Cytoscape elements, styles, statuses, tech-tree layout, focus), `panes/` (side pane, lists, node card, dialog), `legend/`, `state/` (selection history and links, explore hook, theme), `catalog.ts` (labels for any id)
+- `web/src/`: `api/` (typed client), `graph/` (Cytoscape elements, styles, statuses, tech-tree layout, focus mode, hiding busy nodes' extra lines), `detail/` (detail pane for nodes and lines: route checklists, drill-down, expand-all dialog), `chips/` (node-like chips used in every list), `panes/` (side pane, lists, dialog), `search/`, `lib/bounded.ts` (top N, the rest summarised by type), `layout/` (resizable panes), `legend/`, `state/` (selection history and links, explore and explain hooks, breadcrumb trail, theme), `catalog.ts` (labels for any id)
 - `tests/`: pytest suite
 - `docs/`: data format, reasoning rules, and ADRs
 

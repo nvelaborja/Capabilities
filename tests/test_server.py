@@ -53,6 +53,7 @@ class TestServer:
         extra = client.get("/api/graph", params={"action": ["cut:limestone"]}).json()
         assert steel["level"] == 8
         assert "cut:limestone" in {n["id"] for n in extra["nodes"]}
+        assert "cut:limestone" in {a["id"] for a in plain["actions"]}
 
     def test_explore_includes_statuses_and_implied_by(self, client):
         body = client.post("/api/explore", json={"profile": "middle-kingdom-egypt"}).json()
@@ -65,6 +66,11 @@ class TestServer:
         full = client.post("/api/explain", json={**request, "all": True}).json()
         assert brief["status"] == "near" and "all" not in brief
         assert [row["id"] for row in full["all"]["missing"]] == ["bloom-iron", "iron-ore"]
+        assert brief["about"]["description"] and brief["leads_to"]
+
+    def test_explain_edge(self, client):
+        body = client.post("/api/explain-edge", json={"profile": "middle-kingdom-egypt", "source": "heat", "target": "steel"}).json()
+        assert body["kind"] == "requires" and len(body["routes"]) == 2
 
     def test_interactive_docs_stay_at_the_root(self, client):
         assert client.get("/docs").status_code == 200
@@ -78,8 +84,10 @@ class TestServer:
             ("post", "/api/explore", {"select": ["unobtainium"]}, 422),
             ("post", "/api/check", {}, 422),
             ("post", "/api/explain", {"node": "unobtainium"}, 404),
-            ("post", "/api/explain", {"node": "iron-smelting"}, 404),
+            ("post", "/api/explain", {"node": "bloomery-smelting"}, 404),
             ("post", "/api/explain", {}, 422),
+            ("post", "/api/explain-edge", {"source": "wood", "target": "steel"}, 404),
+            ("post", "/api/explain-edge", {"source": "wood"}, 422),
             ("get", "/api/graph?action=bogus", None, 422),
             ("get", "/api/graph?action=fly:granite", None, 422),
             ("post", "/explore", {}, 404),

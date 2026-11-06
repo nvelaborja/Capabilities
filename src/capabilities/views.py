@@ -12,7 +12,7 @@ from typing import Iterable
 
 from .graph import Graph
 from .levels import Levels, action_key
-from .reasoner import Action, Backward, ExploreResult, Necessity, Reachability, Selection, condition_rhs
+from .reasoner import ANY_TARGET, Action, Backward, ExploreResult, Necessity, Reachability, Selection, condition_rhs
 from .tristate import Tri, as_range, compare
 
 # Kinds drawn on the graph. Techniques never gate anything (ADR 0005), so they appear only in details and lists.
@@ -30,12 +30,19 @@ class UnknownNode(KeyError):
 
 def action_label(graph: Graph, action: Action) -> str:
     verb, target = action
+    if target == ANY_TARGET:
+        return f"{graph.label(verb)} anything"
     return f"{graph.label(verb)} {graph.label(target).lower()}"
 
 
 def parse_action(key: str) -> Action:
     verb, target = key.split(":", 1)
     return verb, target
+
+
+def specific_target(target: str) -> str | None:
+    """The target to reason about: none for "(any)", so every route of the verb counts."""
+    return None if target == ANY_TARGET else target
 
 
 def node_label(graph: Graph, key: str) -> str:
@@ -105,7 +112,39 @@ def graph_view(graph: Graph, levels: Levels, extra_actions: Iterable[Action] = (
         "edges": edges,
         "verbs": [{"id": verb_id, "label": verb["label"]} for verb_id, verb in sorted(graph.verbs.items())],
         "techniques": [{"id": tid, "label": t["label"]} for tid, t in sorted(graph.things.items()) if t["kind"] == "technique"],
+        "actions": [{"id": action_key(a), "label": action_label(graph, a)} for a in all_actions(graph)],
+        "needs": certain_needs(graph, [node["id"] for node in nodes if node["kind"] != "route"]),
     }
+
+
+def certain_needs(graph: Graph, keys: Iterable[str]) -> dict[str, list[str]]:
+    """For focus mode (ADR 0030): what each node needs whichever way it is made, at every depth.
+
+    A category stands for any of its members, so its members are listed too. Only nodes in `keys` are kept, since
+    focus mode shows nothing else.
+    """
+    drawn = set(keys)
+    backward = Backward(graph)
+    needs = {}
+    for key in drawn:
+        if ":" in key:
+            need = backward.of_action(*parse_action(key))
+        elif graph.kind(key) == "category":
+            members = sorted(graph.members(key))
+            need = Necessity.common([backward.of_thing(member) for member in members])
+            need.things |= set(members)
+        elif graph.kind(key) == "effect":
+            need = backward.of_effect(key)
+        else:
+            need = backward.of_thing(key)
+        found = need.things | need.categories | set(need.effects) | {action_key(action) for action in need.actions}
+        needs[key] = sorted(found & drawn - {key})
+    return dict(sorted(needs.items()))
+
+
+def all_actions(graph: Graph) -> list[Action]:
+    """Every verb and target pair the data allows, drawn or not, so search can find and add any of them."""
+    return [(verb, target) for verb in sorted(graph.verbs) for target in graph.targets_for(verb)]
 
 
 def _thing_view(graph: Graph, levels: Levels, thing_id: str) -> dict:
@@ -205,6 +244,8 @@ class StatusContext:
             return self._category_status(key)
         if kind == "effect":
             return self._effect_status(key)
+        if kind == "technique":
+            return self._technique_status(key)
         if key in self.hypothetical.things:
             return "hypothetical"
         if key in self.selected.things:
@@ -214,6 +255,8 @@ class StatusContext:
         return _tri_status(self.reach.status.get(key, Tri.NO), near=key in self.near)
 
     def _action_status(self, action: Action) -> str:
+        if action[1] == ANY_TARGET:
+            return _tri_status(self.reach.action_status(action[0], None))
         if action in self.hypothetical.actions:
             return "hypothetical"
         if action in self.selected.actions:
@@ -232,6 +275,13 @@ class StatusContext:
         if effect in self.implied.effects:
             return "implied"
         return _tri_status(self.reach.effect_status(effect, [], None))
+
+    def _technique_status(self, technique: str) -> str:
+        """Know-how never gates anything (ADR 0005): it is implied, or as reachable as the best route it describes."""
+        if technique in self.implied.techniques:
+            return "implied"
+        routes = [rid for rid, route in self.graph.routes.items() if technique in route.get("techniques", [])]
+        return _tri_status(max((self.reach.route_status(rid, None) for rid in routes), default=Tri.NO))
 
     def route_status(self, route_id: str, actions: Iterable[Action]) -> Tri:
         """A thing or effect route's status. A verb route takes its best status over the given actions."""
@@ -256,7 +306,8 @@ def explore_view(graph: Graph, result: ExploreResult) -> dict:
     context = StatusContext.from_explore(graph, result)
     chosen = result.selected | result.hypothetical
     actions = referenced_actions(graph) | set(chosen.actions) | set(result.implied.actions)
-    keys = [tid for tid, t in graph.things.items() if t["kind"] in DRAWN_KINDS] + [action_key(a) for a in actions]
+    # Every possible action gets a status, since search can add any of them to the graph.
+    keys = [tid for tid, t in graph.things.items() if t["kind"] in DRAWN_KINDS] + [action_key(a) for a in actions | set(all_actions(graph))]
     return {
         **result.to_dict(graph),
         "status": {key: context.status(key) for key in sorted(keys)},
@@ -277,17 +328,13 @@ def implied_effects(graph: Graph, implied: Necessity) -> list[dict]:
 
 
 def near_view(graph: Graph, result: ExploreResult) -> list[dict]:
-    """Things one requirement away, grouped by thing, each route naming what it is missing."""
-    reach = result.reach
+    """Things one raw ingredient away, grouped by thing: each route that would work, and what to add for it."""
     grouped: dict[str, list[dict]] = defaultdict(list)
     for miss in result.near_misses:
         route = graph.routes[miss["route"]]
-        missing = next(r for r in route["requires"] if reach.requirement_status(r, None) == Tri.NO)
-        key = requirement_node(missing)
         grouped[miss["thing"]].append({
             "id": miss["route"], "label": route.get("label", miss["route"]),
-            "missing": {"id": key, "label": node_label(graph, key) + (" (any)" if "category" in missing else ""),
-                        "kind": "action" if ":" in key else graph.kind(key)},
+            "missing": {"id": miss["missing"], "label": graph.label(miss["missing"]), "kind": graph.kind(miss["missing"])},
         })
     return [{"id": thing, "label": graph.label(thing), "routes": routes} for thing, routes in sorted(grouped.items())]
 
@@ -313,11 +360,14 @@ def explain(graph: Graph, levels: Levels, context: StatusContext, key: str, ever
     With `everything`, also every certain need at every depth, split into missing, uncertain and have.
     """
     kind = _explainable_kind(graph, key)
-    view = {"id": key, "label": node_label(graph, key), "kind": kind, "status": context.status(key), "level": levels.of(key)}
+    if kind == "technique":
+        return _explain_technique(graph, levels, context, key)
+    view = {"id": key, "label": node_label(graph, key), "kind": kind, "status": context.status(key), "level": levels.of(key),
+            "about": about(graph, key), "leads_to": leads_to(graph, levels, context, key)}
     if kind == "category":
         view["members"] = _ranked(levels, [_member_row(graph, levels, context, m) for m in graph.members(key)])
         return view
-    target = parse_action(key)[1] if kind == "action" else None
+    target = specific_target(parse_action(key)[1]) if kind == "action" else None
     explainer = _Explainer(graph, levels, context.reach, target)
     view["routes"] = sorted((explainer.route_row(rid) for rid in _routes_for(graph, key, kind)),
                             key=lambda r: (r["missing"], r["uncertain"], r["label"].lower()))
@@ -329,18 +379,114 @@ def explain(graph: Graph, levels: Levels, context: StatusContext, key: str, ever
 def _explainable_kind(graph: Graph, key: str) -> str:
     if ":" in key:
         verb, target = parse_action(key)
-        if verb not in graph.verbs or target not in graph.things:
+        if verb not in graph.verbs or (target not in graph.things and target != ANY_TARGET):
             raise UnknownNode(key)
         return "action"
     kind = graph.kind(key)
-    if kind not in DRAWN_KINDS:
+    if kind not in (*DRAWN_KINDS, "technique"):
         raise UnknownNode(key)
     return kind
 
 
+def _item(graph: Graph, levels: Levels, context: StatusContext, key: str) -> dict:
+    return {"id": key, "label": node_label(graph, key), "kind": "action" if ":" in key else graph.kind(key),
+            "status": context.status(key), "level": levels.of(key)}
+
+
+def _explain_technique(graph: Graph, levels: Levels, context: StatusContext, key: str) -> dict:
+    """Know-how is descriptive only (ADR 0005): what it is, and which routes it describes."""
+    actions = sorted(referenced_actions(graph))
+    used_in = []
+    for route_id, route in sorted(graph.routes.items()):
+        if key in route.get("techniques", []):
+            makes = [_item(graph, levels, context, p) for p in _main_products(graph, route_id, actions)]
+            used_in.append({"id": route_id, "label": route.get("label", route_id), "makes": makes})
+    products = {row["id"]: row for route in used_in for row in route["makes"]}
+    return {"id": key, "label": graph.label(key), "kind": "technique", "status": context.status(key), "level": None,
+            "about": about(graph, key), "used_in": used_in, "leads_to": _ranked(levels, list(products.values()))}
+
+
+def explain_edge(graph: Graph, levels: Levels, context: StatusContext, source: str, target: str) -> dict:
+    """Why a line joins two nodes: each route that uses the source to make the target, or the "is a" link."""
+    for key in (source, target):
+        _explainable_kind(graph, key)
+    view = {"source": _item(graph, levels, context, source), "target": _item(graph, levels, context, target)}
+    if graph.kind(target) == "category" and source in graph.members(target):
+        users = sorted(graph.routes[rid].get("label", rid) for rid, route in graph.routes.items()
+                       if any(r.get("category") == target for r in route["requires"]))
+        return {**view, "kind": "is_a", "used_by": users}
+    kind = _explainable_kind(graph, target)
+    explainer = _Explainer(graph, levels, context.reach, parse_action(target)[1] if kind == "action" else None)
+    routes = []
+    for route_id in _routes_for(graph, target, kind):
+        route = graph.routes[route_id]
+        if not any(requirement_node(r) == source for r in route["requires"]):
+            continue
+        row = explainer.route_row(route_id)
+        row["link"] = [req for req in row["requirements"] if req["id"] == source]
+        row["byproduct"] = any(o.get("thing") == target and o.get("byproduct") for o in route.get("outputs", []))
+        routes.append(row)
+    if not routes:
+        raise UnknownNode(f"{source}->{target}")
+    routes.sort(key=lambda r: (r["byproduct"], r["missing"], r["uncertain"], r["label"].lower()))
+    return {**view, "kind": "requires", "routes": routes}
+
+
+def about(graph: Graph, key: str) -> dict:
+    """What the node is: description, numbers, where it is found, what kinds it belongs to, and its sources."""
+    if ":" in key:
+        verb, target = parse_action(key)
+        view = {"description": graph.verbs[verb].get("description"), "references": []}
+        if target != ANY_TARGET:
+            view["target"] = {"id": target, "label": graph.label(target)}
+        return view
+    thing = graph.things[key]
+    view = {
+        "description": thing.get("description"),
+        "quantities": [{"id": q, "label": quantity_name(graph, q), "value": quantity_value(graph, q, v)}
+                       for q, v in thing.get("quantities", {}).items()],
+        "member_of": [{"id": c, "label": graph.label(c)} for c in thing.get("is_a", []) if c in graph.things],
+        "references": references(thing),
+    }
+    for field in ("notes", "origin", "availability", "regions", "era"):
+        if thing.get(field):
+            view[field] = thing[field].strip() if isinstance(thing[field], str) else thing[field]
+    return view
+
+
+def references(item: dict) -> list[dict]:
+    fields = ("citation", "doi", "url", "supports", "status")
+    return [{field: ref[field] for field in fields if field in ref} for ref in item.get("references", [])]
+
+
+def leads_to(graph: Graph, levels: Levels, context: StatusContext, key: str) -> list[dict]:
+    """What the node is used to make directly, most advanced first, with the routes that use it."""
+    actions = sorted(referenced_actions(graph))
+    via: dict[str, list[str]] = defaultdict(list)
+    for route_id, route in sorted(graph.routes.items()):
+        if any(_is_requirement(r, key) for r in route["requires"]):
+            for product in _main_products(graph, route_id, actions):
+                via[product].append(route.get("label", route_id))
+    rows = [{"id": p, "label": node_label(graph, p), "kind": "action" if ":" in p else graph.kind(p), "status": context.status(p),
+             "level": levels.of(p), "via": routes} for p, routes in via.items() if p != key]
+    return _ranked(levels, rows)
+
+
+def _is_requirement(requirement: dict, key: str) -> bool:
+    """Whether a requirement names this node; "move:(any)" stands for moving any target."""
+    if key.endswith(f":{ANY_TARGET}"):
+        return requirement["role"] == "action" and requirement["verb"] == parse_action(key)[0]
+    return requirement_node(requirement) == key
+
+
+def _main_products(graph: Graph, route_id: str, actions: list[Action]) -> list[str]:
+    return [edge["target"] for edge in _product_edges(graph, route_id, actions) if not edge.get("byproduct")]
+
+
 def _routes_for(graph: Graph, key: str, kind: str) -> list[str]:
     if kind == "action":
-        return graph.verb_routes(*parse_action(key))
+        verb, target = parse_action(key)
+        return graph.verb_routes(verb, specific_target(target))
     if kind == "effect":
         return graph.routes_achieving.get(key, [])
     return graph.routes_producing.get(key, [])
@@ -356,13 +502,22 @@ class _Explainer:
         route = self.g.routes[route_id]
         rows = sorted((self.requirement_row(r) for r in route["requires"]),
                       key=lambda row: (_STATUS_RANK[row["status"]], *self.levels.rank(row["id"], row["label"], row["level"])))
-        return {
-            "id": route_id, "label": route.get("label", route_id), "techniques": route.get("techniques", []),
+        row = {
+            "id": route_id, "label": route.get("label", route_id),
+            "techniques": [{"id": t, "label": self.g.label(t)} for t in route.get("techniques", [])],
             "status": self.reach.route_status(route_id, self.target).label,
             "missing": sum(row["status"] == "no" for row in rows),
             "uncertain": sum(row["status"] == "maybe" for row in rows),
             "requirements": rows,
+            "references": references(route),
         }
+        byproducts = [{"id": o["thing"], "label": self.g.label(o["thing"])} for o in route.get("outputs", []) if o.get("byproduct")]
+        if byproducts:
+            row["byproducts"] = byproducts
+        provides = [f"{quantity_name(self.g, q)} up to {quantity_value(self.g, q, v)}" for q, v in route.get("provides", {}).items()]
+        if provides:
+            row["provides"] = provides
+        return row
 
     def requirement_row(self, requirement: dict) -> dict:
         key = requirement_node(requirement)
@@ -377,6 +532,8 @@ class _Explainer:
         reason = self._reason(requirement, status)
         if reason:
             row["reason"] = reason
+        if requirement.get("notes"):
+            row["notes"] = requirement["notes"].strip()
         return row
 
     def _effect_level(self, requirement: dict) -> int | None:

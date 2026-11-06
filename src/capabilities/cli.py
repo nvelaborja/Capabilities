@@ -65,7 +65,7 @@ def build_parser() -> argparse.ArgumentParser:
 def add_selection_args(cmd: argparse.ArgumentParser) -> None:
     cmd.add_argument("--profile", help="Start from a profile, e.g. middle-kingdom-egypt.")
     cmd.add_argument("--select", nargs="*", default=[], metavar="ITEM",
-                     help="Things they made or had, or actions they did (verb:target).")
+                     help="Things made or had, or actions done (verb:target).")
     cmd.add_argument("--deselect", nargs="*", default=[], metavar="ITEM", help="Remove items from the profile.")
     cmd.add_argument("--hypothetical", nargs="*", default=[], metavar="ITEM", help="What-if additions, shown separately.")
 
@@ -145,9 +145,9 @@ def cmd_explore(args, root: Path) -> int:
             line += f"  (maybe: {', '.join(maybe)})"
         print(line)
     print()
-    print("Near misses (one requirement away):")
+    print("One step away (one more raw ingredient):")
     for miss in result["near_misses"] or [{"thing": "-", "route": "", "missing": ""}]:
-        print(f"  {miss['thing']}" + (f" via {miss['route']}: missing {miss['missing']}" if miss["route"] else ""))
+        print(f"  {miss['thing']}" + (f" via {miss['route']}: add {miss['missing']}" if miss["route"] else ""))
     if result["warnings"]:
         print()
         section("Warnings", result["warnings"])

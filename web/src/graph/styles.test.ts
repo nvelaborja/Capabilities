@@ -76,6 +76,14 @@ describe("graph stylesheet", () => {
     expect(sheet.findIndex((b) => b.selector === "edge.highlighted")).toBeGreaterThan(live);
   });
 
+  it("hides folded lines until revealed, and anything outside focus mode even if revealed", () => {
+    expect(styleOf(".folded")?.display).toBe("none");
+    expect(styleOf("edge.revealed")?.display).toBe("element");
+    const revealed = sheet.findIndex((b) => b.selector === "edge.revealed");
+    expect(sheet.findIndex((b) => b.selector === ".outside")).toBeGreaterThan(revealed);
+    expect(sheet.findIndex((b) => b.selector === ".folded")).toBeLessThan(revealed);
+  });
+
   it("puts status rules after type rules so they win", () => {
     const type = sheet.findIndex((b) => b.selector === "node.material");
     const status = sheet.findIndex((b) => b.selector === "node.status-out");

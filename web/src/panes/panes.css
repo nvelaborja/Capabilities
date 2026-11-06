@@ -1,12 +1,38 @@
 /* ---------------------------------------------------------------- side pane */
 
-.side-pane {
+/*
+ * Two panes in one column (ADR 0029). By default the Selected pane fits its content up to half the column, and the
+ * Implied and reachable pane takes the rest. Once the user drags the gap, --selected-height takes over; min() keeps
+ * room for the pane below when the window shrinks.
+ */
+.side-column {
   grid-area: side;
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: fit-content(50%) var(--gutter) minmax(0, 1fr);
   min-height: 0;
-  border-left: 1px solid var(--border);
+}
+
+.app.selected-sized .side-column {
+  grid-template-rows: min(var(--selected-height), calc(100% - 9rem)) var(--gutter) minmax(0, 1fr);
+}
+
+/* Flex, not grid rows, so the optional warning can come and go without shifting the other rows. */
+.selection-pane,
+.reach-pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   background: var(--surface);
+}
+
+.selection-pane > *,
+.reach-pane > * {
+  flex: none;
+}
+
+.selection-pane > .capability-list,
+.reach-pane > .capability-list {
+  flex: 1 1 auto;
 }
 
 .preset-picker {
@@ -47,16 +73,12 @@
   font-size: 0.8rem;
 }
 
-.edited-badge,
-.badge {
+.edited-badge {
   flex: none;
   padding: 0 0.4rem;
   border-radius: 999px;
   font-size: 0.7rem;
   line-height: 1.3rem;
-}
-
-.edited-badge {
   border: 1px dashed var(--text-muted);
   color: var(--text-muted);
 }
@@ -73,10 +95,6 @@
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   min-height: 0;
-}
-
-.capability-list + .capability-list {
-  border-top: 1px solid var(--border);
 }
 
 .capability-header {
@@ -107,67 +125,36 @@
   color: var(--text-muted);
 }
 
-.group summary {
-  padding: 0.3rem 0.5rem;
+.chip-section + .chip-section {
+  margin-top: 0.6rem;
+}
+
+.chip-section h3 {
+  margin: 0.3rem 0.25rem 0.35rem;
   font-size: 0.75rem;
   font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  cursor: pointer;
 }
 
-.group ul {
-  margin: 0;
-  padding: 0;
-  list-style: none;
+.chip-group {
+  margin: 0 0 0.45rem;
 }
 
-.row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.25rem 0.4rem;
-  padding: 0.15rem 0.5rem;
-  border-radius: 6px;
+/* Opened chips sit indented under the chip that folds them. */
+.chip-group-items {
+  margin: 0.35rem 0 0 0.9rem;
+  padding-left: 0.6rem;
+  border-left: 2px solid var(--border);
 }
 
-.row:hover {
-  background: var(--bg);
+.section-hint {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
 }
 
-.row-label {
-  flex: 1;
-  min-width: 0;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--text);
-  text-align: left;
-  cursor: pointer;
-}
-
-.row-label:hover {
-  text-decoration: underline;
-}
-
-.row-note {
-  flex-basis: 100%;
-  color: var(--text-muted);
-  font-size: 0.75rem;
-}
-
-.badge-implied {
-  border: 1px solid var(--accent);
-  color: var(--accent);
-}
-
-.badge-maybe {
-  border: 1px dotted var(--text-muted);
-  color: var(--text-muted);
-}
-
-.row-remove,
 .icon-button {
   width: 1.5rem;
   height: 1.5rem;
@@ -181,7 +168,6 @@
   cursor: pointer;
 }
 
-.row-remove:hover,
 .icon-button:hover {
   background: var(--border);
   color: var(--text);
@@ -207,48 +193,8 @@ summary:focus-visible {
   outline-offset: 1px;
 }
 
-/* ---------------------------------------------------------------- node card */
-
-.node-card {
-  position: absolute;
-  top: 0.75rem;
-  right: 0.75rem;
-  width: min(20rem, calc(100% - 1.5rem));
-  padding: 0.75rem 0.9rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface-raised);
-  box-shadow: var(--shadow);
-}
-
-.node-card header {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.5rem;
-}
-
-.node-card h2 {
-  margin: 0;
-  font-size: 1rem;
-}
-
-.node-card-meta {
-  margin: 0.1rem 0 0;
-  color: var(--text-muted);
-  font-size: 0.8rem;
-}
-
-.node-card p {
-  margin: 0.5rem 0 0;
-}
-
-.node-card-actions {
-  margin-top: 0.75rem;
-}
-
 /* ---------------------------------------------------------------- buttons and dialog */
 
-.node-card-actions button,
 .confirm-actions button {
   padding: 0.35rem 0.8rem;
   border: 1px solid var(--border);
@@ -258,7 +204,6 @@ summary:focus-visible {
   cursor: pointer;
 }
 
-.node-card-actions button.primary,
 .confirm-actions button.primary {
   border-color: var(--accent);
   background: var(--accent);

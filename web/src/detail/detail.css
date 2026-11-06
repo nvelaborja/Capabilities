@@ -1,0 +1,589 @@
+/* ---------------------------------------------------------------- detail pane (under the graph, ADR 0025) */
+
+.detail-pane {
+  grid-area: detail;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  background: var(--surface);
+  /* The pane is resizable (ADR 0028), so its columns respond to its own width, not the window's. */
+  container: detail / inline-size;
+}
+
+.detail-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  padding: 0.6rem 1rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.detail-title {
+  min-width: 0;
+}
+
+.detail-title h2 {
+  display: inline;
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+/* The trail leads into the title: Steel › Bloom iron › Iron ore. */
+.breadcrumb,
+.breadcrumb ol,
+.breadcrumb li {
+  display: inline;
+}
+
+.breadcrumb ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.breadcrumb li::after {
+  content: " › ";
+  color: var(--text-muted);
+}
+
+.breadcrumb .link-button {
+  font-size: 0.95rem;
+}
+
+/* Left to right like the graph: what it needs, what it is, what it leads to. Each column scrolls on its own. */
+.detail-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr);
+  min-height: 0;
+}
+
+.detail-column {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0.6rem 1rem 1rem;
+}
+
+.detail-column + .detail-column {
+  border-left: 1px solid var(--border);
+}
+
+.detail-columns > .muted,
+.detail-columns > .error {
+  padding: 0.6rem 1rem;
+}
+
+/* A narrow pane: one column, scrolling as a whole. */
+@container detail (max-width: 52rem) {
+  .detail-columns {
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-rows: max-content;
+    overflow-y: auto;
+  }
+
+  .detail-column {
+    overflow: visible;
+  }
+
+  .detail-column + .detail-column {
+    border-top: 1px solid var(--border);
+    border-left: 0;
+  }
+}
+
+.detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem 0.5rem;
+  margin: 0.3rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.kind-chip,
+.status-chip,
+.modern-chip {
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  line-height: 1.35rem;
+  white-space: nowrap;
+}
+
+.kind-chip {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.kind-material { background: var(--type-material-tint); }
+.kind-artifact { background: var(--type-artifact-tint); }
+.kind-action { background: var(--type-action-tint); }
+.kind-category { background: var(--type-category-tint); }
+.kind-effect { background: var(--type-effect-tint); }
+
+.status-chip { border: 1px solid currentcolor; }
+.status-chip-yes { color: var(--met); }
+.status-chip-no { color: var(--missing); border-style: dashed; }
+.status-chip-maybe { color: var(--text-muted); border-style: dotted; }
+
+.modern-chip {
+  border: 1px solid var(--border);
+}
+
+.detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.detail-actions button:not(.icon-button),
+.expand-all {
+  padding: 0.3rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.detail-actions button:not(.icon-button):hover,
+.expand-all:hover {
+  border-color: var(--accent);
+}
+
+.detail-actions button.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.detail-actions button[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.detail-note {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+}
+
+.detail-column h3,
+.detail-column h4 {
+  margin: 0 0 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.detail-column h4 {
+  margin-top: 0.9rem;
+}
+
+.detail-column p {
+  margin: 0.35rem 0;
+}
+
+.muted {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.description {
+  line-height: 1.45;
+}
+
+.facts {
+  display: grid;
+  gap: 0.15rem;
+  margin: 0.5rem 0;
+  font-size: 0.85rem;
+}
+
+.facts div {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 0.5rem;
+}
+
+/* Label and value side by side, or the value under its label when the column is narrow. */
+.facts dt {
+  flex: 1 1 6rem;
+  max-width: 9rem;
+}
+
+.facts dd {
+  flex: 999 1 6rem;
+}
+
+.facts dt {
+  color: var(--text-muted);
+}
+
+.facts dd {
+  margin: 0;
+}
+
+/* Buttons that open another node's details. */
+.drill {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.drill:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.mark {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 1.1rem;
+  font-weight: 700;
+}
+
+.mark-yes { color: var(--met); }
+.mark-no { color: var(--missing); }
+.mark-maybe { color: var(--text-muted); }
+
+/* ---------------------------------------------------------------- routes and requirements */
+
+.routes,
+.requirements,
+.item-chips,
+.how-used,
+.used-in,
+.references {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.route {
+  margin-bottom: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+}
+
+.route > summary {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.45rem 0.6rem;
+  cursor: pointer;
+}
+
+.route-label {
+  flex: 1;
+  font-weight: 600;
+}
+
+.verdict {
+  flex: none;
+  font-size: 0.75rem;
+}
+
+.verdict-yes { color: var(--met); }
+.verdict-no { color: var(--missing); }
+.verdict-maybe { color: var(--text-muted); }
+
+.route > :not(summary) {
+  margin-left: 0.6rem;
+  margin-right: 0.6rem;
+}
+
+.requirement,
+.item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  padding: 0.15rem 0;
+}
+
+/* Level with the first line of the row (the chip), not the middle of a long reason. */
+.requirement .mark {
+  align-self: flex-start;
+  margin-top: 0.2rem;
+}
+
+.requirement-body .chip {
+  margin-right: 0.15rem;
+}
+
+.requirement-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.1rem 0.4rem;
+  min-width: 0;
+}
+
+.role-tag {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.conditions {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.reason {
+  flex-basis: 100%;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.requirement-no .reason {
+  color: var(--missing);
+}
+
+.requirement-notes {
+  flex-basis: 100%;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.requirement-notes summary,
+.route-sources summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-size: 0.8rem;
+}
+
+.route-fact {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.route-sources {
+  margin-bottom: 0.5rem;
+}
+
+.via {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.bounded-more {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.3rem 0;
+}
+
+.more-button {
+  padding: 0.1rem 0.55rem;
+  border: 1px dashed var(--text-muted);
+  border-radius: 999px;
+  background: none;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-style: italic;
+  cursor: pointer;
+}
+
+.more-button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.expand-all {
+  margin-top: 0.25rem;
+}
+
+/* ---------------------------------------------------------------- sources */
+
+.references li {
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.35rem 0;
+  border-top: 1px solid var(--border);
+  font-size: 0.8rem;
+}
+
+.references li:first-child {
+  border-top: 0;
+}
+
+.supports {
+  color: var(--text-muted);
+}
+
+.reference-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.reference-meta a {
+  color: var(--accent);
+}
+
+.source-status {
+  color: var(--text-muted);
+}
+
+.source-verified {
+  color: var(--met);
+}
+
+/* ---------------------------------------------------------------- expand all dialog */
+
+.expand-dialog {
+  width: min(40rem, calc(100vw - 2rem));
+  max-height: min(48rem, calc(100dvh - 4rem));
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+
+.expand-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.expand-dialog::backdrop {
+  background: rgb(0 0 0 / 0.35);
+}
+
+.expand-dialog > header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 1rem 1.25rem 0;
+}
+
+.expand-dialog h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.expand-dialog > .muted {
+  margin: 0.25rem 1.25rem 0;
+}
+
+.expand-dialog .filter {
+  margin: 0.75rem 1.25rem 0;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+
+.expand-body {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0.5rem 1.25rem 1.25rem;
+}
+
+.expand-body h3 {
+  margin: 0.9rem 0 0.25rem;
+  font-size: 0.85rem;
+}
+
+.expand-group h4 {
+  margin: 0.4rem 0 0.1rem;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.expand-group ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* "via quench hardening" sits under the name, so long route names don't squeeze it. */
+.item {
+  flex-wrap: wrap;
+}
+
+/* Selecting a class member in one click (ADR 0031). */
+.quick-add {
+  padding: 0.05rem 0.5rem;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: none;
+  color: var(--accent);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.quick-add:hover {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.quick-added {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.item .via {
+  flex-basis: 100%;
+  padding-left: 1.45rem;
+}
+
+/* ---------------------------------------------------------------- lines and know-how */
+
+.edge-end {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.how-used > li + li {
+  margin-top: 0.6rem;
+}
+
+.how-used-route {
+  margin-bottom: 0.2rem;
+}
+
+.used-in > li {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.35rem 0;
+  border-top: 1px solid var(--border);
+}
+
+.used-in > li:first-child {
+  border-top: 0;
+}
+
+.used-in-makes {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.member-of .chip,
+.about .chip,
+.detail-column p .chip {
+  margin: 0.1rem 0.2rem 0.1rem 0;
+}
+
+.expand-body .chip-row {
+  margin-top: 0.3rem;
+}

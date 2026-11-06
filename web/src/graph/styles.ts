@@ -2,6 +2,7 @@ import type { StylesheetJson } from "cytoscape";
 
 import type { DrawnKind, Status } from "../api/types";
 import { STRIP_WIDTH } from "./elements";
+import { FOLDED, OUTSIDE, REVEALED } from "./focus";
 
 export const TYPED_KINDS: readonly DrawnKind[] = ["material", "artifact", "action", "category", "effect"];
 
@@ -162,7 +163,7 @@ export function buildStylesheet(t: GraphTokens): StylesheetJson {
       },
     },
     ...typeRules,
-    // Italic as a second cue for "any of a kind", besides colour.
+    // Italic as a second cue for a class (any member will do), besides colour.
     { selector: "node.category", style: { "font-style": "italic" } },
     { selector: "node.ubiquitous", style: { "font-size": 11 } },
     {
@@ -204,6 +205,11 @@ export function buildStylesheet(t: GraphTokens): StylesheetJson {
     { selector: "edge.byproduct", style: { "line-style": "dotted" } },
     { selector: "edge.is_a", style: { width: 0.75, "line-style": "dashed", "target-arrow-shape": "none" } },
     { selector: "edge.live", style: { "line-color": t.edgeLive, "target-arrow-color": t.edgeLive, opacity: EDGE_OPACITY.live } },
+    // A busy node's extra lines hide until it, or the node at the other end, is clicked (ADR 0030). Outside focus mode
+    // comes last, so it hides even a revealed line.
+    { selector: `.${FOLDED}`, style: { display: "none" } },
+    { selector: `edge.${REVEALED}`, style: { display: "element" } },
+    { selector: `.${OUTSIDE}`, style: { display: "none" } },
 
     // ---------------------------------------------------------------- statuses
     ...statusRules,
@@ -216,6 +222,7 @@ export function buildStylesheet(t: GraphTokens): StylesheetJson {
     { selector: "edge.faded", style: { opacity: EDGE_OPACITY.faded } },
     // Edge labels (heat thresholds) show for the clicked node's edges at any zoom.
     { selector: "edge.highlighted", style: { opacity: EDGE_OPACITY.highlighted, width: 1.5, "min-zoomed-font-size": 0 } },
-    { selector: "node:selected", style: { "overlay-opacity": 0 } },
+    { selector: "edge.focused-edge", style: { width: 3, "line-color": t.accent, "target-arrow-color": t.accent } },
+    { selector: "node:selected, edge:selected", style: { "overlay-opacity": 0 } },
   ];
 }

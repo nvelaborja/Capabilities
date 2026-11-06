@@ -1,62 +1,80 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 
-import type { Group, Row } from "./groups";
-import { countRows } from "./groups";
+import { byKind, type Chip, type ChipGroup, countChips, type Section, sectionCount } from "./groups";
+import { NodeChip } from "../chips/NodeChip";
 
 interface CapabilityListProps {
   id: string;
   title: string;
-  groups: Group[];
+  sections: Section[];
   emptyText: string;
   onPick: (id: string) => void;
   onRemove?: (id: string) => void;
   headerAction?: ReactNode;
-  children?: ReactNode;
 }
 
-function RowItem({ row, onPick, onRemove }: { row: Row; onPick: (id: string) => void; onRemove?: (id: string) => void }) {
-  return (
-    <li className="row">
-      <button type="button" className="row-label" onClick={() => onPick(row.id)} title={`Show ${row.label} on the graph`}>
-        {row.label}
-      </button>
-      {row.badge && <span className={`badge badge-${row.badge}`}>{row.badge === "implied" ? "implied" : "maybe"}</span>}
-      {row.removable && onRemove && (
-        <button type="button" className="row-remove" onClick={() => onRemove(row.id)} aria-label={`Remove ${row.label}`} title="Remove">
-          ×
-        </button>
-      )}
-      {row.note && <span className="row-note">{row.note}</span>}
-    </li>
-  );
-}
-
-/** One half of the right-hand pane: a titled, independently scrolling list of grouped rows. */
-export function CapabilityList({ id, title, groups, emptyText, onPick, onRemove, headerAction, children }: CapabilityListProps) {
+/** A titled, independently scrolling set of chips, each type starting on its own line. */
+export function CapabilityList({ id, title, sections, emptyText, onPick, onRemove, headerAction }: CapabilityListProps) {
   return (
     <section className="capability-list" aria-labelledby={`${id}-title`}>
       <header className="capability-header">
         <h2 id={`${id}-title`}>
-          {title} <span className="count">{countRows(groups)}</span>
+          {title} <span className="count">{countChips(sections)}</span>
         </h2>
         {headerAction}
       </header>
       <div className="capability-scroll">
-        {groups.length === 0 && !children && <p className="empty">{emptyText}</p>}
-        {groups.map((group) => (
-          <details key={group.key} open className="group">
-            <summary>
-              {group.title} <span className="count">{group.rows.length}</span>
-            </summary>
-            <ul>
-              {group.rows.map((row) => (
-                <RowItem key={row.id} row={row} onPick={onPick} onRemove={onRemove} />
-              ))}
-            </ul>
-          </details>
+        {sections.length === 0 && <p className="empty">{emptyText}</p>}
+        {sections.map((section) => (
+          <div key={section.key} className="chip-section" aria-label={section.title || title}>
+            {section.title && (
+              <h3>
+                {section.title} <span className="count">{sectionCount(section)}</span>
+                {section.hint && <span className="section-hint"> · {section.hint}</span>}
+              </h3>
+            )}
+            {section.groups?.map((group) => <FoldedChips key={group.key} group={group} onPick={onPick} />)}
+            {byKind(section.chips).map((run) => (
+              <ChipRow key={run[0]?.kind} chips={run} onPick={onPick} onRemove={onRemove} />
+            ))}
+          </div>
         ))}
-        {children}
       </div>
     </section>
+  );
+}
+
+function ChipRow({ chips, onPick, onRemove }: { chips: Chip[]; onPick: (id: string) => void; onRemove?: (id: string) => void }) {
+  return (
+    <ul className="chip-row">
+      {chips.map((chip) => (
+        <li key={chip.id}>
+          <NodeChip {...chip} onPick={onPick} onRemove={chip.removable ? onRemove : undefined} />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** One chip standing for many ("Cut · 19 materials"); clicking it shows or hides them, on the lines below. */
+function FoldedChips({ group, onPick }: { group: ChipGroup; onPick: (id: string) => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="chip-group">
+      <NodeChip
+        id={group.key}
+        label={group.label}
+        kind={group.kind}
+        status={group.status}
+        note={group.note}
+        expanded={open}
+        onPick={() => setOpen((value) => !value)}
+      />
+      {open && (
+        <div className="chip-group-items">
+          <ChipRow chips={group.chips} onPick={onPick} />
+        </div>
+      )}
+    </div>
   );
 }

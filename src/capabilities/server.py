@@ -16,12 +16,12 @@ from . import __version__
 from .graph import Graph, find_root
 from .levels import compute_levels
 from .reasoner import Backward, Selection, assess_job, closure, explore, need_tree
-from .views import StatusContext, UnknownNode, explain, explore_view, graph_view, parse_action
+from .views import StatusContext, UnknownNode, explain, explain_edge, explore_view, graph_view, parse_action
 
 
 class SelectionRequest(BaseModel):
     profile: str | None = Field(None, description="Start from a profile, e.g. middle-kingdom-egypt.")
-    select: list[str] = Field(default_factory=list, description="Things they made or had, or actions they did (verb:target).")
+    select: list[str] = Field(default_factory=list, description="Things made or had, or actions done (verb:target).")
     deselect: list[str] = Field(default_factory=list, description="Items to remove from the profile.")
     hypothetical: list[str] = Field(default_factory=list, description="What-if additions, reported separately.")
 
@@ -29,6 +29,11 @@ class SelectionRequest(BaseModel):
 class ExplainRequest(SelectionRequest):
     node: str = Field(..., description="A thing, category or effect id, or an action (verb:target).")
     all: bool = Field(False, description="Also list every certain need at every depth (\"Expand all dependencies\").")
+
+
+class EdgeRequest(SelectionRequest):
+    source: str = Field(..., description="Where the line starts: a requirement, or a member of a category.")
+    target: str = Field(..., description="Where the line ends: what the requirement helps make, or the category.")
 
 
 class CheckRequest(SelectionRequest):
@@ -58,7 +63,7 @@ def create_app(root: Path | None = None, web_dist: Path | None = None) -> FastAP
     app = FastAPI(
         title="Capabilities",
         version=__version__,
-        description="What would it take to make X? What else could they do? Could this job have been done this way?",
+        description="What would it take to make X? What else is within reach? Could this job have been done this way?",
     )
 
     def selection(request: SelectionRequest) -> tuple[Selection, Selection]:
@@ -154,6 +159,16 @@ def create_app(root: Path | None = None, web_dist: Path | None = None) -> FastAP
             return explain(graph, levels, context, request.node, everything=request.all)
         except UnknownNode:
             raise HTTPException(404, f"{request.node!r} is not a thing, category, effect or action that can be explained") from None
+
+    @api.post("/explain-edge")
+    def explain_edge_endpoint(request: EdgeRequest) -> dict:
+        """Why a line joins two nodes: the routes behind it, the source's role and thresholds, or the "is a" link."""
+        selected, what_if = selection(request)
+        context = StatusContext.from_explore(graph, explore(graph, selected, what_if))
+        try:
+            return explain_edge(graph, levels, context, request.source, request.target)
+        except UnknownNode:
+            raise HTTPException(404, f"No line joins {request.source!r} to {request.target!r}") from None
 
     @api.post("/check")
     def check(request: CheckRequest) -> dict:

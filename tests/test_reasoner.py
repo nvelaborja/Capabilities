@@ -190,7 +190,61 @@ class TestExplore:
 
     def test_iron_is_one_ingredient_away_for_egypt(self, graph):
         result = explore(graph, egypt(graph))
-        assert {"thing": "bloom-iron", "route": "bloomery-smelting", "missing": "consumed iron-ore (any)"} in result.near_misses
+        assert {"thing": "bloom-iron", "route": "bloomery-smelting", "missing": "hematite"} in result.near_misses
+
+    def test_the_whole_iron_chain_is_one_ore_away(self, graph):
+        # given: Egypt, which has no iron ore
+        # when: exploring
+        near = {miss["thing"]: miss for miss in explore(graph, egypt(graph)).near_misses}
+        # then: hardened steel is one step away, because one ore unlocks bloom iron, steel and hardened steel at once
+        assert near["hardened-steel"]["missing"] in {"hematite", "limonite"}
+
+
+class TestOneStepAway:
+    """A thing is one step away when a single raw ingredient makes it reachable, however deep the chain (ADR 0027)."""
+
+    @pytest.fixture
+    def chain_graph(self, tmp_path) -> Graph:
+        # lump <- rock;  bar <- lump;  ore <- rock + salt;  metal <- ore;  tool <- metal
+        def route(output, *inputs):
+            return {"id": f"make-{output}", "kind": "route", "label": f"Make {output}", "achieves": {"thing": output},
+                    "requires": [{"role": "consumed", "thing": thing} for thing in inputs],
+                    "outputs": [{"thing": output}], "references": []}
+
+        def material(thing_id, natural):
+            origin = {"origin": "natural", "availability": "regional"} if natural else {"origin": "produced"}
+            return {"id": thing_id, "kind": "material", "label": thing_id.title(), **origin}
+
+        raw, made = ["rock", "salt"], ["lump", "bar", "ore", "metal"]
+        things = {**{t: material(t, True) for t in raw}, **{t: material(t, False) for t in made},
+                  "tool": {"id": "tool", "kind": "artifact", "label": "Tool"}}
+        routes = [route("lump", "rock"), route("bar", "lump"), route("ore", "rock", "salt"), route("metal", "ore"), route("tool", "metal")]
+        return Graph(tmp_path, things=things, routes={r["id"]: r for r in routes})
+
+    def test_a_chain_that_one_raw_ingredient_unlocks_is_one_step_away(self, chain_graph):
+        # given: nothing selected
+        # when: exploring
+        near = explore(chain_graph, Selection()).near_misses
+        # then: rock alone unlocks lump and bar, so both are one step away
+        assert {(miss["thing"], miss["missing"]) for miss in near} >= {("lump", "rock"), ("bar", "rock")}
+
+    def test_a_chain_that_needs_two_raw_ingredients_is_not_one_step_away(self, chain_graph):
+        # given: nothing selected; the ore needs rock and salt
+        # when: exploring
+        near = {miss["thing"] for miss in explore(chain_graph, Selection()).near_misses}
+        # then: neither the ore nor anything made from it is one step away, though metal and tool each miss one input
+        assert near.isdisjoint({"ore", "metal", "tool"})
+
+    def test_having_one_of_two_raw_ingredients_makes_the_chain_one_step_away(self, chain_graph):
+        # given: salt is selected
+        # when: exploring
+        near = {miss["thing"]: miss["missing"] for miss in explore(chain_graph, Selection.parse(["salt"])).near_misses}
+        # then: rock is the one thing missing for the whole chain
+        assert near["ore"] == near["metal"] == near["tool"] == "rock"
+
+    def test_made_things_are_never_offered_as_the_missing_ingredient(self, chain_graph):
+        near = explore(chain_graph, Selection()).near_misses
+        assert {miss["missing"] for miss in near} <= {"rock", "salt"}
 
     def test_hypothetical_iron_ore_unlocks_steel(self, graph):
         result = explore(graph, egypt(graph), Selection.parse(["hematite"]))
