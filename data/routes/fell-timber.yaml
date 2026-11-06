@@ -1,0 +1,15 @@
+id: fell-timber
+kind: route
+label: Felling trees
+achieves: { thing: timber }
+techniques: [woodworking]
+requires:
+  - { role: consumed, thing: standing-trees }
+  - { role: tool, category: edged-tool, notes: "An axe or adze; a stone one will do, more slowly than metal." }
+outputs:
+  - { thing: timber }
+references:
+  - citation: "Saraydar, S. & Shimada, I. (1971). A quantitative comparison of efficiency between a stone axe and a steel axe. American Antiquity 36(2), 216–217."
+    doi: 10.2307/278680
+    supports: Stone axes can fell trees, more slowly than steel axes.
+    status: unverified

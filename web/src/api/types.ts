@@ -1,6 +1,6 @@
 // Shapes returned by the Python API (src/capabilities/views.py and server.py).
 
-export type DrawnKind = "material" | "artifact" | "category" | "effect" | "action";
+export type DrawnKind = "source" | "material" | "artifact" | "category" | "effect" | "action";
 export type NodeKind = DrawnKind | "route";
 
 /** Where a node stands relative to the current selection. */
@@ -18,7 +18,7 @@ export interface GraphNode {
   selectable?: boolean;
   level?: number | null;
   prerequisites?: number;
-  origin?: "natural" | "produced";
+  origin?: "natural" | "extracted" | "produced";
   availability?: "ubiquitous" | "regional";
   era?: string;
   verb?: string;
@@ -171,7 +171,7 @@ export interface DependencyRow {
 export interface About {
   description?: string | null;
   notes?: string;
-  origin?: "natural" | "produced";
+  origin?: "natural" | "extracted" | "produced";
   availability?: "ubiquitous" | "regional";
   regions?: string[];
   era?: string;

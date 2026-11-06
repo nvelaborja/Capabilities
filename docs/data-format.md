@@ -13,7 +13,8 @@ schema/                  JSON Schemas (language-neutral)
 data/
   quantities/            measurable dimensions, with units and ballpark bands
   things/
-    materials/           natural and produced substances (including states, e.g. hardened steel)
+    sources/             where natural resources are found (standing trees, a granite outcrop, a hematite deposit)
+    materials/           natural, extracted, and produced substances (including states, e.g. hardened steel)
     artifacts/           tools, machines, and products
     techniques/          named know-how, for description (never gates anything)
     knowledge/           abstract understanding (none yet)
@@ -48,18 +49,26 @@ Current quantities: `temperature_c`, `hardness_mohs`, `toughness_mpa_sqrt_m`, `t
 
 ```yaml
 id: granite
-kind: material            # material | artifact | technique | knowledge | effect | category
+kind: material            # material | artifact | technique | knowledge | effect | category | source
 label: Granite
-origin: natural           # materials only: natural | produced
-availability: regional    # natural materials only: ubiquitous | regional
-regions: ["Aswan (Egypt)"]
+origin: extracted         # materials only: natural (gathered as is) | extracted (from a source) | produced (made)
 is_a: [stone]             # categories this belongs to
 quantities:
   hardness_mohs: [6, 7]   # a number or a [low, high] range
   toughness_mpa_sqrt_m: [1.1, 1.9]
 ```
 
-- **Ubiquitous** natural materials (wood, clay, water, fieldstone, quartz sand) are assumed available everywhere. **Regional** ones must be selected, implied, or added as hypotheticals.
+- **Where things are found** ([ADR 0032](adr/0032-extract-materials-from-sources-by-routes.md)). A **source** says where a resource is: `availability: ubiquitous | regional`, plus `regions`. Materials taken from it are `origin: extracted`, and an ordinary route extracts them: felling standing trees needs an edged tool, quarrying the granite outcrop needs granite to be shaped by pounding, mining a hematite deposit needs a stone hammer. Materials gathered by hand as they are (deadwood, plant fiber, reed, clay, water, fieldstone, quartz sand) stay `origin: natural` with their own `availability`, since a source would add nothing.
+
+  ```yaml
+  id: granite-outcrop
+  kind: source
+  label: Granite outcrop
+  availability: regional
+  regions: ["Aswan (Egypt)", "Widespread in continental crust"]
+  ```
+
+- **Ubiquitous** sources and natural materials (standing trees, deadwood, clay, water, fieldstone, quartz sand) are assumed available everywhere. **Regional** ones must be selected, implied, or added as hypotheticals.
 - **Effects** list their `dimensions` (heat: temperature, duration, volume).
 - `era: modern` marks things kept only for comparison (the diamond saw).
 
@@ -82,7 +91,7 @@ requires:                             # ALL must be met
     category: abrasive
     where:
       - { quantity: hardness_mohs, op: ">=", value: target.hardness_mohs }
-  - { role: action, verb: cut, target: wood }
+  - { role: action, verb: cut, target: timber }
 outputs: []                           # thing routes: products and byproducts (slag)
 provides: {}                          # effect routes: the most the effect reaches
 envelope:
@@ -107,7 +116,7 @@ references:                           # at least one
 | `consumed` | used up | a material/artifact, or a category |
 | `tool` | used, not used up | a material/artifact, or a category |
 | `effect` | a physical effect | an effect, usually with `where` conditions |
-| `action` | the ability to do something | a verb and a target, e.g. `cut` + `wood` |
+| `action` | the ability to do something | a verb and a target, e.g. `cut` + `timber` |
 
 **Conditions** (`where`) compare a quantity with a number (`value: 1100`), a band (`band: hours`, meaning the band's lower edge), or the verb's target (`value: target.hardness_mohs`).
 
@@ -138,13 +147,13 @@ The reasoner in `src/capabilities/reasoner.py` follows these rules.
 - **Selected:** what the user says was made or done (from a profile, plus or minus their own choices).
 - **Hypothetical:** what-if additions. They are treated like selections but reported separately.
 - **Implied:** what every route to a selected item needs, recursively. For example, anyone who had tin bronze had copper, a crucible, and heat of at least 1085 °C. Having something also implies the capability of making it: the techniques shared by all its routes are listed as implied.
-- **Reachable:** everything that can be made from selected + implied + ubiquitous materials, repeating until nothing new appears. Cycles (heat needs charcoal, charcoal needs a fire) are fine.
-- **One step away (near misses):** things that adding one raw ingredient would make reachable, however long the chain from it. A raw ingredient is something no route makes: a natural material, or a thing with no known route. Adding a made thing directly doesn't count ([ADR 0027](adr/0027-count-one-step-away-as-one-raw-ingredient.md)).
+- **Reachable:** everything that can be made or extracted from selected + implied + ubiquitous sources and materials, repeating until nothing new appears. Cycles (heat needs charcoal, charcoal needs a fire) are fine.
+- **One step away (near misses):** things that adding one raw ingredient would make reachable, however long the chain from it. A raw ingredient is something no route makes: a source (a hematite deposit), a natural material, or a thing with no known route. Adding a made thing directly doesn't count ([ADR 0027](adr/0027-count-one-step-away-as-one-raw-ingredient.md)).
 
 ### Core rules
 
 1. **Know-how never gates.** If the ingredients are there, the route counts as within reach. Techniques are labels for describing routes and for reporting what having something implies.
-2. **Ubiquitous natural materials are free.** Regional ones must be selected, implied, or hypothetical. Implied regional needs (tin ore for bronze, in Egypt) produce a trade warning.
+2. **Ubiquitous sources and natural materials are free.** Regional ones must be selected, implied, or hypothetical. Extracted materials come from their source by a route, like anything else. Implied regional needs (tin ore for bronze, in Egypt) produce a trade warning.
 3. **Ranges give three answers.** Comparing ranges yields *yes* (true for every value), *no* (true for none), or *maybe* (overlap). Copper chisels (2.5–3) on limestone (3) are a *maybe*.
 4. **`provides` is a maximum.** An effect route's `provides` values are the most it can deliver; a range means that maximum is uncertain. A furnace that reaches 1100–1250 °C satisfies "≥ 1100" (yes) and "≥ 1200" (maybe).
 5. **Missing data is "maybe", never "no".**
@@ -166,13 +175,13 @@ This is sound (each route's own bound implies the merged one), but it has side e
 
 Tech levels order items for display, highest first ([ADR 0018](adr/0018-rank-dependencies-by-tech-level.md)). They never decide whether something is shown.
 
-- Natural materials are level 0.
+- Sources and natural materials are level 0.
 - A route is at the highest level among its requirements.
 - A thing is one above its easiest route.
 - A category takes its lowest member. A heat requirement takes the easiest heat source that can reach its threshold, so "≥ 1200 °C" ranks above "≥ 900 °C".
 - Ties go to the item that certainly needs more, then alphabetical.
 
-For example: wood 0, stone chopper 1, cut wood 2, heat 4, charcoal 5, bloom iron 7, steel 8, hardened steel 9. The code is in `src/capabilities/levels.py`.
+For example: deadwood 0, stone chopper 1, timber and cut timber 2, heat 4, charcoal 5, bloom iron 7, steel 8, hardened steel 9. The code is in `src/capabilities/levels.py`.
 
 ### Feasibility checks (question 3)
 

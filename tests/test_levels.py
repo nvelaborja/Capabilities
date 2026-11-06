@@ -64,14 +64,18 @@ class TestRanking:
 class TestLevelsOnTheRealGraph:
     def test_the_iron_chain_climbs(self, graph):
         levels = compute_levels(graph)
-        assert levels.of("wood") == 0
+        assert levels.of("deadwood") == 0
         assert 0 < levels.of("bloom-iron") < levels.of("steel") < levels.of("hardened-steel")
 
-    def test_cutting_wood_needs_a_knapped_tool(self, graph):
-        # given: chopping wood needs an edged tool, and the stone chopper is knapped from fieldstone
+    def test_felling_and_cutting_timber_need_a_knapped_tool(self, graph):
+        # given: felling and chopping need an edged tool, and the stone chopper is knapped from fieldstone
         levels = compute_levels(graph)
         assert levels.of("stone-chopper") == 1
-        assert levels.of("cut:wood") == 2
+        assert levels.of("timber") == levels.of("cut:timber") == 2
+
+    def test_sources_and_hand_gathered_materials_start_at_zero(self, graph):
+        levels = compute_levels(graph)
+        assert [levels.of(t) for t in ("standing-trees", "granite-outcrop", "deadwood", "fieldstone")] == [0, 0, 0, 0]
 
     def test_modern_things_without_routes_have_no_level(self, graph):
         assert compute_levels(graph).of("diamond-saw") is None

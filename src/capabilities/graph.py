@@ -27,7 +27,11 @@ THING_DIRS = {
     "knowledge": "knowledge",
     "effects": "effect",
     "categories": "category",
+    "sources": "source",
 }
+
+# Kinds a group can have, and so select: things that are held, plus sources (access to where a resource is found).
+HELD_KINDS = ("material", "artifact", "source")
 
 PRECISION_QUANTITY = "tolerance_mm"
 
@@ -159,12 +163,25 @@ class Graph:
         return self._members[category]
 
     def is_free(self, thing_id: str) -> bool:
-        """Ubiquitous natural materials are assumed available to everyone."""
-        thing = self.things.get(thing_id, {})
-        return thing.get("kind") == "material" and thing.get("origin") == "natural" and thing.get("availability") == "ubiquitous"
+        """Ubiquitous natural materials and sources (standing trees) are assumed available to everyone."""
+        return self.is_natural(thing_id) and self.things[thing_id].get("availability") == "ubiquitous"
 
     def is_regional(self, thing_id: str) -> bool:
-        return self.things.get(thing_id, {}).get("availability") == "regional"
+        """Found only in some places: a regional source or natural material, or something extracted only from those."""
+        thing = self.things.get(thing_id, {})
+        if thing.get("origin") == "extracted":
+            sources = self.sources_of(thing_id)
+            return bool(sources) and all(self.is_regional(source) for source in sources)
+        return thing.get("availability") == "regional"
+
+    def sources_of(self, thing_id: str) -> set[str]:
+        """The sources that routes extract a material from (the granite outcrop for granite)."""
+        return {
+            requirement["thing"]
+            for route_id in self.routes_producing.get(thing_id, [])
+            for requirement in self.routes[route_id]["requires"]
+            if self.kind(requirement.get("thing", "")) == "source"
+        }
 
     def bands(self, quantity: str) -> list[dict]:
         return self.quantities.get(quantity, {}).get("bands", [])
@@ -204,8 +221,9 @@ class Graph:
         return sorted(tid for tid, thing in self.things.items() if thing["kind"] in kinds)
 
     def is_natural(self, thing_id: str) -> bool:
+        """Found in nature: a source, or a material gathered by hand as it is (ADR 0032)."""
         thing = self.things.get(thing_id, {})
-        return thing.get("kind") == "material" and thing.get("origin") == "natural"
+        return thing.get("kind") == "source" or (thing.get("kind") == "material" and thing.get("origin") == "natural")
 
     def thing_routes(self) -> Iterable[str]:
         return (rid for rid, route in self.routes.items() if "thing" in route["achieves"])
