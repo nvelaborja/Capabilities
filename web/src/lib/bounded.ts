@@ -38,6 +38,11 @@ const NOUNS: Record<string, [string, string]> = {
 
 /** "43 other materials", "1 other tool or product". */
 export function summaryLabel(kind: string, count: number): string {
+  return `${count} other ${noun(kind, count)}`;
+}
+
+/** "materials", "tool or product". */
+export function noun(kind: string, count: number): string {
   const [one, many] = NOUNS[kind] ?? ["item", "items"];
-  return `${count} other ${count === 1 ? one : many}`;
+  return count === 1 ? one : many;
 }

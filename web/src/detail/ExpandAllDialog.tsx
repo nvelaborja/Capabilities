@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import type { DependencyRow, SelectionRequest } from "../api/types";
+import type { SelectionRequest } from "../api/types";
+import { NodeChip } from "../chips/NodeChip";
 import { useExplain } from "../state/useExplain";
-import { Mark } from "./Mark";
-import { kindName } from "./marks";
+import type { StatusOf } from "./Routes";
 
 interface ExpandAllDialogProps {
   node: string | null;
   label: string;
   selection: SelectionRequest;
+  statusOf: StatusOf;
   onDrill: (id: string) => void;
   onClose: () => void;
 }
@@ -20,8 +21,8 @@ const SECTIONS = [
   { key: "have", title: "Have" },
 ] as const;
 
-/** Everything a node certainly needs, at every depth, split into missing / unknown / have and grouped by type. */
-export function ExpandAllDialog({ node, label, selection, onDrill, onClose }: ExpandAllDialogProps) {
+/** Everything a node certainly needs, at every depth, split into missing / unknown / have; each type on its own line. */
+export function ExpandAllDialog({ node, label, selection, statusOf, onDrill, onClose }: ExpandAllDialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
   const [filter, setFilter] = useState("");
   const { data, loading, error } = useExplain(selection, node, true);
@@ -81,30 +82,24 @@ export function ExpandAllDialog({ node, label, selection, onDrill, onClose }: Ex
               </h3>
               {section.count === 0 && <p className="muted">None.</p>}
               {section.groups.map((group) => (
-                <div key={group.kind} className="expand-group">
-                  <h4>{kindName(group.kind, group.rows.length)}</h4>
-                  <ul>
-                    {group.rows.map((row) => (
-                      <DependencyItem key={row.id} row={row} onDrill={onDrill} />
-                    ))}
-                  </ul>
-                </div>
+                <ul key={group.kind} className="chip-row">
+                  {group.rows.map((row) => (
+                    <li key={row.id}>
+                      <NodeChip
+                        id={row.id}
+                        label={row.label}
+                        kind={row.kind}
+                        status={statusOf(row.id, row.status)}
+                        note={row.conditions?.join(", ")}
+                        onPick={onDrill}
+                      />
+                    </li>
+                  ))}
+                </ul>
               ))}
             </section>
           ))}
       </div>
     </dialog>
-  );
-}
-
-function DependencyItem({ row, onDrill }: { row: DependencyRow; onDrill: (id: string) => void }) {
-  return (
-    <li className="dependency">
-      <Mark tri={row.status} />
-      <button type="button" className="drill" onClick={() => onDrill(row.id)}>
-        {row.label}
-      </button>
-      {row.conditions && <span className="conditions">{row.conditions.join(" · ")}</span>}
-    </li>
   );
 }

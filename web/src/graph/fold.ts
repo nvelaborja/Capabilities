@@ -5,7 +5,16 @@ import { FOLDED, OUTSIDE } from "./focus";
 import { foldedEdges, type HubNode, summarise, type Summary } from "./summaries";
 
 const SUMMARY_HEIGHT = 26;
+const LINE_HEIGHT = 13;
 const CHAR_WIDTH = 6.5;
+const MAX_WIDTH = 210;
+
+/** Sized to the label, wrapping past MAX_WIDTH ("Charcoal furnace with forced draft → 4 more materials"). */
+function summarySize(label: string): { width: number; height: number } {
+  const text = label.length * CHAR_WIDTH;
+  const lines = Math.ceil(text / (MAX_WIDTH - 24));
+  return { width: Math.round(Math.min(MAX_WIDTH, text + 24)), height: SUMMARY_HEIGHT + (lines - 1) * LINE_HEIGHT };
+}
 
 /**
  * Replace the graph's summary nodes: fold each hub's extra edges into "8 other materials" nodes (ADR 0024). Only
@@ -34,7 +43,7 @@ export function applySummaries(cy: Core, expanded: ReadonlySet<string>, limit = 
           group: "nodes" as const,
           data: {
             id: summary.id, label: summary.label, kind: "summary", rank: null, members: summary.members,
-            width: Math.round(summary.label.length * CHAR_WIDTH + 24), height: SUMMARY_HEIGHT,
+            ...summarySize(summary.label),
           },
           classes: ["summary"],
         },

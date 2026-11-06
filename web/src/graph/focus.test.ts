@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { sampleGraph } from "../test/sampleGraph";
 import { toElements } from "./elements";
-import { clearFocus, focusOn, FOLDED, isolate, lineage, neighbourhood, OUTSIDE } from "./focus";
+import { clearFocus, findEdge, focusOn, focusOnEdge, FOLDED, isolate, lineage, neighbourhood, OUTSIDE } from "./focus";
 
 function headlessGraph() {
   return cytoscape({ headless: true, styleEnabled: false, elements: toElements(sampleGraph) });
@@ -67,5 +67,25 @@ describe("focus", () => {
     expect(cy.$id("knife->spear").hasClass("highlighted")).toBe(true);
     expect(cy.$id("blade->cut:wood").hasClass("highlighted")).toBe(false);
     expect(cy.$id("blade->cut:wood").hasClass("faded")).toBe(true);
+  });
+});
+
+describe("focus on a line", () => {
+  it("brings the line and its two ends forward and fades everything else", () => {
+    const cy = headlessGraph();
+    const edge = findEdge(cy, "knife", "spear");
+    if (!edge) throw new Error("expected a line from knife to spear");
+    focusOnEdge(edge);
+    expect(edge.hasClass("focused-edge")).toBe(true);
+    expect(cy.$id("knife").hasClass("focused") && cy.$id("spear").hasClass("focused")).toBe(true);
+    expect(cy.$id("flint").hasClass("faded")).toBe(true);
+    clearFocus(cy);
+    expect(cy.$(".focused-edge, .faded")).toHaveLength(0);
+  });
+
+  it("finds is-a lines too, and nothing where no line is drawn", () => {
+    const cy = headlessGraph();
+    expect(findEdge(cy, "knife", "blade")?.id()).toBe("knife/is_a/blade");
+    expect(findEdge(cy, "flint", "spear")).toBeNull();
   });
 });

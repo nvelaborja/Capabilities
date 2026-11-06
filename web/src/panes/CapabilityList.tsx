@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 import { byKind, countChips, type Section } from "./groups";
-import { NodeChip } from "./NodeChip";
+import { NodeChip } from "../chips/NodeChip";
 
 interface CapabilityListProps {
   id: string;
@@ -36,7 +36,9 @@ export function CapabilityList({ id, title, sections, emptyText, onPick, onRemov
             {byKind(section.chips).map((run) => (
               <ul key={run[0]?.kind} className="chip-row">
                 {run.map((chip) => (
-                  <NodeChip key={chip.id} chip={chip} onPick={onPick} onRemove={onRemove} />
+                  <li key={chip.id}>
+                    <NodeChip {...chip} onPick={onPick} onRemove={chip.removable ? onRemove : undefined} />
+                  </li>
                 ))}
               </ul>
             ))}

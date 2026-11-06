@@ -1,11 +1,12 @@
-import cytoscape, { type Core } from "cytoscape";
+import cytoscape, { type Core, type EdgeSingular, type NodeSingular } from "cytoscape";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import type { ExploreResponse, GraphResponse } from "../api/types";
 import type { Theme } from "../state/theme";
 import { toElements } from "./elements";
 import { applySummaries, expandSummary } from "./fold";
-import { clearFocus, focusOn, isolate, OUTSIDE } from "./focus";
+import { parseSubject } from "../detail/subjects";
+import { clearFocus, findEdge, focusOn, focusOnEdge, isolate, OUTSIDE } from "./focus";
 import "./GraphView.css";
 import { READABLE_ZOOM, runLayout, showInitialView } from "./layout";
 import { applyStatuses } from "./statuses";
@@ -30,11 +31,26 @@ interface GraphViewProps {
   focus: GraphFocus;
   /** Focus mode: show only this node's lineage (what feeds it, and what it directly makes). */
   isolated: string | null;
-  /** Called with a node's id when it is clicked, or null when the background is. */
+  /** Called with a node's id (or a summary node's) when it is clicked, or null when the background is. */
   onSelectNode: (id: string | null) => void;
+  /** Called when a line is clicked, with the nodes it joins. */
+  onSelectEdge: (source: string, target: string) => void;
   onShowWholeGraph: () => void;
+  /** The summary nodes drawn now, so the detail pane can explain them. */
+  onSummaries: (summaries: Summary[]) => void;
+  /** Unfold one summary's links; `seq` changes on every request. */
+  expandRequest: { id: string; seq: number } | null;
   /** More toolbar items after the graph's own buttons (the legend). */
   toolbarExtra?: ReactNode;
+}
+
+/** The node or line the detail pane is showing, if it is on the graph. */
+function focusedElement(cy: Core, id: string | null): NodeSingular | EdgeSingular | null {
+  if (!id) return null;
+  const subject = parseSubject(id);
+  if (subject.type === "edge") return findEdge(cy, subject.source, subject.target);
+  const node = cy.getElementById(subject.id);
+  return node.nonempty() && node.isNode() ? node : null;
 }
 
 function isInView(cy: Core, box: { x1: number; x2: number; y1: number; y2: number }): boolean {
@@ -42,11 +58,14 @@ function isInView(cy: Core, box: { x1: number; x2: number; y1: number; y2: numbe
   return box.x1 >= view.x1 && box.x2 <= view.x2 && box.y1 >= view.y1 && box.y2 <= view.y2;
 }
 
-export function GraphView({ graph, explore, theme, focus, isolated, onSelectNode, onShowWholeGraph, toolbarExtra }: GraphViewProps) {
+export function GraphView(props: GraphViewProps) {
+  const { graph, explore, theme, focus, isolated, onSelectNode, onSelectEdge, onShowWholeGraph, onSummaries, expandRequest, toolbarExtra } = props;
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<Core | null>(null);
   const exploreRef = useRef<ExploreResponse | null>(explore);
   const onSelectRef = useRef(onSelectNode);
+  const onSelectEdgeRef = useRef(onSelectEdge);
+  const onSummariesRef = useRef(onSummaries);
   const focusIdRef = useRef<string | null>(focus.id);
   const summariesRef = useRef<Summary[]>([]);
   const expandedRef = useRef(new Set<string>());
@@ -56,7 +75,9 @@ export function GraphView({ graph, explore, theme, focus, isolated, onSelectNode
 
   useEffect(() => {
     onSelectRef.current = onSelectNode;
-  }, [onSelectNode]);
+    onSelectEdgeRef.current = onSelectEdge;
+    onSummariesRef.current = onSummaries;
+  }, [onSelectNode, onSelectEdge, onSummaries]);
 
   // Declared before the graph effect so a freshly built graph picks up the latest statuses.
   useEffect(() => {
@@ -78,14 +99,16 @@ export function GraphView({ graph, explore, theme, focus, isolated, onSelectNode
     });
     cy.on("tap", "node", (event) => {
       const node = event.target;
-      if (node.hasClass("level-label")) return;
-      if (node.hasClass("summary")) {
-        expandSummary(cy, summariesRef.current, expandedRef.current, node.id());
-        const focused = focusIdRef.current ? cy.getElementById(focusIdRef.current) : null;
-        if (focused?.nonempty()) focusOn(focused);
+      if (!node.hasClass("level-label")) onSelectRef.current(node.id());
+    });
+    cy.on("tap", "edge", (event) => {
+      const edge = event.target;
+      // A summary's dashed link stands for the summary itself.
+      if (edge.hasClass("summary-edge")) {
+        onSelectRef.current(edge.source().hasClass("summary") ? edge.source().id() : edge.target().id());
         return;
       }
-      onSelectRef.current(node.id());
+      onSelectEdgeRef.current(edge.source().id(), edge.target().id());
     });
     cy.on("tap", (event) => {
       if (event.target === cy) onSelectRef.current(null);
@@ -99,8 +122,8 @@ export function GraphView({ graph, explore, theme, focus, isolated, onSelectNode
       cy.resize();
       cy.panBy({ x: left - nowLeft, y: 0 });
       left = nowLeft;
-      const focused = focusIdRef.current ? cy.getElementById(focusIdRef.current) : null;
-      if (focused?.nonempty() && !isInView(cy, focused.boundingBox())) cy.center(focused);
+      const focused = focusedElement(cy, focusIdRef.current);
+      if (focused && !isInView(cy, focused.boundingBox())) cy.center(focused);
     });
     observer.observe(container);
 
@@ -121,6 +144,7 @@ export function GraphView({ graph, explore, theme, focus, isolated, onSelectNode
     isolate(cy, isolated);
     summariesRef.current = expandAll ? [] : applySummaries(cy, expandedRef.current);
     if (expandAll) cy.remove(".summary");
+    onSummariesRef.current(summariesRef.current);
     runLayout(cy);
     applyStatuses(cy, exploreRef.current);
     const showing = cy.nodes().not(`.${OUTSIDE}`);
@@ -144,18 +168,27 @@ export function GraphView({ graph, explore, theme, focus, isolated, onSelectNode
     cyRef.current?.style(buildStylesheet(readTokens()));
   }, [theme]);
 
+  // Unfold one summary in place: its links come back and nothing moves.
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy || !expandRequest) return;
+    expandSummary(cy, summariesRef.current, expandedRef.current, expandRequest.id);
+    onSummariesRef.current(summariesRef.current.filter((summary) => !expandedRef.current.has(summary.id)));
+  }, [expandRequest]);
+
   useEffect(() => {
     focusIdRef.current = focus.id;
     const cy = cyRef.current;
     if (!cy) return;
-    const node = focus.id ? cy.getElementById(focus.id) : null;
-    if (!node || node.empty()) {
+    const target = focusedElement(cy, focus.id);
+    if (!target) {
       clearFocus(cy);
       return;
     }
-    focusOn(node);
-    if (focus.center && !node.hasClass(OUTSIDE)) {
-      cy.animate({ center: { eles: node }, zoom: Math.max(cy.zoom(), READABLE_ZOOM) }, { duration: 250 });
+    if (target.isEdge()) focusOnEdge(target);
+    else focusOn(target);
+    if (focus.center && !target.hasClass(OUTSIDE)) {
+      cy.animate({ center: { eles: target }, zoom: Math.max(cy.zoom(), READABLE_ZOOM) }, { duration: 250 });
     }
   }, [focus, graph, isolated, expandAll]);
 

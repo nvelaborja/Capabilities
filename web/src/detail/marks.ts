@@ -22,6 +22,15 @@ export function statusTri(status: Status | undefined): Tri {
   }
 }
 
+/**
+ * The status border for an item shown in the detail pane: where the selection puts it, or, for items the explore
+ * result doesn't cover, a status from the three-valued answer.
+ */
+export function chipStatus(status: Status | undefined, tri: Tri): Status {
+  if (status) return status;
+  return tri === "yes" ? "reachable" : tri === "maybe" ? "maybe" : "out";
+}
+
 /** "Works", "Missing 1", "Missing 2 · 1 unknown", "1 unknown". */
 export function routeVerdict(route: Pick<RouteRow, "status" | "missing" | "uncertain">): string {
   if (route.status === "yes") return "Works";
@@ -37,6 +46,7 @@ export const KIND_NAMES: Record<string, { one: string; many: string }> = {
   action: { one: "Action", many: "Actions" },
   category: { one: "Any of a kind", many: "Any of a kind" },
   effect: { one: "Effect", many: "Conditions" },
+  technique: { one: "Know-how", many: "Know-how" },
 };
 
 export function kindName(kind: string, count = 1): string {

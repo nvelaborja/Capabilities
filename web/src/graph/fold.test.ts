@@ -16,7 +16,7 @@ describe("summary nodes on the graph", () => {
     const summaries = applySummaries(cy, new Set(), 1);
     const knife = summaries.find((s) => s.hub === "knife" && s.direction === "out");
     // then: the spear (higher level) stays linked; the blade's edge folds into "1 other kind of thing"
-    expect(knife?.label).toBe("1 other kind of thing");
+    expect(knife?.label).toBe("Knife → 1 more kind of thing");
     expect(cy.$id("knife/is_a/blade").hasClass(FOLDED)).toBe(true);
     expect(knife?.edges).toEqual(["knife/is_a/blade"]);
     expect(cy.$id(`${knife?.id}/edge`).source().id()).toBe("knife");

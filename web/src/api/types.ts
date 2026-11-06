@@ -194,6 +194,27 @@ export interface ExplainResponse {
   members?: ItemRow[];
   /** With `all`: every certain need at every depth. */
   all?: { missing: DependencyRow[]; uncertain: DependencyRow[]; have: DependencyRow[] };
+  /** Know-how: the routes it describes, and what each makes. */
+  used_in?: { id: string; label: string; makes: ItemRow[] }[];
+}
+
+// ---------------------------------------------------------------- /api/explain-edge
+
+export interface EdgeRoute extends RouteRow {
+  /** The source's own requirement rows in this route (its role, threshold and whether it is met). */
+  link: RequirementRow[];
+  /** The target is a byproduct of this route (slag), not its goal. */
+  byproduct: boolean;
+}
+
+/** Why a line joins two nodes: the routes behind it, or an "is a" link. */
+export type EdgeResponse =
+  | { kind: "requires"; source: ItemRow; target: ItemRow; routes: EdgeRoute[] }
+  | { kind: "is_a"; source: ItemRow; target: ItemRow; used_by: string[] };
+
+export interface EdgeRequest extends SelectionRequest {
+  source: string;
+  target: string;
 }
 
 export interface ExplainRequest extends SelectionRequest {

@@ -1,4 +1,4 @@
-import { bound, LIMIT, summaryLabel } from "../lib/bounded";
+import { bound, LIMIT, noun } from "../lib/bounded";
 
 export interface HubNode {
   id: string;
@@ -58,7 +58,7 @@ export function summarise(nodes: readonly HubNode[], edges: readonly HubEdge[], 
           hub,
           direction,
           kind: group.kind,
-          label: summaryLabel(group.kind, members.length),
+          label: summaryNodeLabel(byId.get(hub)?.label ?? hub, direction, group.kind, members.length),
           members,
           edges: members.flatMap((member) => neighbours.get(member) ?? []),
         });
@@ -66,6 +66,12 @@ export function summarise(nodes: readonly HubNode[], edges: readonly HubEdge[], 
     }
   }
   return summaries;
+}
+
+/** Says whose links these are and which way they run: "Heat → 4 more materials", "3 more tools → Steel". */
+export function summaryNodeLabel(hub: string, direction: "in" | "out", kind: string, count: number): string {
+  const more = `${count} more ${noun(kind, count)}`;
+  return direction === "out" ? `${hub} → ${more}` : `${more} → ${hub}`;
 }
 
 /** Edges folded into a summary that hasn't been expanded. An edge two hubs both fold stays hidden until both expand. */

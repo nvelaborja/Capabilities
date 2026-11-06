@@ -191,6 +191,7 @@ export function buildStylesheet(t: GraphTokens): StylesheetJson {
         "font-size": 11,
         "font-style": "italic",
         "text-margin-x": 0,
+        "text-max-width": "190px",
       },
     },
     {
@@ -219,7 +220,8 @@ export function buildStylesheet(t: GraphTokens): StylesheetJson {
     { selector: "edge.byproduct", style: { "line-style": "dotted" } },
     { selector: "edge.is_a", style: { width: 0.75, "line-style": "dashed", "target-arrow-shape": "none" } },
     { selector: "edge.live", style: { "line-color": t.edgeLive, "target-arrow-color": t.edgeLive, opacity: EDGE_OPACITY.live } },
-    { selector: "edge.summary-edge", style: { "line-style": "dashed", "line-color": t.muted, "target-arrow-color": t.muted } },
+    // Stronger than ordinary idle lines, so it is clear which node a summary belongs to.
+    { selector: "edge.summary-edge", style: { "line-style": "dashed", "line-color": t.muted, "target-arrow-color": t.muted, opacity: 0.55 } },
     // Folded into a summary, or outside focus mode.
     { selector: `.${FOLDED}, .${OUTSIDE}`, style: { display: "none" } },
 
@@ -234,6 +236,7 @@ export function buildStylesheet(t: GraphTokens): StylesheetJson {
     { selector: "edge.faded", style: { opacity: EDGE_OPACITY.faded } },
     // Edge labels (heat thresholds) show for the clicked node's edges at any zoom.
     { selector: "edge.highlighted", style: { opacity: EDGE_OPACITY.highlighted, width: 1.5, "min-zoomed-font-size": 0 } },
-    { selector: "node:selected", style: { "overlay-opacity": 0 } },
+    { selector: "edge.focused-edge", style: { width: 3, "line-color": t.accent, "target-arrow-color": t.accent } },
+    { selector: "node:selected, edge:selected", style: { "overlay-opacity": 0 } },
   ];
 }

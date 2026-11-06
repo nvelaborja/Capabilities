@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { foldedEdges, type HubEdge, type HubNode, summarise } from "./summaries";
+import { foldedEdges, type HubEdge, type HubNode, summarise, summaryNodeLabel } from "./summaries";
 
 const node = (id: string, kind: string, level: number | null, prerequisites = 0): HubNode => ({ id, label: id, kind, level, prerequisites });
 
@@ -25,8 +25,8 @@ describe("summarise", () => {
     const summaries = summarise(nodes, edges, 3);
     // then: p5, p4, p3 stay; p2 and p0 (tools) and p1 (a material) fold away, by kind
     expect(summaries.map((s) => [s.label, s.members])).toEqual([
-      ["2 other tools and products", ["p2", "p0"]],
-      ["1 other material", ["p1"]],
+      ["heat → 2 more tools and products", ["p2", "p0"]],
+      ["heat → 1 more material", ["p1"]],
     ]);
     expect(summaries[0]).toMatchObject({ hub: "heat", direction: "out", edges: ["heat->p2", "heat->p0"] });
   });
@@ -44,6 +44,13 @@ describe("summarise", () => {
     const nodes = [node("hub", "effect", 0), node("zeta", "material", 3, 9), node("alpha", "material", 3, 1), node("beta", "material", 3, 1), node("laser", "material", null)];
     const edges = nodes.slice(1).map((n) => ({ id: `hub->${n.id}`, source: "hub", target: n.id }));
     expect(summarise(nodes, edges, 1)[0]?.members).toEqual(["alpha", "beta", "laser"]);
+  });
+});
+
+describe("summaryNodeLabel", () => {
+  it("names the hub and points the way the links run", () => {
+    expect(summaryNodeLabel("Heat", "out", "material", 4)).toBe("Heat → 4 more materials");
+    expect(summaryNodeLabel("Steel", "in", "artifact", 1)).toBe("1 more tool or product → Steel");
   });
 });
 

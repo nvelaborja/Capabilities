@@ -1,4 +1,4 @@
-import type { CollectionReturnValue, Core, NodeSingular } from "cytoscape";
+import type { CollectionReturnValue, Core, EdgeSingular, NodeSingular } from "cytoscape";
 
 /** Classes for edges and nodes that aren't showing: folded into a summary, or outside focus mode. */
 export const FOLDED = "folded";
@@ -31,7 +31,7 @@ export function isolate(cy: Core, id: string | null): void {
   });
 }
 
-const FOCUS_CLASSES = "faded focused highlighted";
+const FOCUS_CLASSES = "faded focused highlighted focused-edge";
 
 /** Fade everything outside the node's neighbourhood and bring its edges forward. */
 export function focusOn(node: NodeSingular): void {
@@ -44,6 +44,24 @@ export function focusOn(node: NodeSingular): void {
     keep.edges().addClass("highlighted");
     node.addClass("focused");
   });
+}
+
+/** A clicked line: it and its two ends stand out, everything else fades. */
+export function focusOnEdge(edge: EdgeSingular): void {
+  const cy = edge.cy();
+  const keep = edge.union(edge.connectedNodes());
+  cy.batch(() => {
+    cy.elements().removeClass(FOCUS_CLASSES);
+    cy.elements().not(keep).not(".level-label").addClass("faded");
+    edge.addClass("highlighted focused-edge");
+    edge.connectedNodes().addClass("focused");
+  });
+}
+
+/** The drawn line from one node to another, if there is one. */
+export function findEdge(cy: Core, source: string, target: string): EdgeSingular | null {
+  const edge = cy.getElementById(source).edgesTo(cy.getElementById(target)).first();
+  return edge.nonempty() ? edge : null;
 }
 
 export function clearFocus(cy: Core): void {
