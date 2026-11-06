@@ -22,7 +22,7 @@ Each file records one significant design decision: the context, what we decided,
 | [0014](0014-license-code-gpl-and-data-cc-by.md) | License the code under GPL-3.0-or-later and the data under CC BY 4.0 | Accepted |
 | [0015](0015-build-the-web-front-end-with-react-and-cytoscape.md) | Build the web front end with React, TypeScript, Vite and Cytoscape.js | Accepted; drawing and layout superseded by 0023 |
 | [0016](0016-recompute-on-every-change.md) | Recompute results on every selection change | Accepted |
-| [0017](0017-ui-selection-model.md) | UI selection model: implicit selection, history and shareable state | Accepted |
+| [0017](0017-ui-selection-model.md) | UI selection model: implicit selection, history and shareable state | Accepted; list contents superseded by 0025 |
 | [0018](0018-rank-dependencies-by-tech-level.md) | Rank items by tech level | Accepted |
 | [0019](0019-desktop-first-mobile-ready.md) | Build desktop-first, without blocking mobile | Accepted |
 | [0020](0020-show-a-bounded-number-of-items.md) | Show one level at a time and a bounded number of items | Accepted; graph summaries refined by 0024 |
@@ -30,3 +30,4 @@ Each file records one significant design decision: the context, what we decided,
 | [0022](0022-type-strip-with-emoji-on-neutral-nodes.md) | Show type with a coloured strip and emoji on neutral nodes | Accepted |
 | [0023](0023-draw-requirements-straight-to-products.md) | Draw requirements straight to products, and order columns by type and name | Accepted |
 | [0024](0024-fold-busy-nodes-links-into-summary-nodes.md) | Fold a busy node's extra links into summary nodes | Accepted |
+| [0025](0025-detail-pane-below-graph-and-chip-lists.md) | Put the detail pane under the graph, and show the side pane as chips | Accepted |
