@@ -63,6 +63,11 @@ class TestGraphView:
         assert {"cut-abrasive-saw", "cut-by-chiseling"} <= performers
         assert "cut-by-chopping" not in performers
 
+    def test_lists_every_possible_action_for_search_drawn_or_not(self, graph, levels):
+        actions = {a["id"]: a["label"] for a in graph_view(graph, levels)["actions"]}
+        assert actions["cut:limestone"] == "Cut limestone"
+        assert len(actions) == sum(len(graph.targets_for(verb)) for verb in graph.verbs)
+
 
 class TestStatuses:
     @pytest.mark.parametrize(("node_id", "status"), [
@@ -190,6 +195,45 @@ class TestExplain:
         have = [row["level"] for row in view["all"]["have"]]
         assert missing == ["bloom-iron", "iron-ore"]  # level 7 before level 0
         assert have == sorted(have, reverse=True)
+
+    def test_about_says_what_a_thing_is_and_where_it_is_found(self, graph, levels):
+        about = explain(graph, levels, context_for(graph, egypt(graph)), "granite")["about"]
+        assert about["description"].startswith("A hard, coarse-grained igneous rock")
+        assert {"id": "hardness_mohs", "label": "Hardness", "value": "6–7 Mohs"} in about["quantities"]
+        assert (about["availability"], about["regions"][0]) == ("regional", "Aswan (Egypt)")
+        assert about["member_of"] == [{"id": "stone", "label": "Stone"}]
+        assert about["references"][0]["doi"] == "10.1007/3-7643-7712-7_2"
+
+    def test_about_an_action_describes_the_verb_and_names_the_target(self, graph, levels):
+        about = explain(graph, levels, context_for(graph, egypt(graph)), "cut:granite")["about"]
+        assert about["target"] == {"id": "granite", "label": "Granite"}
+        assert about["description"] == graph.verbs["cut"]["description"]
+
+    def test_routes_carry_sources_know_how_and_byproducts(self, graph, levels):
+        route = explain(graph, levels, context_for(graph, egypt(graph)), "bloom-iron")["routes"][0]
+        assert route["techniques"] == [{"id": "iron-smelting", "label": graph.label("iron-smelting")}]
+        assert route["byproducts"] == [{"id": "slag", "label": "Slag"}]
+        assert all("citation" in ref and "status" in ref for ref in route["references"])
+        heat = next(row for row in route["requirements"] if row["id"] == "heat")
+        assert heat["notes"].startswith("Hot enough for the slag to melt")
+
+    def test_effect_routes_say_how_far_they_reach(self, graph, levels):
+        routes = {r["id"]: r for r in explain(graph, levels, context_for(graph, egypt(graph)), "heat")["routes"]}
+        assert routes["heat-forced-draft-furnace"]["provides"] == ["Temperature up to 1100–1250 °C", "Duration up to 24 hours"]
+
+    def test_leads_to_lists_direct_products_most_advanced_first_with_the_routes_used(self, graph, levels):
+        # given: bloom iron is carburized or melted into steel, and nothing else uses it directly
+        rows = explain(graph, levels, context_for(graph, egypt(graph)), "bloom-iron")["leads_to"]
+        assert [(r["id"], r["status"]) for r in rows] == [("steel", "near")]
+        assert sorted(rows[0]["via"]) == ["Carburizing iron (cementation)", "Crucible steel (e.g. wootz)"]
+        # and: heat feeds many things, ranked from the highest tech level down
+        heat = [r["level"] for r in explain(graph, levels, context_for(graph, egypt(graph)), "heat")["leads_to"]]
+        assert heat == sorted(heat, reverse=True)
+
+    def test_tools_lead_to_the_actions_they_perform(self, graph, levels):
+        rows = explain(graph, levels, context_for(graph, egypt(graph)), "saw")["leads_to"]
+        assert "cut:granite" in {r["id"] for r in rows}
+        assert all(r["kind"] == "action" for r in rows)
 
     @pytest.mark.parametrize("node", ["iron-smelting", "unobtainium", "fly:granite", "cut:moonrock"])
     def test_rejects_what_it_cannot_explain(self, graph, levels, node):

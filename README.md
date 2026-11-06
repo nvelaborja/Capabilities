@@ -59,10 +59,10 @@ The server hosts the web app at `/` (if built), the API under `/api`, and intera
 |---|---|
 | `GET /api/nodes`, `GET /api/nodes/{id}` | Browse things, verbs, and routes |
 | `GET /api/profiles`, `GET /api/jobs` | List presets and example jobs |
-| `GET /api/graph` | Every drawable node and edge, with tech levels. Add `?action=cut:limestone` to draw extra actions |
+| `GET /api/graph` | Every drawable node and edge, with tech levels, plus every possible action for search. Add `?action=cut:limestone` to draw extra actions |
 | `GET /api/need/{id}` | Q1: the full tree of what it would take, plus what is certain |
 | `POST /api/explore` | Q2: `{"profile": "...", "select": [], "deselect": [], "hypothetical": []}`. Includes a status for every node and what implies each implied item |
-| `POST /api/explain` | What a node needs, one level deep, each requirement met / missing / unknown with a reason: the same body plus `"node": "<id>"`. Add `"all": true` for every certain need at every depth |
+| `POST /api/explain` | What a node needs, one level deep, each requirement met / missing / unknown with a reason: the same body plus `"node": "<id>"`. Also what the node is (description, numbers, sources), each route's references, and what it leads to. Add `"all": true` for every certain need at every depth |
 | `POST /api/check` | Q3: the same body plus `"job": "<id>"` or an inline `"job_spec"` |
 
 ### Tests
