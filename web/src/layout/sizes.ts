@@ -1,7 +1,8 @@
 /** The panes the user can resize, by dragging or with the keyboard on the gap beside them (ADR 0028, 0029). */
 export type Pane = "side" | "detail" | "selected";
 
-const PANES: readonly Pane[] = ["side", "detail", "selected"];
+// The Selected pane is left out: it fits each new selection again (ADR 0030), so its size isn't worth keeping.
+const REMEMBERED: readonly Pane[] = ["side", "detail"];
 
 /** Sizes in pixels; a missing size follows the default in theme.css. */
 export type PaneSizes = Partial<Record<Pane, number>>;
@@ -69,7 +70,7 @@ export function readSizes(): PaneSizes {
     const parsed: unknown = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "{}");
     if (typeof parsed !== "object" || parsed === null) return {};
     const sizes: PaneSizes = {};
-    for (const pane of PANES) {
+    for (const pane of REMEMBERED) {
       const value = (parsed as Record<string, unknown>)[pane];
       if (typeof value === "number" && Number.isFinite(value) && value > 0) sizes[pane] = value;
     }

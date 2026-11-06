@@ -17,10 +17,21 @@ export interface PaneLayout {
 
 const PANE_ELEMENTS: Record<Pane, string> = { side: ".side-column", detail: ".detail-pane", selected: ".selection-pane" };
 
-/** Pane sizes the user has set, remembered in this browser. Attach `ref` to the app grid. */
-export function usePaneSizes(): { ref: React.RefObject<HTMLDivElement | null>; layout: PaneLayout } {
+/**
+ * Pane sizes the user has set. Attach `ref` to the app grid.
+ *
+ * The side and detail panes are remembered in this browser. The Selected pane's size holds only for the selection it
+ * was set on (ADR 0030): any change to the selection, undo included, fits the pane to its chips again (up to half the
+ * column). It is reset while rendering, React's pattern for state that follows a prop, not in an effect.
+ */
+export function usePaneSizes(selectionKey: string): { ref: React.RefObject<HTMLDivElement | null>; layout: PaneLayout } {
   const ref = useRef<HTMLDivElement | null>(null);
-  const [sizes, setSizes] = useState<PaneSizes>(readSizes);
+  const [saved, setSaved] = useState<PaneSizes>(readSizes);
+  const [selected, setSelected] = useState<{ size: number; selection: string } | null>(null);
+  // Forget it as soon as the selection changes, so undoing back to the same selection still fits the chips.
+  if (selected && selected.selection !== selectionKey) setSelected(null);
+  const sizes: PaneSizes = { ...saved };
+  if (selected?.selection === selectionKey) sizes.selected = selected.size;
 
   const measure = useCallback((pane: Pane) => {
     const box = ref.current?.querySelector(PANE_ELEMENTS[pane])?.getBoundingClientRect();
@@ -30,18 +41,28 @@ export function usePaneSizes(): { ref: React.RefObject<HTMLDivElement | null>; l
 
   const preview = useCallback((pane: Pane, size: number) => {
     ref.current?.style.setProperty(SIZE_VARIABLES[pane], `${size}px`);
+    // The Selected pane only follows its variable once sized (panes.css), so switch that on while dragging too.
+    if (pane === "selected") ref.current?.classList.add("selected-sized");
   }, []);
 
-  const commit = useCallback((pane: Pane, size: number | null) => {
-    if (size === null) ref.current?.style.removeProperty(SIZE_VARIABLES[pane]);
-    setSizes((previous) => {
-      const next = { ...previous };
-      if (size === null) delete next[pane];
-      else next[pane] = size;
-      saveSizes(next);
-      return next;
-    });
-  }, []);
+  const commit = useCallback(
+    (pane: Pane, size: number | null) => {
+      if (size === null) ref.current?.style.removeProperty(SIZE_VARIABLES[pane]);
+      if (pane === "selected") {
+        if (size === null) ref.current?.classList.remove("selected-sized");
+        setSelected(size === null ? null : { size, selection: selectionKey });
+        return;
+      }
+      setSaved((previous) => {
+        const next = { ...previous };
+        if (size === null) delete next[pane];
+        else next[pane] = size;
+        saveSizes(next);
+        return next;
+      });
+    },
+    [selectionKey],
+  );
 
   const style = Object.fromEntries(
     (Object.keys(sizes) as Pane[]).map((pane) => [SIZE_VARIABLES[pane], `${sizes[pane]}px`]),

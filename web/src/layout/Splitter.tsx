@@ -43,7 +43,8 @@ export function Splitter({ pane, layout }: { pane: Pane; layout: PaneLayout }) {
     if (!current) return;
     drag.current = null;
     setDragging(false);
-    if (current.last !== current.size) layout.commit(pane, current.last);
+    // A press without a drag puts back whatever was showing before the preview.
+    layout.commit(pane, current.last !== current.size ? current.last : (layout.sizes[pane] ?? null));
   };
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     const next = keyResize(pane, event.key, event.shiftKey, layout.measure(pane), bounds);
