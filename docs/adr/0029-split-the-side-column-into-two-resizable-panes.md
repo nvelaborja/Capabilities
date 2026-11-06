@@ -1,6 +1,6 @@
 # 0029. Split the side column into two resizable panes
 
-- **Status:** Accepted
+- **Status:** Accepted; keeping a dragged Selected size superseded by [0030](0030-hide-extra-lines-focus-on-certain-needs-group-actions.md)
 - **Date:** 2026-11-06
 - **Supersedes:** "two lists in one right-hand pane" in [0017](0017-ui-selection-model.md)
 

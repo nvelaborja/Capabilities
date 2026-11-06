@@ -1,6 +1,6 @@
 # 0025. Put the detail pane under the graph, and show the side pane as chips
 
-- **Status:** Accepted; status wording superseded by [0028](0028-floating-resizable-panes-and-neutral-wording.md), which also makes the panes resizable
+- **Status:** Accepted; status wording superseded by [0028](0028-floating-resizable-panes-and-neutral-wording.md), which also makes the panes resizable; Could do grouped by verb by [0030](0030-hide-extra-lines-focus-on-certain-needs-group-actions.md)
 - **Date:** 2026-11-05
 - **Supersedes:** the contents of the two lists in [0017](0017-ui-selection-model.md)
 

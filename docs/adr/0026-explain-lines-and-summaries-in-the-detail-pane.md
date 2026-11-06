@@ -1,6 +1,6 @@
 # 0026. Explain lines, summary nodes and know-how in the detail pane
 
-- **Status:** Accepted
+- **Status:** Accepted; summary nodes removed by [0030](0030-hide-extra-lines-focus-on-certain-needs-group-actions.md)
 - **Date:** 2026-11-05
 - **Supersedes:** "expand in place when clicked" for summary nodes in [0024](0024-fold-busy-nodes-links-into-summary-nodes.md)
 

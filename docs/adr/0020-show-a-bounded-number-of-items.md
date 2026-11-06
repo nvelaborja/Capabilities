@@ -1,6 +1,6 @@
 # 0020. Show one level at a time and a bounded number of items
 
-- **Status:** Accepted; graph summaries refined by [0024](0024-fold-busy-nodes-links-into-summary-nodes.md)
+- **Status:** Accepted; graph summaries refined by [0024](0024-fold-busy-nodes-links-into-summary-nodes.md), then replaced by hidden lines in [0030](0030-hide-extra-lines-focus-on-certain-needs-group-actions.md)
 - **Date:** 2026-11-05
 
 ## Context
