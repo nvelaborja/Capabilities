@@ -138,6 +138,17 @@
   letter-spacing: 0.04em;
 }
 
+.chip-group {
+  margin: 0 0 0.45rem;
+}
+
+/* Opened chips sit indented under the chip that folds them. */
+.chip-group-items {
+  margin: 0.35rem 0 0 0.9rem;
+  padding-left: 0.6rem;
+  border-left: 2px solid var(--border);
+}
+
 .section-hint {
   font-weight: 400;
   text-transform: none;

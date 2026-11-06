@@ -66,6 +66,11 @@
   text-decoration: underline;
 }
 
+.chip-fold {
+  margin-left: 0.35rem;
+  color: var(--text-muted);
+}
+
 .chip-note {
   margin-left: 0.35rem;
   color: var(--text-muted);

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createCatalog } from "../catalog";
 import { exploreWith } from "../test/sampleExplore";
 import { sampleGraph } from "../test/sampleGraph";
-import { byKind, countChips, selectedChips, withinReach } from "./groups";
+import { byKind, countChips, groupByVerb, selectedChips, withinReach } from "./groups";
 
 const catalog = createCatalog(sampleGraph);
 
@@ -51,12 +51,36 @@ describe("withinReach", () => {
   it("marks maybes, leaves out actions already chosen, and says what a near miss needs", () => {
     expect(section("reachable")?.chips[1]).toMatchObject({ id: "laser", status: "maybe", note: "maybe" });
     expect(section("actions")?.chips.map((c) => [c.label, c.status])).toEqual([["Cut flint", "maybe"]]);
+    expect(section("actions")?.groups).toEqual([]);
     expect(section("near")?.chips[0]).toMatchObject({ status: "near", note: "add flint" });
     expect(countChips(sections)).toBe(7);
   });
 
   it("shows the level an implied effect reaches", () => {
     expect(section("implied")?.chips.at(-1)).toMatchObject({ label: "Heat", note: "Temperature ≥ 1085 °C" });
+  });
+});
+
+describe("groupByVerb", () => {
+  const action = (id: string, status: "reachable" | "maybe" = "reachable") => ({ id, label: catalog.get(id).label, kind: "action" as const, status, removable: false });
+
+  it("folds a verb's targets into one chip that counts them, and leaves a verb with one target alone", () => {
+    // given: cut has two targets (one a maybe), move has one
+    const { groups, single } = groupByVerb([action("cut:wood"), action("cut:flint", "maybe"), action("move:(any)")], catalog);
+    // then: cut becomes "Cut · 2 materials (1 maybe)"; move stays a plain chip
+    expect(groups).toMatchObject([{ key: "cut", label: "Cut", status: "reachable", note: "2 materials (1 maybe)" }]);
+    expect(groups[0]?.chips.map((c) => c.id)).toEqual(["cut:flint", "cut:wood"]);
+    expect(single.map((c) => c.id)).toEqual(["move:(any)"]);
+  });
+
+  it("marks a group maybe only when every target is a maybe", () => {
+    const { groups } = groupByVerb([action("cut:wood", "maybe"), action("cut:flint", "maybe")], catalog);
+    expect(groups[0]).toMatchObject({ status: "maybe", note: "2 materials" });
+  });
+
+  it("counts folded chips with the rest", () => {
+    const { groups } = groupByVerb([action("cut:wood"), action("cut:flint")], catalog);
+    expect(countChips([{ key: "a", title: "A", groups, chips: [action("move:(any)")] }])).toBe(3);
   });
 });
 
