@@ -224,6 +224,8 @@ class _Checker:
             needs_route = thing["kind"] == "artifact" or (thing["kind"] == "material" and thing.get("origin") in ("produced", "extracted"))
             if needs_route and thing_id not in outputs and thing.get("era") != "modern":
                 self.warn(f"thing {thing_id}", "no route produces it")
+            if thing["kind"] == "material" and thing.get("origin") == "natural" and thing.get("availability") == "regional":
+                self.warn(f"thing {thing_id}", "regional natural material: give it a source and an extraction route (ADR 0032)")
             if thing["kind"] == "source" and not any(source_used(route, thing_id) for route in self.g.routes.values()):
                 self.warn(f"thing {thing_id}", "no route extracts anything from this source")
             if thing["kind"] == "category" and not self.g.members(thing_id):

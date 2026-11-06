@@ -97,3 +97,10 @@ class TestBrokenData:
         (data_copy / "data/things/materials/stray-ore.yaml").write_text("id: stray-ore\nkind: material\nlabel: X\norigin: extracted\n")
         warnings = [f"{i.where}: {i.message}" for i in validate(data_copy) if i.severity == "warning"]
         assert "thing stray-ore: no route produces it" in warnings
+
+    def test_warns_about_a_regional_material_without_a_source(self, data_copy):
+        # given: an ore marked natural and regional, so it would be free to anyone who selects it, with no extraction
+        (data_copy / "data/things/materials/loose-ore.yaml").write_text(
+            "id: loose-ore\nkind: material\nlabel: X\norigin: natural\navailability: regional\n")
+        warnings = [f"{i.where}: {i.message}" for i in validate(data_copy) if i.severity == "warning"]
+        assert "thing loose-ore: regional natural material: give it a source and an extraction route (ADR 0032)" in warnings
