@@ -36,3 +36,4 @@ Each file records one significant design decision: the context, what we decided,
 | [0028](0028-floating-resizable-panes-and-neutral-wording.md) | Float the panes with resizable gaps, and word statuses without assuming a group | Accepted |
 | [0029](0029-split-the-side-column-into-two-resizable-panes.md) | Split the side column into two resizable panes | Accepted; keeping a dragged Selected size superseded by 0030 |
 | [0030](0030-hide-extra-lines-focus-on-certain-needs-group-actions.md) | Hide busy nodes' extra lines without placeholders, focus on certain needs, and group actions by verb | Accepted |
+| [0031](0031-call-categories-classes-and-add-members-in-one-click.md) | Call categories "classes" in the interface, and add their members in one click | Accepted |

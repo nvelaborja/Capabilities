@@ -18,7 +18,7 @@ data/
     techniques/          named know-how, for description (never gates anything)
     knowledge/           abstract understanding (none yet)
     effects/             physical effects with many possible sources (heat)
-    categories/          is-a groupings (abrasive, fuel, chisel, plant material...)
+    categories/          is-a groupings (abrasive, fuel, chisel, plant material...), called classes in the web UI
   verbs/                 parameterized actions: cut, drill, shape, finish (target), move (load)
   routes/                ways to obtain things, produce effects, or perform verbs
   profiles/              curated starting sets (e.g. Middle Kingdom Egypt)
