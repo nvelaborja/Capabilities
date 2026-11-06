@@ -1,6 +1,6 @@
 # 0017. UI selection model: implicit selection, history and shareable state
 
-- **Status:** Accepted; the contents of the two lists superseded by [0025](0025-detail-pane-below-graph-and-chip-lists.md)
+- **Status:** Accepted; the contents of the two lists superseded by [0025](0025-detail-pane-below-graph-and-chip-lists.md), and their single pane by [0029](0029-split-the-side-column-into-two-resizable-panes.md)
 - **Date:** 2026-11-05
 
 ## Context
