@@ -37,7 +37,7 @@ export interface Section {
   chips: Chip[];
 }
 
-const KIND_ORDER: ItemKind[] = ["material", "artifact", "action", "category", "effect", "technique"];
+const KIND_ORDER: ItemKind[] = ["source", "material", "artifact", "action", "category", "effect", "technique"];
 
 const byTypeThenLabel = (a: Chip, b: Chip) =>
   KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind) || a.label.localeCompare(b.label, undefined, { sensitivity: "base" });

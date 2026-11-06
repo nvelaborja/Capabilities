@@ -1,6 +1,6 @@
 import type { GraphResponse } from "./api/types";
 
-export type ItemKind = "material" | "artifact" | "action" | "category" | "effect" | "technique" | "route";
+export type ItemKind = "source" | "material" | "artifact" | "action" | "category" | "effect" | "technique" | "route";
 
 export interface CatalogEntry {
   label: string;

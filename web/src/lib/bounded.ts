@@ -27,6 +27,7 @@ export function bound<T>(items: readonly T[], kindOf: (item: T) => string, limit
 }
 
 const NOUNS: Record<string, [string, string]> = {
+  source: ["source", "sources"],
   material: ["material", "materials"],
   artifact: ["tool or product", "tools and products"],
   action: ["action", "actions"],
