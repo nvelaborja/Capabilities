@@ -23,7 +23,7 @@ data/
   verbs/                 parameterized actions: cut, drill, shape, finish (target), move (load)
   routes/                ways to obtain things, produce effects, or perform verbs
   profiles/              curated starting sets (e.g. Middle Kingdom Egypt)
-  LICENSE                CC BY 4.0 (the data); the code is GPL-3.0
+  LICENSE                CC BY-NC-SA 4.0 (the data); the code is PolyForm Noncommercial 1.0.0
 examples/jobs/           concrete tasks for feasibility checks
 src/capabilities/        the Python reasoner, CLI, and local API server
 tests/                   pytest suite

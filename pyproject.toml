@@ -1,10 +1,10 @@
 [project]
 name = "capabilities"
 version = "0.1.0"
-description = "An open knowledge graph of what it takes to make and do things, with a reasoner, CLI, and local API server."
+description = "A free, non-commercial knowledge graph of what it takes to make and do things, with a reasoner, CLI, and local API server."
 readme = "README.md"
 requires-python = ">=3.11"
-license = "GPL-3.0-or-later"
+license = "PolyForm-Noncommercial-1.0.0 AND CC-BY-NC-SA-4.0"
 license-files = ["LICENSE", "data/LICENSE"]
 dependencies = [
     "pyyaml>=6.0",

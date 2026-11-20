@@ -21,13 +21,13 @@ We will build a data platform around the graph, in Python everywhere except the 
 - **Repository: a uv workspace monorepo.** `packages/core` (graph, reasoner, validate), `packages/api` (FastAPI), `pipeline/` (Dagster plus the dbt project), `web/` (React stays: the browser needs JavaScript, and the front end isn't the learning goal), `deploy/`.
 - **Databricks is optional and later.** The same dbt project should run there with little change.
 
-The order of the work (milestones M0–M8) lives in the plan, not in this ADR, so it can change without a new ADR. Each choice between engines that needs a trial (the dbt adapter on Iceberg, the local Kubernetes distribution, the schema registry) gets its own ADR after a short spike.
+The order of the work (milestones M0–M9) lives in the plan, not in this ADR, so it can change without a new ADR. Each choice between engines that needs a trial (the dbt adapter on Iceberg, the local Kubernetes distribution, the schema registry) gets its own ADR after a short spike.
 
 ## Consequences
 
 - Running the whole stack needs Docker, and later a local cluster. The core reasoner and CLI must still work with a plain `uv sync`, so contributors and tests don't need the platform.
 - The amount of data grows by orders of magnitude, so the app has to read a built graph rather than load YAML files at start-up ([0034](0034-build-the-graph-from-upstream-datasets-and-a-curated-layer.md)).
-- Every external dataset needs its license checked against our data license before ingestion ([0014](0014-license-code-gpl-and-data-cc-by.md)).
+- Every external dataset needs its license checked against our data license before ingestion ([0037](0037-license-the-project-for-non-commercial-use-only.md)).
 - More moving parts to keep running. Each milestone ends with a rebuild from nothing to prove it is reproducible.
 
 ## Alternatives considered

@@ -1,6 +1,6 @@
 # 0014. License the code under GPL-3.0-or-later and the data under CC BY 4.0
 
-- **Status:** Accepted
+- **Status:** Superseded by [0037](0037-license-the-project-for-non-commercial-use-only.md)
 - **Date:** 2026-11-04 (recorded 2026-11-05)
 
 ## Context

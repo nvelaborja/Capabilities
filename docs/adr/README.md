@@ -19,7 +19,7 @@ Each file records one significant design decision: the context, what we decided,
 | [0011](0011-routes-can-require-actions-down-to-primitives.md) | Routes can require actions, built down to primitives | Accepted |
 | [0012](0012-use-regionality-only-for-warnings.md) | Record regionality; use it only for warnings | Accepted |
 | [0013](0013-use-python-for-the-reasoner-cli-and-server.md) | Use Python for the reasoner, CLI and local API server | Accepted |
-| [0014](0014-license-code-gpl-and-data-cc-by.md) | License the code under GPL-3.0-or-later and the data under CC BY 4.0 | Accepted |
+| [0014](0014-license-code-gpl-and-data-cc-by.md) | License the code under GPL-3.0-or-later and the data under CC BY 4.0 | Superseded by 0037 |
 | [0015](0015-build-the-web-front-end-with-react-and-cytoscape.md) | Build the web front end with React, TypeScript, Vite and Cytoscape.js | Accepted; drawing and layout superseded by 0023 |
 | [0016](0016-recompute-on-every-change.md) | Recompute results on every selection change | Accepted |
 | [0017](0017-ui-selection-model.md) | UI selection model: implicit selection, history and shareable state | Accepted; list contents superseded by 0025, their single pane by 0029 |
@@ -42,4 +42,4 @@ Each file records one significant design decision: the context, what we decided,
 | [0034](0034-build-the-graph-from-upstream-datasets-and-a-curated-layer.md) | Build the graph from upstream datasets and a curated layer | Proposed; would supersede 0004 and refine 0008 |
 | [0035](0035-propose-curated-facts-with-audited-agents.md) | Propose curated facts with audited AI agents, reviewed by agents and people | Proposed |
 | [0036](0036-place-sources-and-profiles-in-space-and-time.md) | Place sources and profiles in space and time | Proposed; would supersede 0012 and amend 0003 |
-| [0037](0037-license-the-project-for-non-commercial-use-only.md) | License the project for non-commercial use only | Proposed; would supersede 0014 |
+| [0037](0037-license-the-project-for-non-commercial-use-only.md) | License the project for non-commercial use only | Accepted |
