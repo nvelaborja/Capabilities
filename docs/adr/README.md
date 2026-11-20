@@ -42,3 +42,4 @@ Each file records one significant design decision: the context, what we decided,
 | [0034](0034-build-the-graph-from-upstream-datasets-and-a-curated-layer.md) | Build the graph from upstream datasets and a curated layer | Proposed; would supersede 0004 and refine 0008 |
 | [0035](0035-propose-curated-facts-with-audited-agents.md) | Propose curated facts with audited AI agents, reviewed by agents and people | Proposed |
 | [0036](0036-place-sources-and-profiles-in-space-and-time.md) | Place sources and profiles in space and time | Proposed; would supersede 0012 and amend 0003 |
+| [0037](0037-license-the-project-for-non-commercial-use-only.md) | License the project for non-commercial use only | Proposed; would supersede 0014 |

@@ -25,16 +25,19 @@ We will run AI agents as a stage of the pipeline: they propose curated facts, ot
 
    A proposal that fails is rejected or sent back, never fixed silently.
 3. **Challenge.** A reviewer agent receives the proposal and its sources, but not the proposer's reasoning. It is instructed to find what is wrong: unsupported claims, overreach beyond what a source says, missing requirements, implausible conditions. It returns a verdict (accept, revise, reject) with objections, each tied to a claim. Revisions loop back to the proposer, a bounded number of times.
-4. **Decide.** Proposals the agents accept go into a pull request against the curated layer, grouped and labelled as agent-proposed. A person merges, edits or rejects them. Merging is the human acceptance.
+4. **Decide.** Proposals the agents accept go into a pull request against the curated layer, grouped and labelled as agent-generated. A person merges, edits or rejects them. **The pull request is the review.**
 
 **Status and display:**
 
-- Agent-proposed facts carry provenance `agent-proposed` until a person accepts them. Their references stay `unverified` until someone reads the source ([0008](0008-record-the-basis-of-every-number.md)). Passing the agents' review is not verification.
-- The interface labels agent-proposed facts everywhere they appear.
-- We still have to decide whether unreviewed proposals take part in reasoning:
-  - not at all;
-  - with a switch;
-  - as "maybe", so that a route supported only by an agent can never make something a firm yes ([0007](0007-compare-ranges-with-three-answers.md)).
+- **Unmerged proposals never appear in the app.** They exist only in pull requests and the audit log.
+- **Merged facts are facts.** They take part in reasoning and are shown like any other curated fact. Their provenance (`agent-generated`, with a link to the run) is shown alongside, as every fact's provenance is ([0034](0034-build-the-graph-from-upstream-datasets-and-a-curated-layer.md)).
+- **For the first version, we may merge proposals before a person has read every source.** The mechanical checks and the reviewer agent are the bar for merging. References a person hasn't read stay `unverified` ([0008](0008-record-the-basis-of-every-number.md)), which is honest and already shown in the app. Passing the agents' review is not verification.
+
+**Reporting and withdrawal.** Mistakes, including invented facts that get through the first round, are handled by a report and withdrawal process, not by blocking merges:
+
+- Anyone can report a fact from the app's detail pane: what is wrong, and optionally a source. A report becomes a tracked item (a GitHub issue to start with) and joins the curation queue.
+- **Withdrawing** a fact is a pull request against the curated layer that removes or suppresses it, with the reason. If other facts depend on it, the same pull request deals with them, or they are withdrawn too.
+- Every report and withdrawal is recorded in the audit log, linked to the run that produced the fact. When one invented fact is found, we can list every fact from the same run, prompt version or model and re-check them as a batch.
 
 **Audit log.** Every run appends records to an audit table in the lakehouse, which is never updated in place:
 
@@ -60,14 +63,17 @@ Each curated fact links back to the run that produced it. From any fact we can f
 
 - The curation queue can be worked systematically, with people spending their time on decisions rather than drafting.
 - Costs money per item. Runs need budgets and a way to stop, and the queue needs priorities (for example, items that unlock the most).
-- Agents will still get things wrong in ways the checks don't catch: a real source quoted out of context, a plausible but false condition. The human gate and the "unverified" status exist for this.
-- The audit log is a dataset of its own, and a good one for evaluating prompt and model changes over time.
+- Agents will still get things wrong in ways the checks don't catch: a real source quoted out of context, a plausible but false condition. Because the first round merges before every source is read, some of these will reach users. The "unverified" status, the report button and batch withdrawal by run are how we find and remove them.
+- The audit log is a dataset of its own, and a good one for evaluating prompt and model changes over time. Withdrawals become labelled examples of failures.
 - Prompts become versioned code with their own tests (the hand-labelled set).
 - Agent output must never land in the curated layer without a pull request.
+- The app needs a report button, and the curated layer needs a way to record withdrawals.
 
 ## Alternatives considered
 
 - **Hand curation only.** Trustworthy, but it can't keep up with the upstream nodes.
-- **Agents write directly into the graph.** Fast, and invented facts would go straight to users.
+- **Agents write directly into the graph.** Fast, and invented facts would go straight to users with no review at all.
+- **Show unmerged proposals in the app, as "maybe".** More visible, but it blurs what the project stands behind. A merged fact is a claim we make; a proposal isn't yet.
+- **Require a person to read every source before merging.** The safest bar, but it would stall the first round. It becomes the goal for upgrading references from `unverified`, not a gate on merging.
 - **One agent that drafts and reviews its own work.** Cheaper, but self-review tends to agree with itself. An independent reviewer without the proposer's reasoning catches more.
 - **Ask the model for references from memory.** That is how invented citations happen. References must come from sources retrieved during the run, checked by code.

@@ -41,7 +41,7 @@ Rules:
   | **Upstream** | dataset, record id, snapshot date | — |
   | **Curated** | references, with the basis and status rules of [0008](0008-record-the-basis-of-every-number.md) | 0008 |
   | **Override** | what it replaces, why, and its references | 0008 |
-  | **Agent-proposed** | the audited run that produced it ([0035](0035-propose-curated-facts-with-audited-agents.md)) | not human-reviewed until a person accepts it |
+  | **Agent-generated** | the audited run that produced it, merged through a pull request ([0035](0035-propose-curated-facts-with-audited-agents.md)) | references stay `unverified` until a person reads them |
 
   Unknown is still fine. Guessing is still not.
 - **We never correct upstream sources.** We override locally and say so.

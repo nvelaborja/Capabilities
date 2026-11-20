@@ -15,7 +15,7 @@ We will build a data platform around the graph, in Python everywhere except the 
 
 - **Orchestration: Dagster.** Every dataset, model and output is a Dagster asset, so lineage, schedules, retries and data checks come from one place.
 - **Transformation: dbt.** Raw → staging → marts (bronze, silver, gold). dbt tests are the data contracts. Seeds hold small hand-kept tables such as id crosswalks.
-- **Storage: Apache Iceberg tables with an Apache Polaris catalog** on S3-compatible storage (MinIO locally). It starts as DuckDB with local files and moves to Iceberg once the pipeline works, without rewriting the models. Polaris earns its place by letting more than one engine (DuckDB, Spark, maybe Trino) share the same tables.
+- **Storage: Apache Iceberg tables with an Apache Polaris catalog** on S3-compatible storage (SeaweedFS locally, Apache-2.0; MinIO's community edition stopped publishing binaries and images in 2025). It starts as DuckDB with local files and moves to Iceberg once the pipeline works, without rewriting the models. Polaris earns its place by letting more than one engine (DuckDB, Spark, maybe Trino) share the same tables.
 - **Streaming: Kafka** carries usage events from the web app, and later pipeline events if useful. It is a learning goal more than a need, and we say so.
 - **Deployment: Kubernetes**, locally on a Mac Studio with Helm charts. Docker Compose comes first.
 - **Repository: a uv workspace monorepo.** `packages/core` (graph, reasoner, validate), `packages/api` (FastAPI), `pipeline/` (Dagster plus the dbt project), `web/` (React stays: the browser needs JavaScript, and the front end isn't the learning goal), `deploy/`.

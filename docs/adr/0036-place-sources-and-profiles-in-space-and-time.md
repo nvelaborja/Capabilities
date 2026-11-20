@@ -20,7 +20,7 @@ We will give sources and profiles a place and a time.
 
 - **Sources stay kinds in the graph** ("hematite deposit"), so routes and reasoning don't change. Each source kind gets **occurrences** in a separate geospatial layer, not drawn as graph nodes. An occurrence has:
   - a geometry (a point or polygon);
-  - its upstream record (MRDS, Pleiades, Mindat if licensed) or curated provenance ([0034](0034-build-the-graph-from-upstream-datasets-and-a-curated-layer.md));
+  - its upstream record (MRDS, Pleiades) or curated provenance ([0034](0034-build-the-graph-from-upstream-datasets-and-a-curated-layer.md));
   - optionally, a **first known working** date range, with its basis and references;
   - a **state**: worked (with dates), known but not worked, or suppressed, with a reason.
 - **Profiles get a place and a time.** The place is a polygon, a Pleiades place or a Cliopatria polity. The time is a date range. Hand-picked selections still work and still override.
@@ -40,7 +40,7 @@ We will give sources and profiles a place and a time.
 
 - Geometries are stored as GeoParquet or Iceberg geometry columns, and queried with DuckDB's spatial extension, plus Apache Sedona on Spark if needed. Which engine dbt uses follows the engine ADR from [0033](0033-build-a-python-data-platform-around-the-graph.md).
 - The web app gains a map view (MapLibre GL, BSD licensed) for profiles and occurrences.
-- Pleiades and MRDS are usable as far as we know. Cliopatria's and Mindat's licenses must be checked before ingesting ([0014](0014-license-code-gpl-and-data-cc-by.md)).
+- Licenses were checked in [0037](0037-license-the-project-for-non-commercial-use-only.md): MRDS is US public domain, Pleiades CC BY 3.0, Cliopatria CC BY 4.0. Mindat's terms forbid copying its data into another product, so we don't use it.
 
 ## Consequences
 
