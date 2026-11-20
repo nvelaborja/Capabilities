@@ -9,6 +9,7 @@ from pathlib import Path
 
 import yaml
 
+from .credits import cited_works, credits_path, refreshed, works_cited_markdown
 from .graph import Graph, LoadError, find_root
 from .reasoner import Backward, Selection, assess_job, closure, explore, need_tree
 from .validate import validate
@@ -59,6 +60,10 @@ def build_parser() -> argparse.ArgumentParser:
     cmd.add_argument("--host", default="127.0.0.1")
     cmd.add_argument("--port", type=int, default=8000)
     cmd.set_defaults(handler=cmd_serve)
+
+    cmd = commands.add_parser("credits", help="Regenerate the list of works cited in CREDITS.md.")
+    cmd.add_argument("--check", action="store_true", help="Only report whether CREDITS.md is up to date.")
+    cmd.set_defaults(handler=cmd_credits)
     return parser
 
 
@@ -85,6 +90,24 @@ def build_selection(graph: Graph, profile: str | None, select: list[str], desele
 
 
 # ====================================================================== commands
+
+
+def cmd_credits(args, root: Path) -> int:
+    path = credits_path(root)
+    current = path.read_text(encoding="utf-8")
+    try:
+        updated = refreshed(current, works_cited_markdown(cited_works(Graph.load(root))))
+    except ValueError as exc:
+        raise UsageError(str(exc)) from exc
+    if args.check:
+        if updated != current:
+            print("CREDITS.md is out of date: run `uv run capabilities credits`.")
+            return 1
+        print("CREDITS.md is up to date.")
+        return 0
+    path.write_text(updated, encoding="utf-8")
+    print(f"Updated {path.relative_to(root)}.")
+    return 0
 
 
 def cmd_validate(args, root: Path) -> int:
