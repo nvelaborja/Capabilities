@@ -41,6 +41,7 @@ export function routeVerdict(route: Pick<RouteRow, "status" | "missing" | "uncer
 }
 
 export const KIND_NAMES: Record<string, { one: string; many: string }> = {
+  source: { one: "Source", many: "Sources" },
   material: { one: "Material", many: "Materials" },
   artifact: { one: "Tool or product", many: "Tools and products" },
   action: { one: "Action", many: "Actions" },
@@ -55,10 +56,12 @@ export function kindName(kind: string, count = 1): string {
   return count === 1 ? names.one : names.many;
 }
 
-/** The heading over a node's routes: things are made, effects reached, actions done. */
-export function waysHeading(kind: string): string {
+/** The heading over a node's routes: things are made (or extracted, ADR 0032), effects reached, actions done. */
+export function waysHeading(kind: string, origin?: string): string {
   if (kind === "action") return "Ways to do it";
   if (kind === "effect") return "Ways to reach it";
+  if (kind === "source") return "Where it comes from";
+  if (origin === "extracted") return "Ways to extract it";
   return "Ways to make it";
 }
 

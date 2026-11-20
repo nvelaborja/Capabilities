@@ -1,0 +1,6 @@
+id: bog-iron-deposit
+kind: source
+label: Bog iron deposit
+availability: regional
+regions: ["Wetlands of northern Europe", "Widespread in bogs and lake beds"]
+description: Layers and lumps of limonite that form in bogs, lake beds and wetlands, just under the surface.

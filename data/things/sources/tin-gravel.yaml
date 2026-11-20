@@ -1,0 +1,7 @@
+id: tin-gravel
+kind: source
+label: Tin-bearing gravel
+availability: regional
+regions: ["Cornwall (Britain)", "Iberia", "Erzgebirge (central Europe)", "Central Asia"]
+description: Stream gravels where heavy cassiterite pebbles collect after weathering out of granite.
+notes: The regions listed are examples of known deposits, not a complete list. Which deposits were exploited in antiquity is debated (TODO-source).

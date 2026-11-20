@@ -1,0 +1,7 @@
+id: timber
+kind: material
+label: Timber
+origin: extracted
+is_a: [fuel, plant-material]
+description: Wood cut from standing trees. Worked into tools, frames, sledges, and rollers, burned as fuel, and made into charcoal.
+notes: Large timber was scarce in some regions (Egypt imported cedar from Lebanon). Fallen wood gathered by hand is deadwood.

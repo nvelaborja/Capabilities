@@ -1,0 +1,13 @@
+id: collect-dolerite
+kind: route
+label: Collecting dolerite boulders
+achieves: { thing: dolerite }
+requires:
+  - { role: consumed, thing: dolerite-outcrop }
+outputs:
+  - { thing: dolerite }
+notes: "Assumes pounders were picked from loose boulders and cobbles, which needs no tool. How the dolerite was actually obtained isn't sourced yet (TODO-source)."
+references:
+  - citation: "Clarke, S. & Engelbach, R. (1930). Ancient Egyptian Masonry: The Building Craft. Oxford University Press."
+    supports: "Dolerite pounders used to quarry granite at Aswan."
+    status: unverified

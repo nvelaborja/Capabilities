@@ -1,0 +1,15 @@
+id: wash-diamonds
+kind: route
+label: Washing gravel for diamonds
+achieves: { thing: diamond }
+requires:
+  - { role: consumed, thing: diamond-gravel }
+  - { role: consumed, thing: water, notes: "The gravel is dug and washed, then the stones are picked out by hand." }
+outputs:
+  - { thing: diamond }
+notes: Mining diamonds from their parent rock (kimberlite) is modern and isn't recorded.
+references:
+  - citation: "Ball, V. (1881). The Diamonds, Coal and Gold of India: Their Mode of Occurrence and Distribution. Trübner & Co."
+    url: https://archive.org/details/diamondscoalgold00ballrich
+    supports: "Where diamonds occur in India and how the old diamond workings recovered them."
+    status: unverified

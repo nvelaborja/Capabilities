@@ -10,14 +10,14 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Iterable
 
-from .graph import Graph
+from .graph import HELD_KINDS, Graph
 from .levels import Levels, action_key
 from .reasoner import ANY_TARGET, Action, Backward, ExploreResult, Necessity, Reachability, Selection, condition_rhs
 from .tristate import Tri, as_range, compare
 
 # Kinds drawn on the graph. Techniques never gate anything (ADR 0005), so they appear only in details and lists.
-DRAWN_KINDS = ("material", "artifact", "category", "effect")
-SELECTABLE_KINDS = ("material", "artifact")
+DRAWN_KINDS = ("material", "artifact", "category", "effect", "source")
+SELECTABLE_KINDS = HELD_KINDS
 OPERATORS = {">=": "≥", ">": ">", "<=": "≤", "<": "<", "==": "="}
 
 

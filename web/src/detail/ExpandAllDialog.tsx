@@ -14,7 +14,7 @@ interface ExpandAllDialogProps {
   onClose: () => void;
 }
 
-const KIND_ORDER = ["material", "artifact", "action", "category", "effect"];
+const KIND_ORDER = ["source", "material", "artifact", "action", "category", "effect"];
 const SECTIONS = [
   { key: "missing", title: "Missing" },
   { key: "uncertain", title: "Unknown" },

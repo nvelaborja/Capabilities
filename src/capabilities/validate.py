@@ -9,7 +9,7 @@ from pathlib import Path
 from jsonschema import Draft202012Validator
 from referencing import Registry, Resource
 
-from .graph import THING_DIRS, Document, Graph, achieved_id, achieved_kind, load_documents
+from .graph import HELD_KINDS, THING_DIRS, Document, Graph, achieved_id, achieved_kind, load_documents
 
 
 @dataclass(frozen=True)
@@ -153,8 +153,8 @@ class _Checker:
         role = requirement["role"]
         if "thing" in requirement:
             kind = self.g.kind(requirement["thing"])
-            if kind not in ("material", "artifact"):
-                self.error(where, f"{role} must point at a material or artifact, not {kind or 'unknown id'} {requirement['thing']!r}")
+            if kind not in HELD_KINDS:
+                self.error(where, f"{role} must point at a material, artifact or source, not {kind or 'unknown id'} {requirement['thing']!r}")
         if "category" in requirement and self.g.kind(requirement["category"]) != "category":
             self.error(where, f"unknown category {requirement['category']!r}")
         if "effect" in requirement and self.g.kind(requirement["effect"]) != "effect":
@@ -194,8 +194,8 @@ class _Checker:
         where = f"profile {profile_id}"
         for item in profile["includes"]:
             if "id" in item:
-                if self.g.kind(item["id"]) not in ("material", "artifact"):
-                    self.error(where, f"includes {item['id']!r}, which is not a known material or artifact")
+                if self.g.kind(item["id"]) not in HELD_KINDS:
+                    self.error(where, f"includes {item['id']!r}, which is not a known material, artifact or source")
             else:
                 if item["verb"] not in self.g.verbs:
                     self.error(where, f"unknown verb {item['verb']!r}")
@@ -221,9 +221,13 @@ class _Checker:
         outputs = {output["thing"] for route in self.g.routes.values() for output in route.get("outputs", [])}
         used_techniques = {technique for route in self.g.routes.values() for technique in route.get("techniques", [])}
         for thing_id, thing in self.g.things.items():
-            needs_route = thing["kind"] == "artifact" or (thing["kind"] == "material" and thing.get("origin") == "produced")
+            needs_route = thing["kind"] == "artifact" or (thing["kind"] == "material" and thing.get("origin") in ("produced", "extracted"))
             if needs_route and thing_id not in outputs and thing.get("era") != "modern":
                 self.warn(f"thing {thing_id}", "no route produces it")
+            if thing["kind"] == "material" and thing.get("origin") == "natural" and thing.get("availability") == "regional":
+                self.warn(f"thing {thing_id}", "regional natural material: give it a source and an extraction route (ADR 0032)")
+            if thing["kind"] == "source" and not any(source_used(route, thing_id) for route in self.g.routes.values()):
+                self.warn(f"thing {thing_id}", "no route extracts anything from this source")
             if thing["kind"] == "category" and not self.g.members(thing_id):
                 self.warn(f"thing {thing_id}", "category has no members")
             if thing["kind"] in ("technique", "knowledge") and thing_id not in used_techniques:
@@ -231,3 +235,7 @@ class _Checker:
         for route_id, route in self.g.routes.items():
             if all(reference["status"] == "unverified" for reference in route["references"]):
                 self.warn(f"route {route_id}", "only unverified references")
+
+
+def source_used(route: dict, source: str) -> bool:
+    return any(requirement.get("thing") == source for requirement in route["requires"])

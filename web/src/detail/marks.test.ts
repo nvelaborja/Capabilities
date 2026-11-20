@@ -45,4 +45,9 @@ describe("waysHeading", () => {
   ])("heads %s routes with %s", (kind, heading) => {
     expect(waysHeading(kind)).toBe(heading);
   });
+
+  it("says a found material is extracted, and a source is where it comes from", () => {
+    expect(waysHeading("material", "extracted")).toBe("Ways to extract it");
+    expect(waysHeading("source")).toBe("Where it comes from");
+  });
 });

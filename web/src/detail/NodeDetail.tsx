@@ -12,7 +12,7 @@ import { chipStatus, kindName, statusTri, waysHeading } from "./marks";
 import { References } from "./References";
 import { Routes, type StatusOf } from "./Routes";
 
-const SELECTABLE = new Set(["material", "artifact", "action"]);
+const SELECTABLE = new Set(["source", "material", "artifact", "action"]);
 const EXPANDABLE = new Set(["material", "artifact", "action"]);
 
 export interface DetailContext {
@@ -196,12 +196,16 @@ function Needs({ data, statusOf, onDrill, quickAdd, onExpandAll }: NeedsProps) {
       </>
     );
   }
-  const natural = data.about.origin === "natural" && (data.routes?.length ?? 0) === 0;
+  const found = data.kind === "source" || (data.about.origin === "natural" && (data.routes?.length ?? 0) === 0);
   return (
     <>
-      <h3 id="needs-title">{waysHeading(data.kind)}</h3>
-      {natural ? (
-        <p className="muted">A natural material: gathered, not made.</p>
+      <h3 id="needs-title">{waysHeading(data.kind, data.about.origin)}</h3>
+      {found ? (
+        <p className="muted">
+          {data.kind === "source"
+            ? "Found in nature, not made. What can be taken from it is under Leads to."
+            : "A natural material, gathered by hand as it is: nothing makes it, and no tool is needed."}
+        </p>
       ) : (
         <Routes routes={data.routes ?? []} statusOf={statusOf} onDrill={onDrill} />
       )}
@@ -216,7 +220,8 @@ function Needs({ data, statusOf, onDrill, quickAdd, onExpandAll }: NeedsProps) {
 
 function AboutSection({ about, statusOf, onDrill }: { about: About; statusOf: StatusOf; onDrill: (id: string) => void }) {
   const facts: [string, string][] = (about.quantities ?? []).map((q) => [q.label, q.value]);
-  const natural = about.origin === "natural";
+  // Hand-gathered materials and sources say where they are found; extracted materials are found through their source.
+  const natural = about.origin === "natural" || about.availability !== undefined;
   const everywhere = about.availability === "ubiquitous";
   if (natural) facts.push(["Found", everywhere ? "Almost everywhere" : (about.regions ?? []).join("; ") || "Some regions"]);
   return (

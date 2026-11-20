@@ -4,8 +4,8 @@ label: Making a fire drill
 achieves: { thing: fire-drill }
 techniques: [woodworking]
 requires:
-  - { role: consumed, thing: wood, notes: A spindle and a hearth board. }
-  - { role: action, verb: cut, target: wood }
+  - { role: consumed, thing: timber, notes: A spindle and a hearth board. }
+  - { role: action, verb: cut, target: timber }
 outputs:
   - { thing: fire-drill }
 references:

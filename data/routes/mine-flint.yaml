@@ -1,0 +1,14 @@
+id: mine-flint
+kind: route
+label: Gathering and mining flint
+achieves: { thing: flint }
+requires:
+  - { role: consumed, thing: flint-deposit }
+outputs:
+  - { thing: flint }
+notes: "Nodules weathered out of chalk can be picked up by hand; mined flint at Grime's Graves was dug with antler picks. Antler isn't in the graph yet, so the pick isn't required (TODO: add antler)."
+references:
+  - citation: "English Heritage. Discoveries at Grime's Graves."
+    url: https://www.english-heritage.org.uk/visit/places/grimes-graves-prehistoric-flint-mine/history/collection/
+    supports: "Neolithic flint was mined at Grime's Graves, with red deer antler picks as the main tool."
+    status: secondary

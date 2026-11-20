@@ -11,7 +11,7 @@ Each file records one significant design decision: the context, what we decided,
 | [0003](0003-model-timeless-kinds-of-things.md) | Model timeless kinds of things, not history | Accepted |
 | [0004](0004-store-the-graph-as-yaml-in-git.md) | Store the graph as YAML files in git, validated by JSON Schema | Accepted |
 | [0005](0005-know-how-never-gates-reachability.md) | Know-how never gates reachability | Accepted |
-| [0006](0006-separate-selected-implied-and-reachable.md) | Separate selected, hypothetical, implied and reachable | Accepted; near-miss definition superseded by 0027 |
+| [0006](0006-separate-selected-implied-and-reachable.md) | Separate selected, hypothetical, implied and reachable | Accepted; near-miss definition superseded by 0027; free found materials refined by 0032 |
 | [0007](0007-compare-ranges-with-three-answers.md) | Compare ranges with three answers; missing data is "maybe" | Accepted |
 | [0008](0008-record-the-basis-of-every-number.md) | Record the basis of every number and the status of every reference | Accepted |
 | [0009](0009-check-feasibility-with-performance-envelopes.md) | Check feasibility with performance envelopes and ballpark bands | Accepted |
@@ -37,3 +37,4 @@ Each file records one significant design decision: the context, what we decided,
 | [0029](0029-split-the-side-column-into-two-resizable-panes.md) | Split the side column into two resizable panes | Accepted; keeping a dragged Selected size superseded by 0030 |
 | [0030](0030-hide-extra-lines-focus-on-certain-needs-group-actions.md) | Hide busy nodes' extra lines without placeholders, focus on certain needs, and group actions by verb | Accepted |
 | [0031](0031-call-categories-classes-and-add-members-in-one-click.md) | Call categories "classes" in the interface, and add their members in one click | Accepted |
+| [0032](0032-extract-materials-from-sources-by-routes.md) | Extract materials from sources by ordinary routes | Accepted |

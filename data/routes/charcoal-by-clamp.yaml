@@ -4,8 +4,8 @@ label: Charcoal burning in a clamp or pit
 achieves: { thing: charcoal }
 techniques: [charcoal-burning, fire-making]
 requires:
-  - { role: consumed, thing: wood }
-  - { role: action, verb: cut, target: wood }
+  - { role: consumed, thing: timber }
+  - { role: action, verb: cut, target: timber }
   - { role: effect, effect: heat, notes: A fire to light the clamp; the wood then smoulders with little air. }
 outputs:
   - { thing: charcoal }

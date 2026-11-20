@@ -1,0 +1,18 @@
+id: quarry-limestone
+kind: route
+label: Quarrying limestone with chisels
+achieves: { thing: limestone }
+techniques: [stone-dressing]
+requires:
+  - { role: consumed, thing: limestone-outcrop }
+  - { role: action, verb: cut, target: limestone, notes: Channels are cut around a block until it can be split from the bed. }
+outputs:
+  - { thing: limestone }
+references:
+  - citation: "Harrell, J. A. & Storemyr, P. (2009). Ancient Egyptian quarries: an illustrated overview. In: Abu-Jaber, N. et al. (eds.), QuarryScapes: Ancient Stone Quarry Landscapes in the Eastern Mediterranean. Geological Survey of Norway Special Publication 12, 7–50."
+    url: https://www.ngu.no/upload/Publikasjoner/Special%20publication/SP12_s7-50.pdf
+    supports: "The chisel, first of copper and later of bronze or iron, was the main tool for quarrying soft stone such as limestone in all periods."
+    status: secondary
+  - citation: "Klemm, R. & Klemm, D. D. (2008). Stones and Quarries in Ancient Egypt. British Museum Press."
+    supports: "Old and Middle Kingdom limestone quarries show short tool marks of copper chisels."
+    status: unverified

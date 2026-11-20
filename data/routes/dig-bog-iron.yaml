@@ -1,0 +1,13 @@
+id: dig-bog-iron
+kind: route
+label: Digging bog iron
+achieves: { thing: limonite }
+requires:
+  - { role: consumed, thing: bog-iron-deposit }
+outputs:
+  - { thing: limonite }
+notes: "Dug from just under the turf; the spades used aren't in the graph yet, so no tool is required (TODO-source for how it was dug)."
+references:
+  - citation: "Pleiner, R. (2000). Iron in Archaeology: The European Bloomery Smelters. Archeologický ústav AV ČR."
+    supports: "Bog iron ore was a major source of iron for European bloomeries."
+    status: unverified

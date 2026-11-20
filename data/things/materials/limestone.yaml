@@ -1,9 +1,7 @@
 id: limestone
 kind: material
 label: Limestone
-origin: natural
-availability: regional
-regions: ["Giza and Tura (Egypt)", "Widespread"]
+origin: extracted
 is_a: [stone]
 description: A sedimentary rock made mostly of calcite (Mohs 3). The main building stone of the Egyptian pyramids.
 quantities:

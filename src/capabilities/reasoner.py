@@ -7,7 +7,8 @@
 Semantics (see docs/data-format.md, "Reasoning rules"):
 - A thing is reachable if ANY of its routes is satisfied; a route is satisfied if ALL its requirements are.
 - Know-how never gates a route. Routes list techniques for description only.
-- Ubiquitous natural materials are free; everything else must be selected, implied, or produced.
+- Ubiquitous natural materials and sources are free; everything else must be selected, implied, or produced. Materials
+  that must be extracted (timber, quarried granite) come from a source by an ordinary route (ADR 0032).
 - Comparisons over ranges are three-valued (yes / maybe / no); missing data is "maybe".
 """
 
@@ -16,7 +17,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Iterable
 
-from .graph import Graph
+from .graph import HELD_KINDS, Graph
 from .tristate import Tri, as_range, compare
 
 Action = tuple[str, str]  # (verb, target)
@@ -67,7 +68,7 @@ class Selection:
         return sorted(self.things) + sorted(f"{verb}:{target}" for verb, target in self.actions)
 
     def unknown_ids(self, graph: Graph) -> list[str]:
-        unknown = [thing for thing in self.things if graph.kind(thing) not in ("material", "artifact")]
+        unknown = [thing for thing in self.things if graph.kind(thing) not in HELD_KINDS]
         for verb, target in self.actions:
             if verb not in graph.verbs:
                 unknown.append(f"{verb}:{target} (unknown verb)")
@@ -248,7 +249,7 @@ def need_tree(graph: Graph, node: str, max_depth: int = 12) -> dict:
 def _thing_node(graph: Graph, thing_id: str, depth: int, path: frozenset, max_depth: int) -> dict:
     thing = graph.things[thing_id]
     node = {"type": "thing", "id": thing_id, "label": thing.get("label", thing_id), "kind": thing["kind"]}
-    if thing["kind"] == "material" and thing.get("origin") == "natural":
+    if graph.is_natural(thing_id):
         node["natural"] = thing.get("availability")
     route_ids = graph.routes_achieving.get(thing_id, [])
     if thing_id in path:
@@ -493,7 +494,7 @@ def explore(graph: Graph, selected: Selection, hypothetical: Selection = Selecti
 
     def produced(thing_id: str) -> bool:
         thing = graph.things[thing_id]
-        return thing["kind"] == "artifact" or (thing["kind"] == "material" and thing.get("origin") == "produced")
+        return thing["kind"] == "artifact" or (thing["kind"] == "material" and thing.get("origin") in ("produced", "extracted"))
 
     reachable = sorted(t for t, s in reach.status.items() if s == Tri.YES and produced(t) and t not in base.things)
     maybe = sorted(t for t, s in reach.status.items() if s == Tri.MAYBE and produced(t) and t not in base.things)
@@ -537,14 +538,21 @@ def _target_quantities(graph: Graph, verb: str) -> set[str]:
 def _regional_warnings(graph: Graph, chosen: Selection, implied: Necessity) -> list[str]:
     warnings = []
     for thing in sorted(implied.things - chosen.things):
-        if graph.is_regional(thing):
+        # An extracted material's source is implied too, and carries the regions, so it gives the one warning.
+        if graph.is_regional(thing) and graph.things[thing].get("origin") != "extracted":
             regions = "; ".join(graph.things[thing].get("regions", [])) or "unknown regions"
             name = graph.label(thing).lower()
-            warnings.append(f"Implies access to {name}, which is only found in some places ({regions}). It may have been traded.")
+            if graph.kind(thing) == "source":
+                # A source can't be traded, but what comes out of it can.
+                warnings.append(f"Implies access to {name} ({regions}), or trade with someone who had it.")
+            else:
+                warnings.append(f"Implies access to {name}, which is only found in some places ({regions}). It may have been traded.")
     for category in sorted(implied.categories):
         members = graph.members(category)
-        if members and all(graph.is_regional(m) or graph.kind(m) != "material" for m in members) and not (members & chosen.things):
-            sources = ", ".join(sorted(graph.label(m).lower() for m in members if graph.is_regional(m)))
+        regional = sorted(graph.label(m).lower() for m in members if graph.is_regional(m))
+        # Only classes of found materials: a class of tools (pounders) has no regional members, so says nothing about trade.
+        if regional and all(graph.is_regional(m) or graph.kind(m) != "material" for m in members) and not (members & chosen.things):
+            sources = ", ".join(regional)
             name = graph.label(category).lower()
             warnings.append(f"Implies access to some {name} ({sources}); all known sources are regional, so it may have been traded.")
     return warnings
@@ -725,7 +733,7 @@ def _assess_route(graph: Graph, reach: Reachability, route_id: str, step: dict, 
 def one_step_away(graph: Graph, reach: Reachability) -> list[dict]:
     """Things that one more raw ingredient would make reachable, however deep the chain to them (ADR 0027).
 
-    A raw ingredient is something no route makes: a natural material, or a thing with no known route. Adding a made
+    A raw ingredient is something no route makes: a source, a natural material, or a thing with no known route. Adding a made
     thing directly doesn't count, since that would hide everything still missing beneath it: hardened steel is one
     step away only if a single ore unlocks the whole chain through bloom iron and steel.
     """
@@ -744,10 +752,10 @@ def one_step_away(graph: Graph, reach: Reachability) -> list[dict]:
 
 
 def raw_ingredients(graph: Graph, reach: Reachability) -> list[str]:
-    """Materials and artifacts that no route makes and the selection doesn't reach: they can only be added."""
+    """Materials, artifacts and sources that no route makes and the selection doesn't reach: they can only be added."""
     return sorted(
         thing_id for thing_id, thing in graph.things.items()
-        if thing["kind"] in ("material", "artifact") and reach.status[thing_id] == Tri.NO
+        if thing["kind"] in HELD_KINDS and reach.status[thing_id] == Tri.NO
         and not graph.routes_producing.get(thing_id) and not graph.routes_achieving.get(thing_id)
     )
 

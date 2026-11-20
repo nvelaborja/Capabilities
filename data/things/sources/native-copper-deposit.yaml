@@ -1,0 +1,6 @@
+id: native-copper-deposit
+kind: source
+label: Native copper deposit
+availability: regional
+regions: ["Great Lakes (North America)", "Anatolia", "Iran"]
+description: Rock and glacial drift holding nuggets and masses of metallic copper.

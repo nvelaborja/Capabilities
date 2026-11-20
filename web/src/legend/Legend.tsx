@@ -6,6 +6,7 @@ import "./Legend.css";
 
 // Drawn with the same CSS variables, emoji and border rules as the graph (graph/styles.ts).
 export const TYPE_LABELS: Record<DrawnKind, string> = {
+  source: "Source (granite outcrop: where it is found)",
   material: "Material",
   artifact: "Tool or product",
   action: "Action (cut wood)",

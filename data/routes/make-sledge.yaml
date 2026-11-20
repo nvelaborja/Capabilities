@@ -4,9 +4,9 @@ label: Building a sledge
 achieves: { thing: sledge }
 techniques: [woodworking]
 requires:
-  - { role: consumed, thing: wood }
+  - { role: consumed, thing: timber }
   - { role: consumed, thing: rope, notes: Lashings. }
-  - { role: action, verb: cut, target: wood }
+  - { role: action, verb: cut, target: timber }
 outputs:
   - { thing: sledge }
 references:

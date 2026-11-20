@@ -95,9 +95,9 @@ class TestBackward:
         # when: asking what every route needs
         certain = Backward(graph).of_thing("steel")
         # then: both routes share the bloomery chain
-        assert {"bloom-iron", "bloomery-furnace", "charcoal", "clay", "wood"} <= certain.things
+        assert {"bloom-iron", "bloomery-furnace", "charcoal", "clay", "timber"} <= certain.things
         assert {"iron-ore", "carbon-source"} <= certain.categories
-        assert ("cut", "wood") in certain.actions
+        assert ("cut", "timber") in certain.actions
         # and the merged heat need is the weakest common bound: 1100 °C (bloomery) and 24 h (both steel routes)
         assert certain.effects["heat"] == {"temperature_c": (">=", 1100), "duration_h": (">=", 24)}
 
@@ -116,7 +116,7 @@ class TestBackward:
     def test_handles_cycles(self, graph):
         # given: heat needs charcoal, and charcoal needs heat to light the clamp
         # when / then: backward inference terminates
-        assert Backward(graph).of_thing("charcoal").things >= {"wood"}
+        assert Backward(graph).of_thing("charcoal").things >= {"timber"}
 
 
 class TestNeedTree:
@@ -128,9 +128,9 @@ class TestNeedTree:
         assert [route["id"] for route in heat["routes"]] == ["heat-forced-draft-furnace"]
         assert set(heat["too_weak"]) == {"heat-open-fire", "heat-fire-piston"}
 
-    def test_wood_cutting_is_a_common_ancestor(self, graph):
+    def test_timber_cutting_is_a_common_ancestor(self, graph):
         tree = need_tree(graph, "steel-spear")
-        assert any(node["id"] == "cut:wood" for node in walk(tree))
+        assert any(node["id"] == "cut:timber" for node in walk(tree))
 
     def test_actions_can_be_asked_about(self, graph):
         tree = need_tree(graph, "cut:granite")
@@ -190,14 +190,69 @@ class TestExplore:
 
     def test_iron_is_one_ingredient_away_for_egypt(self, graph):
         result = explore(graph, egypt(graph))
-        assert {"thing": "bloom-iron", "route": "bloomery-smelting", "missing": "hematite"} in result.near_misses
+        assert {"thing": "bloom-iron", "route": "bloomery-smelting", "missing": "hematite-deposit"} in result.near_misses
 
     def test_the_whole_iron_chain_is_one_ore_away(self, graph):
         # given: Egypt, which has no iron ore
         # when: exploring
         near = {miss["thing"]: miss for miss in explore(graph, egypt(graph)).near_misses}
         # then: hardened steel is one step away, because one ore unlocks bloom iron, steel and hardened steel at once
-        assert near["hardened-steel"]["missing"] in {"hematite", "limonite"}
+        assert near["hardened-steel"]["missing"] in {"hematite-deposit", "limonite"}
+
+
+class TestExtraction:
+    """Sources say where a resource is found; ordinary routes extract materials from them (ADR 0032)."""
+
+    def test_egypt_quarries_granite_from_the_aswan_outcrop(self, graph):
+        # given: Egypt has the Aswan outcrop and pounds granite with dolerite
+        # when: exploring
+        result = explore(graph, egypt(graph))
+        # then: quarried granite follows
+        assert "granite" in result.reachable
+
+    def test_pounders_alone_do_not_give_granite(self, graph):
+        # given: dolerite pounders, which can shape granite, but no outcrop to quarry
+        reach = Reachability(graph, Selection.parse(["dolerite-pounder"]))
+        # then: they might shape granite (dolerite's toughness isn't sourced yet), but have none to shape
+        assert reach.action_status("shape", "granite") != Tri.NO
+        assert reach.status["granite"] == Tri.NO
+
+    def test_the_outcrop_is_what_granite_is_one_step_away_from(self, graph):
+        near = {(m["thing"], m["missing"]) for m in explore(graph, Selection.parse(["dolerite-pounder"])).near_misses}
+        assert ("granite", "granite-outcrop") in near
+
+    def test_timber_needs_only_a_knapped_stone_tool(self, graph):
+        # given: nothing selected; standing trees and fieldstone are everywhere
+        reach = Reachability(graph, Selection())
+        # then: a stone chopper can be knapped, so timber can be felled; deadwood needs nothing at all
+        assert reach.status["timber"] == Tri.YES
+        assert reach.status["deadwood"] == Tri.YES
+        assert reach.route_status("fell-timber", None) == Tri.YES
+
+    def test_a_hematite_deposit_gives_hematite(self, graph):
+        reach = Reachability(graph, Selection.parse(["hematite-deposit"]))
+        assert reach.status["hematite"] == Tri.YES
+
+    def test_selecting_a_source_says_nothing_about_tools(self, graph):
+        # given: only the outcrop
+        reach = Reachability(graph, Selection.parse(["granite-outcrop"]))
+        # then: no pounder tough enough, so no granite
+        assert reach.status["granite"] == Tri.NO
+
+
+class TestSourceWarnings:
+    def test_an_implied_regional_source_warns_once_and_mentions_trade(self, graph):
+        # given: granite selected without saying where it came from
+        result = explore(graph, Selection.parse(["granite"]))
+        # then: one warning, about the outcrop, not a second about the granite
+        assert result.warnings == ["Implies access to granite outcrop (Aswan (Egypt); Widespread in continental crust), or trade with someone who had it."]
+
+    def test_a_class_of_extracted_materials_is_regional_when_its_sources_are(self, graph):
+        # given: bloom iron needs some iron ore: hematite (from a regional deposit) or limonite (regional)
+        result = explore(graph, Selection.parse(["bloom-iron"]))
+        # then: the class warning still fires
+        assert any(w.startswith("Implies access to some iron ore") for w in result.warnings)
+        assert graph.is_regional("hematite")
 
 
 class TestOneStepAway:

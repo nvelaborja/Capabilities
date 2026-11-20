@@ -1,0 +1,14 @@
+id: mine-native-copper
+kind: route
+label: Digging out native copper
+achieves: { thing: native-copper }
+requires:
+  - { role: consumed, thing: native-copper-deposit }
+  - { role: tool, category: stone, notes: Hammerstones to break the copper free of the rock. }
+outputs:
+  - { thing: native-copper }
+notes: "Loose nuggets in glacial drift can be picked up by hand; the hammerstone is for copper still in the rock. The hammerstone requirement is not yet backed by a cited source (TODO-source)."
+references:
+  - citation: "Martin, S. R. (1999). Wonderful Power: The Story of Ancient Copper Working in the Lake Superior Basin. Wayne State University Press."
+    supports: "Native copper was mined from pits in the Lake Superior basin for thousands of years before European contact."
+    status: unverified

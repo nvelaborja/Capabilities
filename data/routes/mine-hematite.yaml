@@ -1,0 +1,18 @@
+id: mine-hematite
+kind: route
+label: Mining hematite with stone tools
+achieves: { thing: hematite }
+requires:
+  - { role: consumed, thing: hematite-deposit }
+  - { role: tool, category: stone, notes: Hammerstones and picks to break the ore out. }
+outputs:
+  - { thing: hematite }
+notes: Surface and shallow workings. Deep mining (shafts, fire-setting, metal picks) isn't recorded yet.
+references:
+  - citation: "UNESCO World Heritage Centre. Ngwenya Mines (tentative list entry 5421)."
+    url: https://whc.unesco.org/en/tentativelists/5421
+    supports: Hematite (specularite) was mined at Lion Cavern in the Stone Age with stone tools (choppers, picks and hammers of dolerite).
+    status: secondary
+  - citation: "Craddock, P. T. (1995). Early Metal Mining and Production. Edinburgh University Press."
+    supports: General description of early mining methods.
+    status: unverified

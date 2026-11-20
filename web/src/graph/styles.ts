@@ -4,10 +4,12 @@ import type { DrawnKind, Status } from "../api/types";
 import { STRIP_WIDTH } from "./elements";
 import { FOLDED, OUTSIDE, REVEALED } from "./focus";
 
-export const TYPED_KINDS: readonly DrawnKind[] = ["material", "artifact", "action", "category", "effect"];
+// Sources first: in a column, where things are found comes before what is made from them (ADR 0032).
+export const TYPED_KINDS: readonly DrawnKind[] = ["source", "material", "artifact", "action", "category", "effect"];
 
 /** The emoji in each type's strip, a second cue besides colour. */
 export const TYPE_ICONS: Record<DrawnKind, string> = {
+  source: "⛰️",
   material: "🪨",
   artifact: "🔨",
   action: "✋",

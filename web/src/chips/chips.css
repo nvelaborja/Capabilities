@@ -31,6 +31,8 @@
   font-size: 0.7rem;
 }
 
+.chip-source { border-color: var(--type-source-line); }
+.chip-source .chip-strip { background: var(--type-source-fill); }
 .chip-material { border-color: var(--type-material-line); }
 .chip-material .chip-strip { background: var(--type-material-fill); }
 .chip-artifact { border-color: var(--type-artifact-line); }

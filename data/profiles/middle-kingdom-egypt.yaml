@@ -6,11 +6,11 @@ region: Nile valley
 description: Things Middle Kingdom Egypt is known to have made or done. In the tool these are "selected"; everything that follows from them is "reachable". A first draft for testing the model; every item still needs its own reference.
 includes:
   # Resources they had access to
-  - { id: malachite, notes: Mined in Sinai and the Eastern Desert. }
-  - { id: granite, notes: Quarried at Aswan. }
-  - { id: limestone }
-  - { id: flint }
-  - { id: dolerite }
+  - { id: malachite-deposit, notes: Mined in Sinai and the Eastern Desert. }
+  - { id: granite-outcrop, notes: Quarried at Aswan. }
+  - { id: limestone-outcrop, notes: Quarried at Giza and Tura. }
+  - { id: flint-deposit }
+  - { id: dolerite-outcrop }
   # Materials and tools they made
   - { id: copper }
   - { id: tin-bronze, notes: Tin was not available locally and must have been imported. }

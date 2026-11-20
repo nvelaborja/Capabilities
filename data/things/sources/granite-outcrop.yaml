@@ -1,0 +1,6 @@
+id: granite-outcrop
+kind: source
+label: Granite outcrop
+availability: regional
+regions: ["Aswan (Egypt)", "Widespread in continental crust"]
+description: Granite bedrock or boulders at the surface. Blocks are quarried from it by pounding trenches around them.

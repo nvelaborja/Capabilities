@@ -1,9 +1,7 @@
 id: granite
 kind: material
 label: Granite
-origin: natural
-availability: regional
-regions: ["Aswan (Egypt)", "Widespread in continental crust"]
+origin: extracted
 is_a: [stone]
 description: A hard, coarse-grained igneous rock made mostly of quartz (Mohs 7) and feldspar (Mohs 6).
 quantities:

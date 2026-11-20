@@ -59,6 +59,11 @@
   --type-effect-ink: #ffffff;
   --type-effect-tint: #fadfd0;
   --type-effect-line: #bb4708;
+  /* Sources (ADR 0032): Okabe & Ito yellow, with an olive border that keeps 3:1 contrast on the light node surface. */
+  --type-source-fill: #e8d44d;
+  --type-source-ink: #2a2500;
+  --type-source-tint: #f8f2c4;
+  --type-source-line: #857600;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -106,6 +111,10 @@
     --type-effect-ink: #2a1105;
     --type-effect-tint: #452414;
     --type-effect-line: #f08a4f;
+    --type-source-fill: #f0e442;
+    --type-source-ink: #1f1c00;
+    --type-source-tint: #3a3712;
+    --type-source-line: #f0e442;
   }
 }
 
@@ -153,6 +162,10 @@
   --type-effect-ink: #2a1105;
   --type-effect-tint: #452414;
   --type-effect-line: #f08a4f;
+  --type-source-fill: #f0e442;
+  --type-source-ink: #1f1c00;
+  --type-source-tint: #3a3712;
+  --type-source-line: #f0e442;
 }
 
 *,

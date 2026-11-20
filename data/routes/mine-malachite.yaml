@@ -1,0 +1,17 @@
+id: mine-malachite
+kind: route
+label: Mining malachite with stone hammers
+achieves: { thing: malachite }
+requires:
+  - { role: consumed, thing: malachite-deposit }
+  - { role: tool, category: stone, notes: Hammerstones to break the ore from the rock. }
+outputs:
+  - { thing: malachite }
+notes: Shallow workings. Fire-setting and metal chisels, used in deeper or harder ground, aren't recorded yet.
+references:
+  - citation: "Rothenberg, B. (1972). Timna: Valley of the Biblical Copper Mines. Thames and Hudson."
+    supports: "Copper ore was mined at Timna from the Chalcolithic onwards."
+    status: unverified
+  - citation: "Craddock, P. T. (1995). Early Metal Mining and Production. Edinburgh University Press."
+    supports: "General description of early mining methods."
+    status: unverified

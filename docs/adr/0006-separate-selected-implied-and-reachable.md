@@ -1,6 +1,6 @@
 # 0006. Separate selected, hypothetical, implied and reachable
 
-- **Status:** Accepted; the definition of near misses superseded by [0027](0027-count-one-step-away-as-one-raw-ingredient.md)
+- **Status:** Accepted; the definition of near misses superseded by [0027](0027-count-one-step-away-as-one-raw-ingredient.md); free found materials refined by [0032](0032-extract-materials-from-sources-by-routes.md)
 - **Date:** 2026-11-04 (recorded 2026-11-05)
 
 ## Context

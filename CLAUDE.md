@@ -42,7 +42,7 @@ npm run build                    # web/dist, which `capabilities serve` hosts at
 ## Layout
 
 - `schema/`: JSON Schemas for every data file type
-- `data/`: the graph (quantities, things, verbs, routes, profiles), licensed CC BY 4.0
+- `data/`: the graph (quantities, things, verbs, routes, profiles), licensed CC BY 4.0. Things include sources (where a resource is found); extraction routes take materials from them (ADR 0032)
 - `examples/jobs/`: feasibility-check jobs; `examples/README.md` holds worked results that tests check
 - `src/capabilities/`: `graph.py` (loading), `validate.py`, `tristate.py`, `reasoner.py` (the three questions), `levels.py` (tech levels), `views.py` (display-ready shapes for the web UI), `cli.py`, `server.py` (API under `/api`)
 - `web/src/`: `api/` (typed client), `graph/` (Cytoscape elements, styles, statuses, tech-tree layout, focus mode, hiding busy nodes' extra lines), `detail/` (detail pane for nodes and lines: route checklists, drill-down, expand-all dialog), `chips/` (node-like chips used in every list), `panes/` (side pane, lists, dialog), `search/`, `lib/bounded.ts` (top N, the rest summarised by type), `layout/` (resizable panes), `legend/`, `state/` (selection history and links, explore and explain hooks, breadcrumb trail, theme), `catalog.ts` (labels for any id)
@@ -55,6 +55,7 @@ npm run build                    # web/dist, which `capabilities serve` hosts at
 - Every route cites at least one reference, with an honest `status` and a `supports` statement.
 - Know-how never gates a route ([ADR 0005](docs/adr/0005-know-how-never-gates-reachability.md)). Techniques are descriptive labels only.
 - Missing data must produce "maybe", never "no" ([ADR 0007](docs/adr/0007-compare-ranges-with-three-answers.md)).
+- A natural resource that takes tools to get (timber, quarried stone, mined ore) is `origin: extracted`, with a `source` saying where it is found and a cited extraction route. Only materials gathered by hand as they are stay `origin: natural` ([ADR 0032](docs/adr/0032-extract-materials-from-sources-by-routes.md)).
 - If you change data that the worked examples depend on, update `examples/README.md` and the tests that check it.
 
 ## Code conventions
