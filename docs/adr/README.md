@@ -38,3 +38,7 @@ Each file records one significant design decision: the context, what we decided,
 | [0030](0030-hide-extra-lines-focus-on-certain-needs-group-actions.md) | Hide busy nodes' extra lines without placeholders, focus on certain needs, and group actions by verb | Accepted |
 | [0031](0031-call-categories-classes-and-add-members-in-one-click.md) | Call categories "classes" in the interface, and add their members in one click | Accepted |
 | [0032](0032-extract-materials-from-sources-by-routes.md) | Extract materials from sources by ordinary routes | Accepted |
+| [0033](0033-build-a-python-data-platform-around-the-graph.md) | Build a Python data platform around the graph | Proposed |
+| [0034](0034-build-the-graph-from-upstream-datasets-and-a-curated-layer.md) | Build the graph from upstream datasets and a curated layer | Proposed; would supersede 0004 and refine 0008 |
+| [0035](0035-propose-curated-facts-with-audited-agents.md) | Propose curated facts with audited AI agents, reviewed by agents and people | Proposed |
+| [0036](0036-place-sources-and-profiles-in-space-and-time.md) | Place sources and profiles in space and time | Proposed; would supersede 0012 and amend 0003 |
