@@ -17,6 +17,8 @@ jobs:
         run: uv sync --locked
       - name: Validate data
         run: uv run capabilities validate --quiet
+      - name: Build the graph (dbt, with its data tests)
+        run: uv run capabilities build
       - name: Run tests
         run: uv run pytest -q
 

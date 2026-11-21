@@ -20,8 +20,9 @@ Design decisions are recorded in [docs/adr/](docs/adr/README.md). They are bindi
 
 ```bash
 uv sync                          # install (uv installs Python 3.12)
-uv run pytest                    # tests
+uv run pytest                    # tests (all packages; builds the graph once into a temp dir)
 uv run capabilities validate     # check every data file; run before any data PR
+uv run capabilities build        # build the graph with dbt into build/graph (the questions and server rebuild when stale)
 uv run capabilities need steel   # Q1
 uv run capabilities explore --profile middle-kingdom-egypt   # Q2
 uv run capabilities check granite-slab-saw-cut --profile middle-kingdom-egypt   # Q3
@@ -44,9 +45,12 @@ npm run build                    # web/dist, which `capabilities serve` hosts at
 - `schema/`: JSON Schemas for every data file type
 - `data/`: the graph (quantities, things, verbs, routes, profiles), licensed CC BY-NC-SA 4.0. Things include sources (where a resource is found); extraction routes take materials from them (ADR 0032)
 - `examples/jobs/`: feasibility-check jobs; `examples/README.md` holds worked results that tests check
-- `src/capabilities/`: `graph.py` (loading), `validate.py`, `tristate.py`, `reasoner.py` (the three questions), `levels.py` (tech levels), `views.py` (display-ready shapes for the web UI), `credits.py` (the works cited in CREDITS.md), `cli.py`, `server.py` (API under `/api`)
+- `packages/core/src/capabilities/`: `graph.py` (the in-memory graph; `Graph.from_curated` reads the YAML), `built.py` (reading the built graph, freshness), `validate.py`, `tristate.py`, `reasoner.py` (the three questions), `levels.py` (tech levels), `views.py` (display-ready shapes for the web UI), `credits.py` (the works cited in CREDITS.md), `cli.py`
+- `packages/api/src/capabilities_api/server.py`: the API under `/api`, which also hosts the web app
+- `pipeline/`: `src/capabilities_pipeline/build.py` (loads the curated layer into DuckDB, runs dbt, writes the manifest) and `dbt/` (sources, staging, marts written as Parquet). See [ADR 0038](docs/adr/0038-serve-the-app-from-a-built-graph-artifact.md)
 - `web/src/`: `api/` (typed client), `graph/` (Cytoscape elements, styles, statuses, tech-tree layout, focus mode, hiding busy nodes' extra lines), `detail/` (detail pane for nodes and lines: route checklists, drill-down, expand-all dialog), `chips/` (node-like chips used in every list), `panes/` (side pane, lists, dialog), `search/`, `lib/bounded.ts` (top N, the rest summarised by type), `layout/` (resizable panes), `legend/`, `state/` (selection history and links, explore and explain hooks, breadcrumb trail, theme), `catalog.ts` (labels for any id)
-- `tests/`: pytest suite
+- Tests live beside each package (`packages/*/tests`, `pipeline/tests`); shared fixtures are in the root `conftest.py`
+- `build/`: generated (warehouse, built graph, dbt logs); never commit it
 - `docs/`: data format, reasoning rules, and ADRs
 
 ## Data rules
@@ -56,6 +60,7 @@ npm run build                    # web/dist, which `capabilities serve` hosts at
 - Know-how never gates a route ([ADR 0005](docs/adr/0005-know-how-never-gates-reachability.md)). Techniques are descriptive labels only.
 - Missing data must produce "maybe", never "no" ([ADR 0007](docs/adr/0007-compare-ranges-with-three-answers.md)).
 - A natural resource that takes tools to get (timber, quarried stone, mined ore) is `origin: extracted`, with a `source` saying where it is found and a cited extraction route. Only materials gathered by hand as they are stay `origin: natural` ([ADR 0032](docs/adr/0032-extract-materials-from-sources-by-routes.md)).
+- The YAML in `data/` is the curated layer; the app reads the graph built from it ([ADR 0034](docs/adr/0034-build-the-graph-from-upstream-datasets-and-a-curated-layer.md), [ADR 0038](docs/adr/0038-serve-the-app-from-a-built-graph-artifact.md)). Every fact must have provenance: curated facts cite references (above); upstream facts, from milestone 1, carry their dataset and record. Never edit upstream sources, override them in the curated layer instead.
 - If you change data that the worked examples depend on, update `examples/README.md` and the tests that check it.
 
 ## Code conventions

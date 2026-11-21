@@ -1,0 +1,10 @@
+version: 2
+
+models:
+  - name: stg_curated__documents
+    description: Curated documents with their common fields as columns.
+    columns:
+      - name: kind
+        data_tests: [not_null]
+      - name: label
+        data_tests: [not_null]

@@ -1,13 +1,13 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from capabilities.server import create_app
+from capabilities_api.server import create_app
 
 
 @pytest.fixture(scope="module")
-def client(repo_root, tmp_path_factory) -> TestClient:
+def client(repo_root, built_dir, tmp_path_factory) -> TestClient:
     # Ignore any local web build so results don't depend on whether `npm run build` has been run.
-    return TestClient(create_app(repo_root, web_dist=tmp_path_factory.mktemp("no-web-build")))
+    return TestClient(create_app(repo_root, web_dist=tmp_path_factory.mktemp("no-web-build"), build_dir=built_dir))
 
 
 class TestServer:

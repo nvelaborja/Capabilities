@@ -1,0 +1,13 @@
+version: 2
+
+models:
+  - name: graph_nodes
+    description: Every node in the graph, as the app reads it (build/graph/graph_nodes.parquet).
+    columns:
+      - name: ordinal
+        data_tests: [unique, not_null]
+      - name: id
+        description: Unique across every type of node (ADR 0004 data rules).
+        data_tests: [unique, not_null]
+      - name: provenance
+        data_tests: [not_null]

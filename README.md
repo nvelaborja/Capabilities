@@ -16,6 +16,7 @@ You need [uv](https://docs.astral.sh/uv/) (it installs the right Python for you)
 ```bash
 uv sync                                   # install
 uv run capabilities validate              # check every data file
+uv run capabilities build                 # build the graph the app and questions read (automatic when needed)
 uv run capabilities need steel            # Q1: what would it take to make steel?
 uv run capabilities need cut:granite      # Q1 works for actions too
 uv run capabilities explore --profile middle-kingdom-egypt                      # Q2
@@ -23,7 +24,9 @@ uv run capabilities explore --profile middle-kingdom-egypt --hypothetical hemati
 uv run capabilities check granite-slab-saw-cut --profile middle-kingdom-egypt   # Q3
 ```
 
-Every command takes `--json` for machine-readable output. `explore` and `check` take `--profile`, `--select`, `--deselect`, and `--hypothetical`. Items are thing ids (`copper-saw`) or actions (`cut:granite`).
+The data files in `data/` are the curated layer. `capabilities build` turns them into the built graph in `build/graph/` (Parquet tables and a manifest) with dbt on DuckDB ([ADR 0038](docs/adr/0038-serve-the-app-from-a-built-graph-artifact.md)). The questions and the server read the built graph and rebuild it first whenever the data has changed, so you rarely need to run `build` yourself.
+
+Every question command takes `--json` for machine-readable output. `explore` and `check` take `--profile`, `--select`, `--deselect`, and `--hypothetical`. Items are thing ids (`copper-saw`) or actions (`cut:granite`).
 
 ### Web app
 
@@ -69,7 +72,7 @@ The server hosts the web app at `/` (if built), the API under `/api`, and intera
 ### Tests
 
 ```bash
-uv run pytest
+uv run pytest                             # every package's tests; builds the graph once into a temporary directory
 ```
 
 ## Layout
@@ -78,9 +81,11 @@ uv run pytest
 schema/            JSON Schemas for every data file type
 data/              the graph: quantities, things, verbs, routes, profiles
 examples/          example jobs and worked results
-src/capabilities/  reasoner, CLI, and API server
+packages/core/     the graph, reasoner, validator and CLI (`capabilities`), with its tests
+packages/api/      the local API server, which also hosts the web app
+pipeline/          builds the graph: loading, the dbt project (pipeline/dbt) and its tests
 web/               the web app (React, TypeScript, Cytoscape.js)
-tests/             pytest suite
+build/             the built graph and the DuckDB warehouse (generated, not in git)
 docs/              data format, reasoning rules, and design decisions (docs/adr/)
 ```
 

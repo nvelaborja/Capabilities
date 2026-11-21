@@ -52,13 +52,11 @@ def find_root(start: Path | None = None) -> Path:
     env = os.environ.get("CAPABILITIES_ROOT")
     if env:
         return Path(env).resolve()
-    origin = (start or Path.cwd()).resolve()
-    for candidate in (origin, *origin.parents):
-        if (candidate / "schema" / "route.schema.json").is_file() and (candidate / "data").is_dir():
-            return candidate
-    package_root = Path(__file__).resolve().parents[2]
-    if (package_root / "data").is_dir():
-        return package_root
+    # From where the command runs first, then from where the package is installed (an editable install in the repo).
+    for origin in ((start or Path.cwd()).resolve(), Path(__file__).resolve().parent):
+        for candidate in (origin, *origin.parents):
+            if (candidate / "schema" / "route.schema.json").is_file() and (candidate / "data").is_dir():
+                return candidate
     raise LoadError("Could not find the Capabilities data. Run from inside the repo, or set CAPABILITIES_ROOT.")
 
 
@@ -115,17 +113,26 @@ class Graph:
         self._members: dict[str, frozenset[str]] = {}
 
     @classmethod
-    def load(cls, root: Path | None = None) -> "Graph":
+    def from_curated(cls, root: Path | None = None) -> "Graph":
+        """The graph straight from the curated YAML files: for validation, tests, and the build's input.
+
+        The app and the question commands read the built graph instead (`capabilities.built`, ADR 0038).
+        """
         root = root or find_root()
         documents, errors = load_documents(root)
         if errors:
             raise LoadError("\n".join(errors))
+        return cls.from_documents(root, ((doc.schema, doc.data, str(doc.path.relative_to(root))) for doc in documents))
+
+    @classmethod
+    def from_documents(cls, root: Path, documents: Iterable[tuple[str, dict, str]]) -> "Graph":
+        """Build from (schema, data, where it came from) triples, whichever store they were read from."""
         buckets: dict[str, dict[str, dict]] = {schema: {} for schema in SCHEMA_BY_DIR.values()}
-        for doc in documents:
-            node_id = doc.data.get("id")
-            if node_id in buckets[doc.schema]:
-                raise LoadError(f"Duplicate id {node_id!r} in {doc.path.relative_to(root)}")
-            buckets[doc.schema][node_id] = doc.data
+        for schema, data, origin in documents:
+            node_id = data.get("id")
+            if node_id in buckets[schema]:
+                raise LoadError(f"Duplicate id {node_id!r} in {origin}")
+            buckets[schema][node_id] = data
         return cls(
             root,
             quantities=buckets["quantity"], things=buckets["thing"], verbs=buckets["verb"],
