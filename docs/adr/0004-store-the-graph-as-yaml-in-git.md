@@ -1,6 +1,6 @@
 # 0004. Store the graph as YAML files in git, validated by JSON Schema
 
-- **Status:** Accepted
+- **Status:** Superseded by [0034](0034-build-the-graph-from-upstream-datasets-and-a-curated-layer.md)
 - **Date:** 2026-11-04 (recorded 2026-11-05)
 
 ## Context

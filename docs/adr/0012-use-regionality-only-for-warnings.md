@@ -1,6 +1,6 @@
 # 0012. Record regionality; use it only for warnings
 
-- **Status:** Accepted
+- **Status:** Superseded by [0036](0036-place-sources-and-profiles-in-space-and-time.md)
 - **Date:** 2026-11-04 (recorded 2026-11-05)
 
 ## Context

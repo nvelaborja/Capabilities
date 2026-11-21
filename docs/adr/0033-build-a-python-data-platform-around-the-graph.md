@@ -1,13 +1,13 @@
 # 0033. Build a Python data platform around the graph
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-20
 
 ## Context
 
 The graph is small and written by hand: about 96 things, 53 routes and one profile. Public datasets know far more than we can type: mineral deposits, ancient places, past societies, material properties and the literature. Using them takes ingestion, modelling, quality checks, scheduling and storage that a folder of YAML files can't give.
 
-This is also a learning project. The maintainer is preparing for data platform roles, so the platform should use the tools those teams use, in the language they mostly use (Python), and each tool should solve a real problem here, not be added for show. Keeping today's format and code isn't a constraint.
+This is also a learning project. It's acceptable to over-engineer parts of it to gain experience with more technologies, as long as each tool still does a real job here. The platform uses the tools data platform teams commonly use, in the language they mostly use (Python). Keeping today's format and code isn't a constraint.
 
 ## Decision
 
@@ -33,6 +33,6 @@ The order of the work (milestones M0–M9) lives in the plan, not in this ADR, s
 ## Alternatives considered
 
 - **Keep the scripts and files, and add datasets by hand.** Simplest, but it doesn't scale to thousands of records and teaches none of the target tools.
-- **Airflow instead of Dagster.** More widely deployed, but built around tasks rather than data assets. Dagster's asset model and its dbt integration match this pipeline more closely. Either would serve the interview story.
-- **A managed cloud stack from the start (Databricks, Snowflake).** Faster to start, but it hides the catalog, storage and deployment layers the maintainer wants to learn, and it costs money. Databricks stays as a later comparison.
+- **Airflow instead of Dagster.** More widely deployed, but built around tasks rather than data assets. Dagster's asset model and its dbt integration match this pipeline more closely. Either would serve the learning goal.
+- **A managed cloud stack from the start (Databricks, Snowflake).** Faster to start, but it hides the catalog, storage and deployment layers this project sets out to learn, and it costs money. Databricks stays as a later comparison.
 - **Rewrite the front end in Python (Streamlit, Reflex).** Fewer languages, but it loses the Cytoscape graph work for little learning value.

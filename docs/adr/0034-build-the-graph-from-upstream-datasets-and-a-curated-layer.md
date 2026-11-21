@@ -1,8 +1,8 @@
 # 0034. Build the graph from upstream datasets and a curated layer
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-20
-- **Supersedes (when accepted):** [0004](0004-store-the-graph-as-yaml-in-git.md). Refines [0008](0008-record-the-basis-of-every-number.md): its rules stay for curated facts, and upstream facts carry their dataset and record instead.
+- **Supersedes:** [0004](0004-store-the-graph-as-yaml-in-git.md). Refines [0008](0008-record-the-basis-of-every-number.md): its rules stay for curated facts, and upstream facts carry their dataset and record instead.
 
 ## Context
 

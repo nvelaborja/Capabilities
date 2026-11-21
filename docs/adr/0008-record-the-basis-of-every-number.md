@@ -1,6 +1,6 @@
 # 0008. Record the basis of every number and the status of every reference
 
-- **Status:** Accepted
+- **Status:** Accepted; refined by [0034](0034-build-the-graph-from-upstream-datasets-and-a-curated-layer.md) (upstream facts carry their dataset and record instead)
 - **Date:** 2026-11-04 (recorded 2026-11-05)
 
 ## Context

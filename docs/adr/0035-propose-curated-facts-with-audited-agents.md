@@ -1,6 +1,6 @@
 # 0035. Propose curated facts with audited AI agents, reviewed by agents and people
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-20
 
 ## Context
@@ -52,6 +52,13 @@ We will run AI agents as a stage of the pipeline: they propose curated facts, ot
 
 Each curated fact links back to the run that produced it. From any fact we can find its run, and from any run, prompt version or model, every fact it produced.
 
+**Cost and limits.** Agent calls cost money and count against API rate limits, so runs are deliberate:
+
+- **Runs are started by hand only**, never by a schedule or sensor. A person launches a run in Dagster.
+- **Each run names its size:** how many queue items to process, and optionally a spending cap. It stops at whichever comes first, finishing the item in progress and leaving the rest in the queue.
+- **Concurrency is limited** so that calls stay under the API rate limits, and calls that are rate-limited are retried with backoff rather than failing the run.
+- **The audit log records tokens and cost** for every call and run, so prompts and models can be compared on cost as well as quality.
+
 **Models and interfaces (initial choice, revisit by measurement):**
 
 - The pipeline drives the loop. Each step is a Dagster asset calling the Claude API: the proposer uses the server-side web search and fetch tools and structured outputs; the reviewer gets the fetched sources as documents. The orchestration and audit records stay in our pipeline, where the data platform work is.
@@ -62,7 +69,7 @@ Each curated fact links back to the run that produced it. From any fact we can f
 ## Consequences
 
 - The curation queue can be worked systematically, with people spending their time on decisions rather than drafting.
-- Costs money per item. Runs need budgets and a way to stop, and the queue needs priorities (for example, items that unlock the most).
+- Costs money per item. Manual, sized runs keep spending deliberate, and the queue needs priorities (for example, items that unlock the most) so a small run does the most useful work.
 - Agents will still get things wrong in ways the checks don't catch: a real source quoted out of context, a plausible but false condition. Because the first round merges before every source is read, some of these will reach users. The "unverified" status, the report button and batch withdrawal by run are how we find and remove them.
 - The audit log is a dataset of its own, and a good one for evaluating prompt and model changes over time. Withdrawals become labelled examples of failures.
 - Prompts become versioned code with their own tests (the hand-labelled set).

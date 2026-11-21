@@ -1,8 +1,8 @@
 # 0036. Place sources and profiles in space and time
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-20
-- **Supersedes (when accepted):** [0012](0012-use-regionality-only-for-warnings.md). Amends [0003](0003-model-timeless-kinds-of-things.md): the graph of kinds and routes stays timeless, but where sources are and when they were known becomes data.
+- **Supersedes:** [0012](0012-use-regionality-only-for-warnings.md). Amends [0003](0003-model-timeless-kinds-of-things.md): the graph of kinds and routes stays timeless, but where sources are and when they were known becomes data.
 
 ## Context
 
@@ -39,7 +39,7 @@ We will give sources and profiles a place and a time.
 **Storage and tools:**
 
 - Geometries are stored as GeoParquet or Iceberg geometry columns, and queried with DuckDB's spatial extension, plus Apache Sedona on Spark if needed. Which engine dbt uses follows the engine ADR from [0033](0033-build-a-python-data-platform-around-the-graph.md).
-- The web app gains a map view (MapLibre GL, BSD licensed) for profiles and occurrences.
+- The web app gains a map view (MapLibre GL, BSD licensed) for profiles and occurrences. **Choosing a material shows every place it can be found:** every occurrence of every source it is extracted from, each marked as worked (with its dates), or present but not known to be worked. Materials found almost everywhere say so instead of drawing thousands of points.
 - Licenses were checked in [0037](0037-license-the-project-for-non-commercial-use-only.md): MRDS is US public domain, Pleiades CC BY 3.0, Cliopatria CC BY 4.0. Mindat's terms forbid copying its data into another product, so we don't use it.
 
 ## Consequences

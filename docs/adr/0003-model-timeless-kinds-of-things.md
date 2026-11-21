@@ -1,6 +1,6 @@
 # 0003. Model timeless kinds of things, not history
 
-- **Status:** Accepted
+- **Status:** Accepted; amended by [0036](0036-place-sources-and-profiles-in-space-and-time.md) (sources and profiles have places and dates)
 - **Date:** 2026-11-04 (recorded 2026-11-05)
 
 ## Context
