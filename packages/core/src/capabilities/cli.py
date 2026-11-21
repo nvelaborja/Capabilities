@@ -212,7 +212,7 @@ def cmd_check(args, root: Path) -> int:
 def cmd_serve(args, root: Path) -> int:
     import uvicorn
 
-    from .server import create_app
+    from capabilities_api.server import create_app
 
     uvicorn.run(create_app(root), host=args.host, port=args.port)
     return 0

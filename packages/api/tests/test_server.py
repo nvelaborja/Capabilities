@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from capabilities.server import create_app
+from capabilities_api.server import create_app
 
 
 @pytest.fixture(scope="module")

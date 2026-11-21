@@ -5,7 +5,7 @@ import pytest
 
 from capabilities.graph import Graph
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parent
 
 
 @pytest.fixture(scope="session")

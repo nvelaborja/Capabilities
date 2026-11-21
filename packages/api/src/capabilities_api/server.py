@@ -12,11 +12,11 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import __version__
-from .graph import Graph, find_root
-from .levels import compute_levels
-from .reasoner import Backward, Selection, assess_job, closure, explore, need_tree
-from .views import StatusContext, UnknownNode, explain, explain_edge, explore_view, graph_view, parse_action
+from capabilities import __version__
+from capabilities.graph import Graph, find_root
+from capabilities.levels import compute_levels
+from capabilities.reasoner import Backward, Selection, assess_job, closure, explore, need_tree
+from capabilities.views import StatusContext, UnknownNode, explain, explain_edge, explore_view, graph_view, parse_action
 
 
 class SelectionRequest(BaseModel):

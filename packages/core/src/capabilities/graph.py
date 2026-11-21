@@ -52,13 +52,11 @@ def find_root(start: Path | None = None) -> Path:
     env = os.environ.get("CAPABILITIES_ROOT")
     if env:
         return Path(env).resolve()
-    origin = (start or Path.cwd()).resolve()
-    for candidate in (origin, *origin.parents):
-        if (candidate / "schema" / "route.schema.json").is_file() and (candidate / "data").is_dir():
-            return candidate
-    package_root = Path(__file__).resolve().parents[2]
-    if (package_root / "data").is_dir():
-        return package_root
+    # From where the command runs first, then from where the package is installed (an editable install in the repo).
+    for origin in ((start or Path.cwd()).resolve(), Path(__file__).resolve().parent):
+        for candidate in (origin, *origin.parents):
+            if (candidate / "schema" / "route.schema.json").is_file() and (candidate / "data").is_dir():
+                return candidate
     raise LoadError("Could not find the Capabilities data. Run from inside the repo, or set CAPABILITIES_ROOT.")
 
 
