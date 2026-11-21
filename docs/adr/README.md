@@ -43,3 +43,4 @@ Each file records one significant design decision: the context, what we decided,
 | [0035](0035-propose-curated-facts-with-audited-agents.md) | Propose curated facts with audited AI agents, reviewed by agents and people | Accepted |
 | [0036](0036-place-sources-and-profiles-in-space-and-time.md) | Place sources and profiles in space and time | Accepted |
 | [0037](0037-license-the-project-for-non-commercial-use-only.md) | License the project for non-commercial use only | Accepted |
+| [0038](0038-serve-the-app-from-a-built-graph-artifact.md) | Serve the app from a built graph artifact (Parquet tables and a manifest, built by dbt) | Proposed |

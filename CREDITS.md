@@ -70,7 +70,7 @@ The references behind routes, materials and numbers. A status of *unverified* me
 
 ## Software
 
-Direct dependencies. Each brings its own dependencies, all under permissive licenses (MIT, BSD, Apache-2.0, ISC, MPL-2.0, PSF, BlueOak) as of 2026-11-20.
+Direct dependencies. Each brings its own dependencies, all under permissive licenses (MIT, BSD, Apache-2.0, ISC, MPL-2.0, PSF, BlueOak) as of 2026-11-20, with one exception: dbt pulls in `text-unidecode`, which is dual-licensed under the Artistic License or GPL-2.0-or-later, and which we use under the Artistic License. It is installed for local builds only and never shipped with the project.
 
 | Software | Used for | License |
 |---|---|---|
@@ -79,6 +79,8 @@ Direct dependencies. Each brings its own dependencies, all under permissive lice
 | [FastAPI](https://fastapi.tiangolo.com/) and [Starlette](https://www.starlette.io/) | The local API | MIT, BSD-3-Clause |
 | [Uvicorn](https://www.uvicorn.org/) | Serving the API | BSD-3-Clause |
 | [Pydantic](https://docs.pydantic.dev/) | API models | MIT |
+| [DuckDB](https://duckdb.org/) | The build's warehouse, and reading the built graph | MIT |
+| [dbt Core](https://github.com/dbt-labs/dbt-core) and [dbt-duckdb](https://github.com/duckdb/dbt-duckdb) | Building the graph from its inputs (ADR 0038) | Apache-2.0 |
 | [React](https://react.dev/) | The web app | MIT |
 | [Cytoscape.js](https://js.cytoscape.org/) | Drawing the graph | MIT |
 | [Vite](https://vite.dev/), [Vitest](https://vitest.dev/), [TypeScript](https://www.typescriptlang.org/), [ESLint](https://eslint.org/) | Building and testing the web app | MIT, Apache-2.0 |
