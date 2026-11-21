@@ -35,7 +35,7 @@ def validate(root: Path) -> list[Issue]:
     if any(issue.severity == "error" for issue in issues):
         # Cross-references assume schema-valid documents.
         return issues
-    graph = Graph.load(root)
+    graph = Graph.from_curated(root)
     return issues + _Checker(graph).run()
 
 

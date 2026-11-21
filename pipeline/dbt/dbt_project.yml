@@ -1,0 +1,19 @@
+# Builds the graph the app reads (ADR 0038). Run through `uv run capabilities build`, which loads the raw tables first.
+name: capabilities
+version: "0.1.0"
+config-version: 2
+profile: capabilities
+
+model-paths: ["models"]
+
+flags:
+  send_anonymous_usage_stats: false
+
+models:
+  capabilities:
+    staging:
+      +materialized: view
+    marts:
+      # Marts are written as Parquet files in the build's graph/ directory: the artifact the app reads.
+      +materialized: external
+      +format: parquet

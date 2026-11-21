@@ -10,6 +10,7 @@ from pathlib import Path
 import yaml
 
 from .credits import cited_works, credits_path, refreshed, works_cited_markdown
+from .built import build_dir_for, current_graph, run_build
 from .graph import Graph, LoadError, find_root
 from .reasoner import Backward, Selection, assess_job, closure, explore, need_tree
 from .validate import validate
@@ -33,6 +34,7 @@ class UsageError(Exception):
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="capabilities", description="Query the Capabilities knowledge graph.")
     parser.add_argument("--root", help="Repository root holding schema/ and data/ (default: search upward from here).")
+    parser.add_argument("--build-dir", help="Where the built graph lives (default: $CAPABILITIES_BUILD_DIR, then build/ in the repo).")
     commands = parser.add_subparsers(dest="command", required=True)
 
     cmd = commands.add_parser("validate", help="Check every data file against the schemas and cross-references.")
@@ -60,6 +62,9 @@ def build_parser() -> argparse.ArgumentParser:
     cmd.add_argument("--host", default="127.0.0.1")
     cmd.add_argument("--port", type=int, default=8000)
     cmd.set_defaults(handler=cmd_serve)
+
+    cmd = commands.add_parser("build", help="Build the graph the app reads, from the curated layer, with dbt.")
+    cmd.set_defaults(handler=cmd_build)
 
     cmd = commands.add_parser("credits", help="Regenerate the list of works cited in CREDITS.md.")
     cmd.add_argument("--check", action="store_true", help="Only report whether CREDITS.md is up to date.")
@@ -92,11 +97,18 @@ def build_selection(graph: Graph, profile: str | None, select: list[str], desele
 # ====================================================================== commands
 
 
+def cmd_build(args, root: Path) -> int:
+    manifest = run_build(root, build_dir_for(root, args.build_dir))
+    rows = sum(manifest["tables"].values())
+    print(f"Built the graph: {rows} nodes, from inputs {manifest['fingerprint'][:12]}.")
+    return 0
+
+
 def cmd_credits(args, root: Path) -> int:
     path = credits_path(root)
     current = path.read_text(encoding="utf-8")
     try:
-        updated = refreshed(current, works_cited_markdown(cited_works(Graph.load(root))))
+        updated = refreshed(current, works_cited_markdown(cited_works(Graph.from_curated(root))))
     except ValueError as exc:
         raise UsageError(str(exc)) from exc
     if args.check:
@@ -121,7 +133,7 @@ def cmd_validate(args, root: Path) -> int:
 
 
 def cmd_need(args, root: Path) -> int:
-    graph = Graph.load(root)
+    graph = current_graph(root, args.build_dir)
     node = args.node
     if ":" in node:
         verb, target = node.split(":", 1)
@@ -144,7 +156,7 @@ def cmd_need(args, root: Path) -> int:
 
 
 def cmd_explore(args, root: Path) -> int:
-    graph = Graph.load(root)
+    graph = current_graph(root, args.build_dir)
     selected, what_if = build_selection(graph, args.profile, args.select, args.deselect, args.hypothetical)
     result = explore(graph, selected, what_if).to_dict(graph)
     if args.json:
@@ -178,7 +190,7 @@ def cmd_explore(args, root: Path) -> int:
 
 
 def cmd_check(args, root: Path) -> int:
-    graph = Graph.load(root)
+    graph = current_graph(root, args.build_dir)
     job = load_job(graph, args.job)
     selected, what_if = build_selection(graph, args.profile, args.select, args.deselect, args.hypothetical)
     _, reach = closure(graph, selected, what_if)
@@ -214,7 +226,7 @@ def cmd_serve(args, root: Path) -> int:
 
     from capabilities_api.server import create_app
 
-    uvicorn.run(create_app(root), host=args.host, port=args.port)
+    uvicorn.run(create_app(root, build_dir=args.build_dir), host=args.host, port=args.port)
     return 0
 
 

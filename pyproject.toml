@@ -1,6 +1,6 @@
 # The workspace root holds no package of its own (ADR 0033): `uv sync` installs every member below.
 [tool.uv.workspace]
-members = ["packages/core", "packages/api"]
+members = ["packages/core", "packages/api", "pipeline"]
 
 [dependency-groups]
 dev = [
@@ -9,7 +9,7 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["packages/core/tests", "packages/api/tests"]
+testpaths = ["packages/core/tests", "packages/api/tests", "pipeline/tests"]
 # Test files in different packages share names' namespace otherwise; importlib mode needs no __init__.py files.
 addopts = ["--import-mode=importlib"]
 filterwarnings = ["ignore:Using `httpx` with `starlette.testclient` is deprecated"]

@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from capabilities import __version__
+from capabilities.built import current_graph
 from capabilities.graph import Graph, find_root
 from capabilities.levels import compute_levels
 from capabilities.reasoner import Backward, Selection, assess_job, closure, explore, need_tree
@@ -55,9 +56,9 @@ npm run build</code></pre>
 """
 
 
-def create_app(root: Path | None = None, web_dist: Path | None = None) -> FastAPI:
+def create_app(root: Path | None = None, web_dist: Path | None = None, build_dir: Path | None = None) -> FastAPI:
     root = root or find_root()
-    graph = Graph.load(root)
+    graph = current_graph(root, build_dir)
     levels = compute_levels(graph)
     api = APIRouter(prefix="/api")
     app = FastAPI(

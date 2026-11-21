@@ -1,0 +1,8 @@
+capabilities:
+  target: local
+  outputs:
+    local:
+      type: duckdb
+      path: "{{ env_var('CAPABILITIES_BUILD_DIR') }}/warehouse.duckdb"
+      external_root: "{{ env_var('CAPABILITIES_BUILD_DIR') }}/graph"
+      threads: 1
