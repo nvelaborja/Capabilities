@@ -4,7 +4,7 @@ Guidance for AI coding agents working in this repository.
 
 ## What this is
 
-Capabilities is an open knowledge graph of what it physically takes to make and do things. It answers three questions: what would it take (Q1), what else could they do (Q2), and could it have been done this way (Q3). Start with [README.md](README.md), then [docs/data-format.md](docs/data-format.md).
+Capabilities is a free, non-commercial knowledge graph of what it physically takes to make and do things. It answers three questions: what would it take (Q1), what else could they do (Q2), and could it have been done this way (Q3). Start with [README.md](README.md), then [docs/data-format.md](docs/data-format.md).
 
 ## Design decisions (ADRs)
 
@@ -42,9 +42,9 @@ npm run build                    # web/dist, which `capabilities serve` hosts at
 ## Layout
 
 - `schema/`: JSON Schemas for every data file type
-- `data/`: the graph (quantities, things, verbs, routes, profiles), licensed CC BY 4.0. Things include sources (where a resource is found); extraction routes take materials from them (ADR 0032)
+- `data/`: the graph (quantities, things, verbs, routes, profiles), licensed CC BY-NC-SA 4.0. Things include sources (where a resource is found); extraction routes take materials from them (ADR 0032)
 - `examples/jobs/`: feasibility-check jobs; `examples/README.md` holds worked results that tests check
-- `src/capabilities/`: `graph.py` (loading), `validate.py`, `tristate.py`, `reasoner.py` (the three questions), `levels.py` (tech levels), `views.py` (display-ready shapes for the web UI), `cli.py`, `server.py` (API under `/api`)
+- `src/capabilities/`: `graph.py` (loading), `validate.py`, `tristate.py`, `reasoner.py` (the three questions), `levels.py` (tech levels), `views.py` (display-ready shapes for the web UI), `credits.py` (the works cited in CREDITS.md), `cli.py`, `server.py` (API under `/api`)
 - `web/src/`: `api/` (typed client), `graph/` (Cytoscape elements, styles, statuses, tech-tree layout, focus mode, hiding busy nodes' extra lines), `detail/` (detail pane for nodes and lines: route checklists, drill-down, expand-all dialog), `chips/` (node-like chips used in every list), `panes/` (side pane, lists, dialog), `search/`, `lib/bounded.ts` (top N, the rest summarised by type), `layout/` (resizable panes), `legend/`, `state/` (selection history and links, explore and explain hooks, breadcrumb trail, theme), `catalog.ts` (labels for any id)
 - `tests/`: pytest suite
 - `docs/`: data format, reasoning rules, and ADRs
@@ -65,5 +65,5 @@ npm run build                    # web/dist, which `capabilities serve` hosts at
 - Tests describe behavior. When a test fails, fix the code unless the test is wrong, and say why.
 - Conventional Commits (`feat:`, `fix:`, `docs:`...), lines under 120 characters.
 - Work on a branch and open a draft pull request. Never push to `main`.
-- Check a dependency's license against GPL-3.0 before adding it ([ADR 0014](docs/adr/0014-license-code-gpl-and-data-cc-by.md)).
+- The project is for non-commercial use only: code under PolyForm Noncommercial 1.0.0, data under CC BY-NC-SA 4.0 ([ADR 0037](docs/adr/0037-license-the-project-for-non-commercial-use-only.md)). Check a dependency's or dataset's license before adding it, never call the project "open source", and add every new dataset or cited work to [CREDITS.md](CREDITS.md) (`uv run capabilities credits` regenerates the works cited).
 - Web: colours come from CSS custom properties in `web/src/theme.css` (light and dark); the graph reads them, so never hard-code colours in `graph/styles.ts`. A coloured strip with an emoji shows a node's type and its border shows its status ([ADR 0022](docs/adr/0022-type-strip-with-emoji-on-neutral-nodes.md)); status must never rely on colour alone, and nothing may be available only on hover ([ADR 0019](docs/adr/0019-desktop-first-mobile-ready.md)).

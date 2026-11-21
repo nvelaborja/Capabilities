@@ -8,18 +8,18 @@ Each file records one significant design decision: the context, what we decided,
 |---|---|---|
 | [0001](0001-record-architecture-decisions.md) | Record design decisions as ADRs | Accepted |
 | [0002](0002-model-capabilities-as-an-and-or-graph.md) | Model capabilities as an AND/OR graph with quantity constraints | Accepted |
-| [0003](0003-model-timeless-kinds-of-things.md) | Model timeless kinds of things, not history | Accepted |
-| [0004](0004-store-the-graph-as-yaml-in-git.md) | Store the graph as YAML files in git, validated by JSON Schema | Accepted |
+| [0003](0003-model-timeless-kinds-of-things.md) | Model timeless kinds of things, not history | Accepted; amended by 0036 |
+| [0004](0004-store-the-graph-as-yaml-in-git.md) | Store the graph as YAML files in git, validated by JSON Schema | Superseded by 0034 |
 | [0005](0005-know-how-never-gates-reachability.md) | Know-how never gates reachability | Accepted |
 | [0006](0006-separate-selected-implied-and-reachable.md) | Separate selected, hypothetical, implied and reachable | Accepted; near-miss definition superseded by 0027; free found materials refined by 0032 |
 | [0007](0007-compare-ranges-with-three-answers.md) | Compare ranges with three answers; missing data is "maybe" | Accepted |
-| [0008](0008-record-the-basis-of-every-number.md) | Record the basis of every number and the status of every reference | Accepted |
+| [0008](0008-record-the-basis-of-every-number.md) | Record the basis of every number and the status of every reference | Accepted; refined by 0034 |
 | [0009](0009-check-feasibility-with-performance-envelopes.md) | Check feasibility with performance envelopes and ballpark bands | Accepted |
 | [0010](0010-merge-effect-thresholds-by-the-weakest-shared-bound.md) | Merge effect thresholds by the weakest shared bound | Accepted |
 | [0011](0011-routes-can-require-actions-down-to-primitives.md) | Routes can require actions, built down to primitives | Accepted |
-| [0012](0012-use-regionality-only-for-warnings.md) | Record regionality; use it only for warnings | Accepted |
+| [0012](0012-use-regionality-only-for-warnings.md) | Record regionality; use it only for warnings | Superseded by 0036 |
 | [0013](0013-use-python-for-the-reasoner-cli-and-server.md) | Use Python for the reasoner, CLI and local API server | Accepted |
-| [0014](0014-license-code-gpl-and-data-cc-by.md) | License the code under GPL-3.0-or-later and the data under CC BY 4.0 | Accepted |
+| [0014](0014-license-code-gpl-and-data-cc-by.md) | License the code under GPL-3.0-or-later and the data under CC BY 4.0 | Superseded by 0037 |
 | [0015](0015-build-the-web-front-end-with-react-and-cytoscape.md) | Build the web front end with React, TypeScript, Vite and Cytoscape.js | Accepted; drawing and layout superseded by 0023 |
 | [0016](0016-recompute-on-every-change.md) | Recompute results on every selection change | Accepted |
 | [0017](0017-ui-selection-model.md) | UI selection model: implicit selection, history and shareable state | Accepted; list contents superseded by 0025, their single pane by 0029 |
@@ -38,3 +38,8 @@ Each file records one significant design decision: the context, what we decided,
 | [0030](0030-hide-extra-lines-focus-on-certain-needs-group-actions.md) | Hide busy nodes' extra lines without placeholders, focus on certain needs, and group actions by verb | Accepted |
 | [0031](0031-call-categories-classes-and-add-members-in-one-click.md) | Call categories "classes" in the interface, and add their members in one click | Accepted |
 | [0032](0032-extract-materials-from-sources-by-routes.md) | Extract materials from sources by ordinary routes | Accepted |
+| [0033](0033-build-a-python-data-platform-around-the-graph.md) | Build a Python data platform around the graph | Accepted |
+| [0034](0034-build-the-graph-from-upstream-datasets-and-a-curated-layer.md) | Build the graph from upstream datasets and a curated layer | Accepted |
+| [0035](0035-propose-curated-facts-with-audited-agents.md) | Propose curated facts with audited AI agents, reviewed by agents and people | Accepted |
+| [0036](0036-place-sources-and-profiles-in-space-and-time.md) | Place sources and profiles in space and time | Accepted |
+| [0037](0037-license-the-project-for-non-commercial-use-only.md) | License the project for non-commercial use only | Accepted |

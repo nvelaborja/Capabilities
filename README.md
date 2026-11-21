@@ -1,7 +1,7 @@
 # Capabilities
 A tool to help understand what was possible, and when.
 
-Capabilities is an open knowledge graph of what it physically takes to make things and do things: materials, tools, actions, and conditions like temperature, hardness, and toughness. It answers three questions:
+Capabilities is a free knowledge graph of what it physically takes to make things and do things: materials, tools, actions, and conditions like temperature, hardness, and toughness. It answers three questions:
 
 1. **What would it take?** What would it take to produce steel, or cut granite?
 2. **What else could they do?** If a group made or did these things, what else was within their reach? What would one more ingredient unlock?
@@ -90,9 +90,13 @@ docs/              data format, reasoning rules, and design decisions (docs/adr/
 
 ## Contributing data
 
-Every route must cite at least one source, and every number should say how it was obtained (measured, derived, estimated, or unknown). Unknown is fine; guessing is not. Search the data for `TODO-source` to find claims that still need sources, and run `uv run capabilities validate` before opening a pull request.
+Every route must cite at least one source, and every number should say how it was obtained (measured, derived, estimated, or unknown). Unknown is fine; guessing is not. Search the data for `TODO-source` to find claims that still need sources, and run `uv run capabilities validate` before opening a pull request. If you add or change a citation, run `uv run capabilities credits` to update [CREDITS.md](CREDITS.md). Contributions are accepted under the project's licenses.
 
 ## License
 
-- **Code** (everything outside `data/`): [GNU GPL v3.0 or later](LICENSE).
-- **Data** (`data/`): [Creative Commons Attribution 4.0 International (CC BY 4.0)](data/LICENSE). You can reuse and adapt it for any purpose, including in research and publications, as long as you credit the Capabilities project.
+Capabilities is free to use, study, change and share for any **non-commercial** purpose: personal use, research, teaching, and use by charities, schools, public bodies and similar organizations. Commercial use is not allowed. Because of that, it is source-available rather than "open source" in the strict sense ([ADR 0037](docs/adr/0037-license-the-project-for-non-commercial-use-only.md)).
+
+- **Code** (everything outside `data/`): [PolyForm Noncommercial License 1.0.0](LICENSE).
+- **Data** (`data/`, and any graph built from it): [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)](data/LICENSE). You can reuse and adapt it for non-commercial work, including research and publications, as long as you credit the Capabilities project and share adaptations under the same license.
+
+[CREDITS.md](CREDITS.md) lists the datasets, published works, software and design research the project builds on, with their licenses.
