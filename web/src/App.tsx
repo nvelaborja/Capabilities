@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useReducer, useState } from "react";
 
 import { api } from "./api/client";
 import type { GraphResponse, Profile } from "./api/types";
@@ -22,6 +22,9 @@ import { useExplore } from "./state/useExplore";
 import { usePresetItems } from "./state/usePresetItems";
 import { useSelectionHistory } from "./state/useSelectionHistory";
 
+// MapLibre is large, so the map loads only when it is first opened.
+const MapView = lazy(() => import("./map/MapView").then((module) => ({ default: module.MapView })));
+
 type Loaded<T> = { status: "loading" } | { status: "ready"; value: T } | { status: "failed"; error: string };
 
 /** Actions in the link that the graph doesn't draw by default ("cut:limestone") are drawn from the start. */
@@ -42,6 +45,8 @@ export function App() {
   const [trail, navigate] = useReducer(trailReducer, []);
   const [centerSeq, setCenterSeq] = useState({ center: false, seq: 0 });
   const [isolated, setIsolated] = useState<string | null>(null);
+  // The material or source shown on the map in place of the graph, if any.
+  const [mapped, setMapped] = useState<string | null>(null);
   // undefined: no confirmation pending. null or an id: the preset waiting to replace an edited selection.
   const [pendingPreset, setPendingPreset] = useState<string | null | undefined>(undefined);
 
@@ -149,10 +154,18 @@ export function App() {
           onAdd={add}
           onRemove={remove}
           onIsolate={setIsolated}
+          mapped={mapped}
+          onShowMap={setMapped}
         />
       )}
       <main className="app-graph">
-        {loaded && (
+        {mapped && (
+          <Suspense fallback={<p className="notice">Loading the map…</p>}>
+            {/* Keyed by id, so each material's map starts from "loading". */}
+            <MapView key={mapped} id={mapped} theme={theme} onClose={() => setMapped(null)} />
+          </Suspense>
+        )}
+        {loaded && !mapped && (
           <GraphView
             graph={loaded}
             explore={explore.data}

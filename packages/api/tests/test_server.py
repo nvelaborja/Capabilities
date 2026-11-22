@@ -116,3 +116,35 @@ class TestWebUi:
         page = client.get("/")
         assert page.status_code == 200
         assert "npm run build" in page.text
+
+
+class TestOccurrences:
+    @pytest.fixture(scope="class")
+    def mapped(self, repo_root, mrds_built_dir, tmp_path_factory) -> TestClient:
+        """A server on a build with the 14-record MRDS sample."""
+        return TestClient(create_app(repo_root, web_dist=tmp_path_factory.mktemp("no-web-build"), build_dir=mrds_built_dir))
+
+    def test_a_materials_places_are_the_occurrences_of_its_sources_as_geojson(self, mapped):
+        body = mapped.get("/api/occurrences/hematite").json()
+        assert body["sources"] == [{
+            "id": "hematite-deposit", "label": "Hematite deposit", "availability": "regional",
+            "regions": body["sources"][0]["regions"], "places": 3, "worked": 1,
+        }]
+        records = {f["properties"]["record_id"]: f for f in body["features"]["features"]}
+        assert set(records) == {"10001442", "10003682", "10008106"}
+        assert records["10008106"]["geometry"] == {"type": "Point", "coordinates": [-106.26, 39.24]}
+        assert records["10008106"]["properties"]["worked_by_year"] == 1860
+        assert body["datasets"][0]["id"] == "mrds"
+
+    def test_large_answers_are_compressed(self, mapped):
+        response = mapped.get("/api/occurrences/hematite", headers={"Accept-Encoding": "gzip"})
+        assert response.headers["content-encoding"] == "gzip"
+
+    def test_without_a_snapshot_a_material_has_sources_but_no_places(self, client):
+        body = client.get("/api/occurrences/hematite").json()
+        assert body["sources"][0]["places"] == 0
+        assert body["features"]["features"] == []
+        assert body["datasets"] == []
+
+    def test_only_materials_and_sources_have_places(self, client):
+        assert client.get("/api/occurrences/copper-saw").status_code == 404

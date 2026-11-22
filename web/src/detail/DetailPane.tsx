@@ -18,6 +18,9 @@ interface DetailPaneProps {
   onAdd: (id: string) => void;
   onRemove: (id: string) => void;
   onIsolate: (id: string | null) => void;
+  /** The material or source on the map, if the map is showing. */
+  mapped: string | null;
+  onShowMap: (id: string | null) => void;
 }
 
 /** The pane under the graph (ADR 0025): a node or a line, whichever was clicked last. */
@@ -56,6 +59,8 @@ export function DetailPane(props: DetailPaneProps) {
           onAdd={props.onAdd}
           onRemove={props.onRemove}
           onIsolate={props.onIsolate}
+          mapped={props.mapped}
+          onShowMap={props.onShowMap}
         />
       );
   }

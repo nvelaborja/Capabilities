@@ -223,3 +223,56 @@ export interface ExplainRequest extends SelectionRequest {
   node: string;
   all?: boolean;
 }
+
+// ---------------------------------------------------------------- /api/occurrences/{id}
+
+/** Worked: known to have been worked by a year. Present: there, with no known working date (ADR 0041). */
+export type OccurrenceState = "worked" | "present";
+
+export interface PlaceProperties {
+  id: string;
+  source_id: string;
+  name: string | null;
+  country: string | null;
+  admin_area: string | null;
+  development_status: string | null;
+  deposit_type: string | null;
+  worked_by_year: number | null;
+  state: OccurrenceState;
+  record_id: string;
+  url: string | null;
+}
+
+export interface PlaceFeature {
+  type: "Feature";
+  geometry: { type: "Point"; coordinates: [number, number] };
+  properties: PlaceProperties;
+}
+
+export interface SourceSummary {
+  id: string;
+  label: string;
+  availability?: "ubiquitous" | "regional" | null;
+  regions: string[];
+  /** How many places are mapped, and how many of those are known to have been worked. */
+  places: number;
+  worked: number;
+}
+
+export interface PlaceDataset {
+  id: string;
+  label: string;
+  home: string | null;
+  retrieved_at: string | null;
+  license: string | null;
+}
+
+export interface OccurrencesResponse {
+  id: string;
+  label: string;
+  kind: "material" | "source";
+  origin?: "natural" | "extracted" | "produced" | null;
+  sources: SourceSummary[];
+  datasets: PlaceDataset[];
+  features: { type: "FeatureCollection"; features: PlaceFeature[] };
+}

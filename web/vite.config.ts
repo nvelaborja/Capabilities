@@ -12,8 +12,9 @@ export default defineConfig({
   build: {
     outDir: "dist",
     emptyOutDir: true,
-    // Cytoscape alone is about 400 kB. One bundle is fine for a page served locally; revisit when hosted.
-    chunkSizeWarningLimit: 900,
+    // Cytoscape alone is about 400 kB, and MapLibre (loaded only when the map opens) about 1 MB. Fine for a page served
+    // locally; revisit when hosted.
+    chunkSizeWarningLimit: 1100,
   },
   test: {
     environment: "node",
