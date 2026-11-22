@@ -1,0 +1,84 @@
+# Architecture overview
+
+Capabilities is a knowledge graph of what it physically takes to make and do things, plus a reasoner that answers three questions about it: what would it take (Q1), what else could a group do (Q2), and could a job have been done a certain way (Q3). This page explains how the pieces fit together. The diagrams are at `/architecture/` when the app is running (see [README](README.md)); the master diagram is the `index` view.
+
+## The big picture
+
+```
+ curated layer            pipeline                         built graph              app
+ (YAML in git)   ──▶  loader ──▶ DuckDB ──▶ dbt   ──▶  Parquet + manifest  ──▶  core library ──▶ API server ──▶ browser
+ data/, schema/        (Python)  (warehouse) (models,      (build/graph/)         (reasoner)       (FastAPI)       (React)
+                                             tests)
+```
+
+Data flows one way, left to right. People edit the **curated layer**. The **pipeline** turns it into the **built graph**. The **core library** loads the built graph into memory and reasons over it. The **API server** exposes that reasoning as JSON and hosts the **web app**, which draws the graph.
+
+## The parts
+
+| Part | Where | Technology | What it does |
+|---|---|---|---|
+| Curated layer | `data/`, `examples/jobs/`, `schema/` | [YAML and JSON Schema](technologies/yaml-and-json-schema.md) | The facts people write and review: things, routes, verbs, quantities, profiles and example jobs, one file per node, each checked against a schema. |
+| Pipeline | `pipeline/` | [Python](technologies/python-and-uv.md), [DuckDB](technologies/duckdb.md), [dbt](technologies/dbt.md) | Builds the graph. A Python loader puts every curated document into a DuckDB table; a dbt project transforms and tests it, and writes the result as [Parquet](technologies/parquet.md). |
+| Built graph | `build/graph/` (generated) | [Parquet](technologies/parquet.md), JSON | The artifact the app reads: one row per node, plus a manifest saying which inputs it was built from ([ADR 0038](../adr/0038-serve-the-app-from-a-built-graph-artifact.md)). |
+| Core library | `packages/core/` | [Python](technologies/python-and-uv.md) | The in-memory graph, the reasoner (Q1–Q3, tech levels, display shapes), the validator, and the `capabilities` command-line tool. |
+| API server | `packages/api/` | [FastAPI](technologies/fastapi.md) | JSON endpoints under `/api`, interactive docs at `/docs`, and static hosting for the web app at `/` and these diagrams at `/architecture/`. |
+| Web app | `web/` | [React, TypeScript, Vite, Cytoscape.js](technologies/react-vite-and-cytoscape.md) | The interactive graph, selection panes and detail pane. |
+| Architecture docs | `docs/architecture/` | [LikeC4](technologies/likec4.md) | These pages and the diagrams, built into a static site served by the API server. |
+| CI | `.github/workflows/ci.yml` | [GitHub Actions](technologies/github-actions.md) | On every pull request: validate the data, build the graph, run every test, lint, type-check and build the web app and diagrams. |
+
+## How a question travels
+
+Take "what else could Middle Kingdom Egypt do?" (Q2) in the browser:
+
+1. **Browser.** Choosing the preset updates the selection. The web app sends `POST /api/explore` with `{"profile": "middle-kingdom-egypt"}`.
+2. **API server.** FastAPI validates the request body against a Pydantic model and calls the reasoner. The server loaded the built graph once, at start-up.
+3. **Reasoner.** It computes what the selection implies (what it must have needed), what becomes reachable (repeatedly adding everything whose requirements are met until nothing changes, a *fixed point*), and what is one raw ingredient away. Ranges are compared with three answers: yes, no, or maybe ([ADR 0007](../adr/0007-compare-ranges-with-three-answers.md)).
+4. **Views.** The result is shaped for display: a status for every node, what implies what, groups for the side panes.
+5. **Browser.** The web app colours each node's border by status and lists the results as chips.
+
+The command line takes the same path without the browser and server: `uv run capabilities explore --profile middle-kingdom-egypt` calls the same reasoner on the same built graph.
+
+## How the graph gets built
+
+`uv run capabilities build` runs the pipeline. The question commands and the server also run it themselves whenever the inputs changed since the last build. Each build:
+
+1. hashes every input (the data, the schemas, and the pipeline's own code) into a *fingerprint*;
+2. loads every curated document, whole, into `raw.curated_documents` in a DuckDB file;
+3. runs `dbt build`: a staging view pulls the common fields out of each document, a mart adds provenance and writes `graph_nodes.parquet`, and data tests check the results along the way;
+4. writes `manifest.json` last, with the fingerprint. A build is *current* when its fingerprint matches the inputs on disk.
+
+The [data pipeline reference](data-pipeline.md) has every detail.
+
+## Key design decisions
+
+The [ADRs](../adr/README.md) record every significant decision. The ones that shape the architecture:
+
+| Decision | ADR |
+|---|---|
+| The graph is an AND/OR graph: a thing can be made by any of several routes (OR), each needing all of its requirements (AND), with quantity conditions. | [0002](../adr/0002-model-capabilities-as-an-and-or-graph.md) |
+| Missing data gives "maybe", never "no". | [0007](../adr/0007-compare-ranges-with-three-answers.md) |
+| Python for the reasoner, CLI and server; React and Cytoscape.js for the web. | [0013](../adr/0013-use-python-for-the-reasoner-cli-and-server.md), [0015](../adr/0015-build-the-web-front-end-with-react-and-cytoscape.md) |
+| A Python data platform around the graph, deliberately broader than the data needs, as a learning project. | [0033](../adr/0033-build-a-python-data-platform-around-the-graph.md) |
+| The graph is a built product: upstream datasets plus a curated layer, every fact with provenance. | [0034](../adr/0034-build-the-graph-from-upstream-datasets-and-a-curated-layer.md) |
+| The app reads a built artifact (Parquet and a manifest), rebuilt when its inputs change. | [0038](../adr/0038-serve-the-app-from-a-built-graph-artifact.md) |
+| Architecture docs and diagrams are updated with every change. | [0039](../adr/0039-keep-architecture-docs-and-diagrams-current.md) |
+
+## Repository layout
+
+```
+schema/              JSON Schemas for every data file type
+data/                the curated layer: quantities, things, verbs, routes, profiles
+examples/            example jobs (Q3) and worked results the tests check
+packages/core/       `capabilities`: graph, reasoner, validator, CLI, and their tests
+packages/api/        `capabilities_api`: the FastAPI server, and its tests
+pipeline/            `capabilities_pipeline`: the build (src/), the dbt project (dbt/), and their tests
+web/                 the web app; `npm run build` also builds the diagrams into web/dist/architecture
+docs/                data format, ADRs, and these architecture docs
+build/               generated: warehouse, built graph, dbt logs (not in git)
+```
+
+The Python code is a [uv workspace](technologies/python-and-uv.md): three packages in one repository, installed together by `uv sync`. Packages depend on each other, never in a cycle: `api` and `pipeline` depend on `core`, and `core` imports the pipeline only when it needs to rebuild.
+
+## What comes next
+
+The [data platform plan](../adr/0033-build-a-python-data-platform-around-the-graph.md) adds, milestone by milestone: upstream datasets and Dagster for orchestration (M1), citation checks (M2), AI agents that propose curated facts (M3), places and dates for sources and profiles (M4), Apache Iceberg tables with an Apache Polaris catalog (M5), Kubernetes (M6) and Kafka for usage events (M7). Each one updates this page, the diagrams, and adds a technology page.

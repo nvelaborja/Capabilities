@@ -10,12 +10,15 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "tsc && vite build && npm run diagrams:build",
     "preview": "vite preview",
     "typecheck": "tsc",
     "lint": "eslint .",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "diagrams": "likec4 start ../docs/architecture/diagrams",
+    "diagrams:check": "likec4 validate ../docs/architecture/diagrams",
+    "diagrams:build": "likec4 build ../docs/architecture/diagrams -o dist/architecture --base /architecture/ --use-hash-history --title \"Capabilities architecture\""
   },
   "dependencies": {
     "cytoscape": "^3.34.4",
@@ -30,6 +33,7 @@
     "eslint": "^10.14.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.14.0",
+    "likec4": "1.61.0",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.72.1",
     "vite": "^8.3.6",

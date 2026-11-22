@@ -1,0 +1,135 @@
+// The architecture of Capabilities as it is today. Every pull request that changes it updates this model (ADR 0039).
+model {
+
+  explorer = actor 'Explorer' {
+    description 'Anyone asking what it takes to make or do something, what else a group could do, or whether a job was feasible.'
+  }
+
+  contributor = actor 'Contributor' {
+    description 'Adds and corrects data and code through pull requests.'
+  }
+
+  github = external 'GitHub' {
+    description 'Hosts the repository and pull requests, and runs CI (GitHub Actions): validate, build the graph, tests, lint and the web build.'
+  }
+
+  capabilities = system 'Capabilities' {
+    description 'A free, non-commercial knowledge graph of what it physically takes to make and do things, with a reasoner that answers three questions.'
+
+    curated = store 'Curated layer' {
+      technology 'YAML files in git, checked by JSON Schema'
+      description 'data/ (things, routes, verbs, quantities, profiles), examples/jobs/ and schema/. Written by people, reviewed in pull requests.'
+    }
+
+    pipeline = container 'Pipeline' {
+      technology 'Python, dbt Core, dbt-duckdb'
+      description 'pipeline/: builds the graph from its inputs. `capabilities build`.'
+
+      loader = component 'Loader' {
+        technology 'Python (capabilities_pipeline.build)'
+        description 'Reads every curated document and loads it, whole, into a raw DuckDB table. Writes the manifest last.'
+      }
+      dbt = component 'dbt project' {
+        technology 'dbt Core with the DuckDB adapter'
+        description 'pipeline/dbt: sources, staging views and marts, with data tests. Marts are written as Parquet.'
+      }
+    }
+
+    warehouse = store 'Warehouse' {
+      #generated
+      technology 'DuckDB (build/warehouse.duckdb)'
+      description 'Where the build stages and transforms data. Generated; not in git.'
+
+      rawDocuments = table 'raw.curated_documents' {
+        description 'One row per curated document: ordinal, node_type, id, document (JSON), path.'
+      }
+      stgDocuments = table 'stg_curated__documents' {
+        technology 'dbt view'
+        description 'Common fields (kind, label) pulled out of each document.'
+      }
+    }
+
+    artifact = store 'Built graph' {
+      #generated
+      technology 'Parquet and JSON (build/graph/)'
+      description 'What the app reads (ADR 0038). Generated; not in git.'
+
+      graphNodes = file 'graph_nodes.parquet' {
+        technology 'dbt mart, external materialization'
+        description 'Every node: type, id, kind, label, full document, provenance, and read order.'
+      }
+      manifest = file 'manifest.json' {
+        description 'Format version, input fingerprint, build time, git commit, row counts. A build is current when its fingerprint matches the inputs.'
+      }
+    }
+
+    core = container 'Core library' {
+      technology 'Python package `capabilities`'
+      description 'packages/core: the in-memory graph, reasoner, validator and the `capabilities` CLI.'
+
+      built = component 'Built-graph reader' {
+        technology 'capabilities.built'
+        description 'Checks the fingerprint, rebuilds when stale, and loads the built graph into memory.'
+      }
+      reasoner = component 'Reasoner' {
+        technology 'capabilities.reasoner, levels, views'
+        description 'Answers Q1 (what would it take), Q2 (what else) and Q3 (could it be done), and shapes results for the UI.'
+      }
+      validator = component 'Validator' {
+        technology 'capabilities.validate, jsonschema'
+        description 'Checks every curated file against its schema and every cross-reference.'
+      }
+      cli = component 'CLI' {
+        technology 'argparse (`capabilities`)'
+        description 'validate, build, need, explore, check, credits, serve.'
+      }
+    }
+
+    api = container 'API server' {
+      technology 'FastAPI, Uvicorn'
+      description 'packages/api: the JSON API under /api, and hosts the web app at / and these diagrams at /architecture/.'
+    }
+
+    web = container 'Web app' {
+      technology 'React, TypeScript, Vite, Cytoscape.js'
+      description 'web/: the graph, selection panes and detail pane, built to web/dist.'
+    }
+
+    diagrams = container 'Architecture diagrams' {
+      technology 'LikeC4'
+      description 'docs/architecture/diagrams, built into a static site by `npm run build` in web/.'
+    }
+  }
+
+  // People and outside systems
+  explorer -> capabilities.web 'explores the graph in a browser'
+  explorer -> capabilities.diagrams 'reads how it is built'
+  contributor -> capabilities.curated 'edits data through pull requests'
+  contributor -> capabilities.core.cli 'validates, builds and asks questions'
+  github -> capabilities 'runs CI on every pull request'
+
+  // Serving
+  capabilities.web -> capabilities.api 'calls /api (JSON over HTTP)'
+  capabilities.api -> capabilities.web 'hosts the built app'
+  capabilities.api -> capabilities.diagrams 'hosts at /architecture/'
+  capabilities.api -> capabilities.core.reasoner 'asks the three questions'
+  capabilities.api -> capabilities.core.built 'loads the graph at start-up'
+  capabilities.core.cli -> capabilities.core.reasoner 'asks the three questions'
+  capabilities.core.cli -> capabilities.core.built 'loads the graph'
+  capabilities.core.cli -> capabilities.core.validator 'validate'
+  capabilities.core.validator -> capabilities.curated 'checks every file'
+
+  // Building the graph
+  capabilities.core.built -> capabilities.pipeline.loader 'rebuilds when the inputs changed'
+  capabilities.core.built -> capabilities.artifact.manifest 'compares fingerprints'
+  capabilities.core.built -> capabilities.artifact.graphNodes 'reads every node'
+  capabilities.pipeline.loader -> capabilities.curated 'reads every document'
+  capabilities.pipeline.loader -> capabilities.warehouse.rawDocuments 'loads documents, whole'
+  capabilities.pipeline.loader -> capabilities.pipeline.dbt 'runs dbt build'
+  capabilities.pipeline.loader -> capabilities.artifact.manifest 'writes it last'
+  capabilities.pipeline.dbt -> capabilities.warehouse.rawDocuments 'source, with data tests'
+  capabilities.pipeline.dbt -> capabilities.warehouse.stgDocuments 'builds the staging view'
+  capabilities.pipeline.dbt -> capabilities.artifact.graphNodes 'writes the mart as Parquet, with data tests'
+  capabilities.warehouse.rawDocuments -> capabilities.warehouse.stgDocuments 'parsed into columns'
+  capabilities.warehouse.stgDocuments -> capabilities.artifact.graphNodes 'adds provenance'
+}

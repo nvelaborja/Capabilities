@@ -5,7 +5,7 @@ import pytest
 
 from capabilities.graph import Graph
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parent
 
 
 @pytest.fixture(scope="session")
@@ -15,7 +15,17 @@ def repo_root() -> Path:
 
 @pytest.fixture(scope="session")
 def graph() -> Graph:
-    return Graph.load(REPO_ROOT)
+    return Graph.from_curated(REPO_ROOT)
+
+
+@pytest.fixture(scope="session")
+def built_dir(tmp_path_factory) -> Path:
+    """The repository's graph, built once per test run into a temporary directory (never the repo's build/)."""
+    from capabilities.built import run_build
+
+    build_dir = tmp_path_factory.mktemp("build")
+    run_build(REPO_ROOT, build_dir)
+    return build_dir
 
 
 @pytest.fixture

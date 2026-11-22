@@ -1,0 +1,26 @@
+// The diagrams. `index` is the master diagram of the whole project; add to it as the project grows (ADR 0039).
+views {
+
+  view index {
+    title 'Capabilities: the whole project'
+    description 'Everything that exists today: who uses it, the parts of the system, and how data flows from the curated YAML to the browser.'
+    include *
+    include capabilities.*
+    include capabilities.core.*, capabilities.pipeline.*
+    exclude capabilities.core, capabilities.pipeline
+    style capabilities.artifact, capabilities.warehouse {
+      border dashed
+    }
+  }
+
+  view pipeline {
+    title 'The data pipeline'
+    description 'How `capabilities build` turns the curated layer into the built graph the app reads (docs/architecture/data-pipeline.md).'
+    include capabilities.curated
+    include capabilities.pipeline.*
+    include capabilities.warehouse.*
+    include capabilities.artifact.*
+    include capabilities.core.built
+    autoLayout LeftRight
+  }
+}
