@@ -1,6 +1,6 @@
 # 0038. Serve the app from a built graph artifact
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-20
 
 ## Context
