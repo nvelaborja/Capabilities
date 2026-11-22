@@ -11,3 +11,28 @@ models:
         data_tests: [unique, not_null]
       - name: provenance
         data_tests: [not_null]
+  - name: source_occurrences
+    description: >
+      Where each source kind is found: one row per source kind and located upstream record, with a point geometry
+      (build/graph/source_occurrences.parquet, GeoParquet; ADR 0036, ADR 0041).
+    columns:
+      - name: id
+        data_tests: [unique, not_null]
+      - name: source_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('graph_nodes')
+                field: id
+      - name: geometry
+        data_tests: [not_null]
+      - name: state
+        description: worked (known to be worked by worked_by_year) or present (no known working date).
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [worked, present]
+      - name: provenance
+        data_tests: [not_null]

@@ -28,6 +28,7 @@ uv run capabilities explore --profile middle-kingdom-egypt   # Q2
 uv run capabilities check granite-slab-saw-cut --profile middle-kingdom-egypt   # Q3
 uv run capabilities serve        # local API at http://127.0.0.1:8000/docs
 cd pipeline && uv run dg dev     # Dagster UI at http://localhost:3000: the build as assets, lineage, checks, runs
+cd pipeline && uv run dg launch --assets 'upstream/mrds_deposits'   # download an MRDS snapshot (only Dagster downloads)
 ```
 
 Web app (`web/`, React + TypeScript + Cytoscape.js, see [ADR 0015](docs/adr/0015-build-the-web-front-end-with-react-and-cytoscape.md)); needs Node 22+:
@@ -49,10 +50,10 @@ npm run diagrams                 # live preview of the LikeC4 diagrams in docs/a
 - `examples/jobs/`: feasibility-check jobs; `examples/README.md` holds worked results that tests check
 - `packages/core/src/capabilities/`: `graph.py` (the in-memory graph; `Graph.from_curated` reads the YAML), `built.py` (reading the built graph, freshness), `validate.py`, `tristate.py`, `reasoner.py` (the three questions), `levels.py` (tech levels), `views.py` (display-ready shapes for the web UI), `credits.py` (the works cited in CREDITS.md), `cli.py`
 - `packages/api/src/capabilities_api/server.py`: the API under `/api`, which also hosts the web app
-- `pipeline/`: `src/capabilities_pipeline/build.py` (loads the curated layer into DuckDB, runs dbt, writes the manifest), `assets.py` and `definitions.py` (the same steps as Dagster assets; `[tool.dg]` in `pipeline/pyproject.toml`) and `dbt/` (sources, staging, marts written as Parquet). See [ADR 0038](docs/adr/0038-serve-the-app-from-a-built-graph-artifact.md) and [ADR 0040](docs/adr/0040-orchestrate-the-build-with-dagster.md)
+- `pipeline/`: `src/capabilities_pipeline/build.py` (loads the curated layer, crosswalks and upstream snapshots into DuckDB, runs dbt, writes the manifest), `upstream.py` (downloading and loading upstream snapshots), `assets.py` and `definitions.py` (the same steps as Dagster assets, plus downloads; `[tool.dg]` in `pipeline/pyproject.toml`) and `dbt/` (sources, staging, marts written as Parquet, singular tests in `tests/`). See [ADR 0038](docs/adr/0038-serve-the-app-from-a-built-graph-artifact.md), [ADR 0040](docs/adr/0040-orchestrate-the-build-with-dagster.md) and [ADR 0041](docs/adr/0041-place-sources-with-mrds-deposits-through-a-crosswalk.md)
 - `web/src/`: `api/` (typed client), `graph/` (Cytoscape elements, styles, statuses, tech-tree layout, focus mode, hiding busy nodes' extra lines), `detail/` (detail pane for nodes and lines: route checklists, drill-down, expand-all dialog), `chips/` (node-like chips used in every list), `panes/` (side pane, lists, dialog), `search/`, `lib/bounded.ts` (top N, the rest summarised by type), `layout/` (resizable panes), `legend/`, `state/` (selection history and links, explore and explain hooks, breadcrumb trail, theme), `catalog.ts` (labels for any id)
 - Tests live beside each package (`packages/*/tests`, `pipeline/tests`); shared fixtures are in the root `conftest.py`
-- `build/`: generated (warehouse, built graph, dbt logs); never commit it
+- `build/`: generated (upstream snapshots, warehouse, built graph, dbt logs); never commit it
 - `docs/`: `architecture/` (overview, data pipeline, technology guides, LikeC4 diagrams), data format, reasoning rules, and ADRs
 
 ## Architecture docs
@@ -69,6 +70,7 @@ npm run diagrams                 # live preview of the LikeC4 diagrams in docs/a
 - Missing data must produce "maybe", never "no" ([ADR 0007](docs/adr/0007-compare-ranges-with-three-answers.md)).
 - A natural resource that takes tools to get (timber, quarried stone, mined ore) is `origin: extracted`, with a `source` saying where it is found and a cited extraction route. Only materials gathered by hand as they are stay `origin: natural` ([ADR 0032](docs/adr/0032-extract-materials-from-sources-by-routes.md)).
 - The YAML in `data/` is the curated layer; the app reads the graph built from it ([ADR 0034](docs/adr/0034-build-the-graph-from-upstream-datasets-and-a-curated-layer.md), [ADR 0038](docs/adr/0038-serve-the-app-from-a-built-graph-artifact.md)). Every fact must have provenance: curated facts cite references (above); upstream facts, from milestone 1, carry their dataset and record. Never edit upstream sources, override them in the curated layer instead.
+- Crosswalks (`data/crosswalks/*.csv`) match upstream records to our ids. Add a match only when it is defensible and say why in `notes`; leave a source unmapped rather than guess ([ADR 0041](docs/adr/0041-place-sources-with-mrds-deposits-through-a-crosswalk.md)).
 - If you change data that the worked examples depend on, update `examples/README.md` and the tests that check it.
 
 ## Code conventions

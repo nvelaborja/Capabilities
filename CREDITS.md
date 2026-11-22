@@ -6,12 +6,12 @@ The project itself is free for non-commercial use: the code under the [PolyForm 
 
 ## Datasets
 
-The upstream datasets the graph is built from ([ADR 0034](docs/adr/0034-build-the-graph-from-upstream-datasets-and-a-curated-layer.md)). None is ingested yet; each row says what it will be used for. Licenses were checked on 2026-11-20. Before a new dataset is ingested, it gets a row here.
+The upstream datasets the graph is built from ([ADR 0034](docs/adr/0034-build-the-graph-from-upstream-datasets-and-a-curated-layer.md)). USGS MRDS is ingested (since 2026-11-22); the others are not yet, and each row says what it will be used for. Licenses were checked on 2026-11-20. Before a new dataset is ingested, it gets a row here.
 
 | Dataset | Used for | License | Credit |
 |---|---|---|---|
 | [Wikidata](https://www.wikidata.org/) | Materials and minerals, their properties, and links to other datasets | CC0 1.0 | Wikidata contributors |
-| [USGS Mineral Resources Data System (MRDS)](https://mrdata.usgs.gov/mrds/) | Mineral deposits and their locations | US public domain | U.S. Geological Survey |
+| [USGS Mineral Resources Data System (MRDS)](https://mrdata.usgs.gov/mrds/) | Mineral deposits and their locations: where our sources (hematite, malachite and native copper deposits, tin and diamond gravels, flint, granite and limestone) are found ([ADR 0041](docs/adr/0041-place-sources-with-mrds-deposits-through-a-crosswalk.md)) | US public domain (its metadata lists no use constraints) | U.S. Geological Survey, 2005, Mineral Resources Data System: U.S. Geological Survey, Reston, Virginia. Snapshot of `mrds-csv.zip` (last changed 2022-08-23) retrieved 2026-11-22 |
 | [Pleiades](https://pleiades.stoa.org/) | Ancient places, and the periods they are attested in | CC BY 3.0 | Pleiades contributors; cite the numbered release used |
 | [Cliopatria](https://github.com/Seshat-Global-History-Databank/cliopatria) | Borders of past polities over time | CC BY 4.0 | Seshat: Global History Databank. Paper: [Scientific Data (2025), doi:10.1038/s41597-025-04516-9](https://doi.org/10.1038/s41597-025-04516-9) |
 | [Seshat: Global History Databank](https://seshat-db.com/) | Comparing the reasoner with what past societies had | CC BY-NC-SA | Seshat: Global History Databank. TODO: add the exact attribution line Seshat asks for when the data is ingested |
@@ -70,7 +70,7 @@ The references behind routes, materials and numbers. A status of *unverified* me
 
 ## Software
 
-Direct dependencies. Each brings its own dependencies, all under permissive licenses (MIT, BSD, Apache-2.0, ISC, MPL-2.0, PSF, BlueOak) as of 2026-11-22, with one exception: dbt pulls in `text-unidecode`, which is dual-licensed under the Artistic License or GPL-2.0-or-later, and which we use under the Artistic License. It is installed for local builds only and never shipped with the project.
+Direct dependencies. Each brings its own dependencies, all under permissive licenses (MIT, BSD, Apache-2.0, ISC, MPL-2.0, PSF, BlueOak) as of 2026-11-22, with one exception: dbt pulls in `text-unidecode`, which is dual-licensed under the Artistic License or GPL-2.0-or-later, and which we use under the Artistic License. It is installed for local builds only and never shipped with the project. DuckDB's spatial extension (MIT) statically links GEOS (LGPL-2.1), PROJ (MIT) and GDAL (MIT-style); DuckDB downloads it on each machine that builds the graph, and the project never redistributes it.
 
 | Software | Used for | License |
 |---|---|---|
@@ -80,6 +80,7 @@ Direct dependencies. Each brings its own dependencies, all under permissive lice
 | [Uvicorn](https://uvicorn.dev/) | Serving the API | BSD-3-Clause |
 | [Pydantic](https://docs.pydantic.dev/) | API models | MIT |
 | [DuckDB](https://duckdb.org/) | The build's warehouse, and reading the built graph | MIT |
+| [DuckDB spatial extension](https://github.com/duckdb/duckdb-spatial), with [GEOS](https://libgeos.org/), [PROJ](https://proj.org/) and [GDAL](https://gdal.org/) | Point geometries for where sources are found, written as GeoParquet (ADR 0041) | MIT; GEOS LGPL-2.1, PROJ MIT, GDAL MIT-style |
 | [dbt Core](https://github.com/dbt-labs/dbt-core) and [dbt-duckdb](https://github.com/duckdb/dbt-duckdb) | Building the graph from its inputs (ADR 0038) | Apache-2.0 |
 | [Dagster](https://github.com/dagster-io/dagster), with dagster-dbt, dagster-webserver and the `dg` CLI | Orchestrating the build as assets (ADR 0040) | Apache-2.0 |
 | [React](https://react.dev/) | The web app | MIT |

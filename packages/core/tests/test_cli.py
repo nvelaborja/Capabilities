@@ -30,6 +30,13 @@ class TestCli:
         assert main(["--root", str(repo_root), "--build-dir", str(built_dir), "check", "granite-slab-saw-cut", "--profile", "middle-kingdom-egypt"]) == 0
         assert "500–1,667 hours" in capsys.readouterr().out
 
+    def test_build_reports_nodes_and_occurrences_separately(self, repo_root, tmp_path, capsys):
+        assert main(["--root", str(repo_root), "--build-dir", str(tmp_path / "build"), "build"]) == 0
+        output = capsys.readouterr().out
+        # No snapshot has been downloaded into a new build directory, so there are no occurrences.
+        assert " nodes and 0 source occurrences" in output
+        assert "upstream datasets: none downloaded" in output
+
     @pytest.mark.parametrize(
         "args",
         [

@@ -6,20 +6,23 @@ Capabilities is a knowledge graph of what it physically takes to make and do thi
 
 ```
  curated layer            pipeline                         built graph              app
- (YAML in git)   ──▶  loader ──▶ DuckDB ──▶ dbt   ──▶  Parquet + manifest  ──▶  core library ──▶ API server ──▶ browser
- data/, schema/        (Python)  (warehouse) (models,      (build/graph/)         (reasoner)       (FastAPI)       (React)
-                                             tests)
+ (YAML, CSV in git) ─┐
+ data/, schema/      ├▶ loader ──▶ DuckDB ──▶ dbt   ──▶  Parquet + manifest  ──▶  core library ──▶ API server ──▶ browser
+ upstream datasets ──┘  (Python)  (warehouse) (models,      (build/graph/)         (reasoner)       (FastAPI)       (React)
+ (MRDS, downloaded                            tests)
+  by Dagster)
 ```
 
-Data flows one way, left to right. People edit the **curated layer**. The **pipeline** turns it into the **built graph**. The **core library** loads the built graph into memory and reasons over it. The **API server** exposes that reasoning as JSON and hosts the **web app**, which draws the graph.
+Data flows one way, left to right. People edit the **curated layer**; **upstream datasets** are downloaded as snapshots. The **pipeline** turns them into the **built graph**. The **core library** loads the built graph into memory and reasons over it. The **API server** exposes that reasoning as JSON and hosts the **web app**, which draws the graph.
 
 ## The parts
 
 | Part | Where | Technology | What it does |
 |---|---|---|---|
-| Curated layer | `data/`, `examples/jobs/`, `schema/` | [YAML and JSON Schema](technologies/yaml-and-json-schema.md) | The facts people write and review: things, routes, verbs, quantities, profiles and example jobs, one file per node, each checked against a schema. |
-| Pipeline | `pipeline/` | [Python](technologies/python-and-uv.md), [DuckDB](technologies/duckdb.md), [dbt](technologies/dbt.md), [Dagster](technologies/dagster.md) | Builds the graph. A Python loader puts every curated document into a DuckDB table; a dbt project transforms and tests it, and writes the result as [Parquet](technologies/parquet.md). Dagster runs the same steps as assets, with lineage, checks and run history. |
-| Built graph | `build/graph/` (generated) | [Parquet](technologies/parquet.md), JSON | The artifact the app reads: one row per node, plus a manifest saying which inputs it was built from ([ADR 0038](../adr/0038-serve-the-app-from-a-built-graph-artifact.md)). |
+| Curated layer | `data/`, `examples/jobs/`, `schema/` | [YAML and JSON Schema](technologies/yaml-and-json-schema.md), CSV | The facts people write and review: things, routes, verbs, quantities, profiles and example jobs, one file per node, each checked against a schema; and crosswalks, CSV tables matching upstream records to our ids. |
+| Upstream datasets | `build/upstream/` (downloaded) | [Parquet](technologies/parquet.md) | Snapshots of public datasets, each recorded with where and when it was retrieved, its hash and its license. Today: USGS MRDS mineral deposits ([ADR 0041](../adr/0041-place-sources-with-mrds-deposits-through-a-crosswalk.md)). |
+| Pipeline | `pipeline/` | [Python](technologies/python-and-uv.md), [DuckDB](technologies/duckdb.md), [dbt](technologies/dbt.md), [Dagster](technologies/dagster.md) | Builds the graph. A Python loader puts every curated document, crosswalk and upstream snapshot into DuckDB tables; a dbt project transforms and tests them, and writes the results as [Parquet](technologies/parquet.md), using [DuckDB's spatial extension](technologies/duckdb-spatial-and-geoparquet.md) for locations. Dagster downloads the upstream snapshots and runs the same steps as assets, with lineage, checks and run history. |
+| Built graph | `build/graph/` (generated) | [Parquet](technologies/parquet.md), [GeoParquet](technologies/duckdb-spatial-and-geoparquet.md), JSON | The artifact the app reads: one row per node, where each source kind is found (occurrences, with point geometries), and a manifest saying which inputs it was built from ([ADR 0038](../adr/0038-serve-the-app-from-a-built-graph-artifact.md)). |
 | Core library | `packages/core/` | [Python](technologies/python-and-uv.md) | The in-memory graph, the reasoner (Q1–Q3, tech levels, display shapes), the validator, and the `capabilities` command-line tool. |
 | API server | `packages/api/` | [FastAPI](technologies/fastapi.md) | JSON endpoints under `/api`, interactive docs at `/docs`, and static hosting for the web app at `/` and these diagrams at `/architecture/`. |
 | Web app | `web/` | [React, TypeScript, Vite, Cytoscape.js](technologies/react-vite-and-cytoscape.md) | The interactive graph, selection panes and detail pane. |
@@ -42,11 +45,11 @@ The command line takes the same path without the browser and server: `uv run cap
 
 `uv run capabilities build` runs the pipeline. The question commands and the server also run it themselves whenever the inputs changed since the last build. Each build:
 
-1. loads every curated document, whole, into `raw.curated_documents` in a DuckDB file, with a *fingerprint*: a hash of every input (the data, the schemas, and the pipeline's own code);
-2. runs `dbt build`: a staging view pulls the common fields out of each document, a mart adds provenance and writes `graph_nodes.parquet`, and data tests check the results along the way;
+1. loads every input into raw tables in a DuckDB file: each curated document, whole; each crosswalk; and each upstream snapshot already downloaded. It records a *fingerprint*: a hash of every input (the data, the schemas, the snapshots, and the pipeline's own code);
+2. runs `dbt build`: staging views pull typed columns out of each input; one mart adds provenance and writes `graph_nodes.parquet`, another matches MRDS deposits to our source kinds through the crosswalk and writes `source_occurrences.parquet`; data tests check the results along the way;
 3. writes `manifest.json` last, with that fingerprint. A build is *current* when its fingerprint matches the inputs on disk.
 
-In [Dagster](technologies/dagster.md), the same three steps are assets: `cd pipeline && uv run dg dev` shows their lineage from the YAML to the manifest, runs them, and records every run and check ([ADR 0040](../adr/0040-orchestrate-the-build-with-dagster.md)). The [data pipeline reference](data-pipeline.md) has every detail.
+In [Dagster](technologies/dagster.md), the same three steps are assets, along with the download of each upstream snapshot, which only Dagster does: `cd pipeline && uv run dg dev` shows their lineage from the downloads and the YAML to the manifest, runs them, and records every run and check ([ADR 0040](../adr/0040-orchestrate-the-build-with-dagster.md)). The [data pipeline reference](data-pipeline.md) has every detail.
 
 ## Key design decisions
 
@@ -62,23 +65,25 @@ The [ADRs](../adr/README.md) record every significant decision. The ones that sh
 | The app reads a built artifact (Parquet and a manifest), rebuilt when its inputs change. | [0038](../adr/0038-serve-the-app-from-a-built-graph-artifact.md) |
 | Architecture docs and diagrams are updated with every change. | [0039](../adr/0039-keep-architecture-docs-and-diagrams-current.md) |
 | Dagster orchestrates the build as assets; `capabilities build` runs the same steps without it. | [0040](../adr/0040-orchestrate-the-build-with-dagster.md) |
+| Sources are placed by occurrences in a geospatial layer, not drawn as graph nodes. | [0036](../adr/0036-place-sources-and-profiles-in-space-and-time.md) |
+| MRDS deposits become occurrences of source kinds through a hand-kept crosswalk. | [0041](../adr/0041-place-sources-with-mrds-deposits-through-a-crosswalk.md) |
 
 ## Repository layout
 
 ```
 schema/              JSON Schemas for every data file type
-data/                the curated layer: quantities, things, verbs, routes, profiles
+data/                the curated layer: quantities, things, verbs, routes, profiles, crosswalks
 examples/            example jobs (Q3) and worked results the tests check
 packages/core/       `capabilities`: graph, reasoner, validator, CLI, and their tests
 packages/api/        `capabilities_api`: the FastAPI server, and its tests
 pipeline/            `capabilities_pipeline`: the build and its Dagster assets (src/), the dbt project (dbt/), and their tests
 web/                 the web app; `npm run build` also builds the diagrams into web/dist/architecture
 docs/                data format, ADRs, and these architecture docs
-build/               generated: warehouse, built graph, dbt logs and run folders (not in git)
+build/               generated: upstream snapshots, warehouse, built graph, dbt logs and run folders (not in git)
 ```
 
 The Python code is a [uv workspace](technologies/python-and-uv.md): three packages in one repository, installed together by `uv sync`. Packages depend on each other, never in a cycle: `api` and `pipeline` depend on `core`, and `core` imports the pipeline only when it needs to rebuild.
 
 ## What comes next
 
-The [data platform plan](../adr/0033-build-a-python-data-platform-around-the-graph.md) adds, milestone by milestone: upstream datasets and a map of where materials are found (M1), citation checks (M2), AI agents that propose curated facts (M3), places and dates for sources and profiles (M4), Apache Iceberg tables with an Apache Polaris catalog (M5), Kubernetes (M6) and Kafka for usage events (M7). Each one updates this page, the diagrams, and adds a technology page.
+The [data platform plan](../adr/0033-build-a-python-data-platform-around-the-graph.md) adds, milestone by milestone: the rest of the upstream datasets and a map of where materials are found (M1), citation checks (M2), AI agents that propose curated facts (M3), places and dates for sources and profiles (M4), Apache Iceberg tables with an Apache Polaris catalog (M5), Kubernetes (M6) and Kafka for usage events (M7). Each one updates this page, the diagrams, and adds a technology page.

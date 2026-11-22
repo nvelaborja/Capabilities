@@ -22,7 +22,7 @@ The diagrams are written as code in [LikeC4](technologies/likec4.md) (`diagrams/
 | View | Shows |
 |---|---|
 | `index`: Capabilities, the whole project | The master diagram: people, outside systems, every part of the system, and how data flows between them. |
-| `pipeline`: The data pipeline | How `capabilities build` turns the curated YAML into the built graph the app reads. |
+| `pipeline`: The data pipeline | How `capabilities build`, or Dagster, turns the curated YAML, the crosswalks and upstream snapshots (USGS MRDS) into the built graph the app reads. |
 
 ## Keeping this current
 

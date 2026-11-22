@@ -18,8 +18,10 @@ DuckDB is an analytical SQL database that runs *inside* your program, like SQLit
 
 ## How we use it
 
-- **The build's warehouse.** The pipeline loads every curated document into `raw.curated_documents` in `build/warehouse.duckdb`, and [dbt](dbt.md) runs its models there ([data pipeline](../data-pipeline.md)).
-- **Writing the built graph.** dbt-duckdb writes the `graph_nodes` mart as a [Parquet](parquet.md) file.
+- **The build's warehouse.** The pipeline loads every curated document, crosswalk and upstream snapshot into raw tables in `build/warehouse.duckdb`, and [dbt](dbt.md) runs its models there ([data pipeline](../data-pipeline.md)).
+- **Converting downloads.** An upstream CSV is read with `read_csv(..., all_varchar = true)` and written to Parquet unchanged.
+- **Writing the built graph.** dbt-duckdb writes the `graph_nodes` and `source_occurrences` marts as [Parquet](parquet.md) files.
+- **Geometry.** The spatial extension makes the occurrences' points and writes them as GeoParquet ([DuckDB spatial and GeoParquet](duckdb-spatial-and-geoparquet.md)).
 - **Reading the built graph.** `capabilities.built.load_built` reads `graph_nodes.parquet` with one DuckDB query and parses each document.
 
 Why DuckDB: no server, so `uv sync` is enough for contributors and CI ([ADR 0033](../../adr/0033-build-a-python-data-platform-around-the-graph.md)); it is fast; and it is one of the engines that will read the same Iceberg tables in M5.
@@ -28,7 +30,7 @@ Why DuckDB: no server, so `uv sync` is enough for contributors and CI ([ADR 0033
 
 | What | Where |
 |---|---|
-| Loading raw tables | `pipeline/src/capabilities_pipeline/build.py` (`load_curated`) |
+| Loading raw tables | `pipeline/src/capabilities_pipeline/build.py` (`load_inputs`) and `upstream.py` (`load_upstream`) |
 | Connection for dbt | `pipeline/dbt/profiles.yml` |
 | Reading the artifact | `packages/core/src/capabilities/built.py` (`load_built`) |
 | The warehouse file | `build/warehouse.duckdb` (generated) |
@@ -43,6 +45,8 @@ with duckdb.connect("build/warehouse.duckdb", read_only=True) as con:
 ## Things to know
 
 - DuckDB 2.0 changed the Python relation API: a relation keeps no result between calls, so `fetchone()` is gone. Use `fetchall()`.
+- DuckDB 2.0 also changed lambdas: `list_transform(items, lambda x: trim(x))`. The old arrow form (`x -> trim(x)`) is an error.
+- Comma-separated values in a text column become a list with `string_split(text, ',')`; `list_contains`, `list_filter` and `list_transform` then work on it.
 - Only one process can open a database file for writing at a time. Close connections (`with duckdb.connect(...)`) before dbt runs.
 - `group by all` and `select * exclude (col)` are DuckDB conveniences, not standard SQL.
 

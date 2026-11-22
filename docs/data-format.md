@@ -23,6 +23,7 @@ data/
   verbs/                 parameterized actions: cut, drill, shape, finish (target), move (load)
   routes/                ways to obtain things, produce effects, or perform verbs
   profiles/              curated starting sets (e.g. Middle Kingdom Egypt)
+  crosswalks/            CSV tables matching upstream records to our ids (MRDS deposits to source kinds)
   LICENSE                CC BY-NC-SA 4.0 (the data); the code is PolyForm Noncommercial 1.0.0
 examples/jobs/           concrete tasks for feasibility checks
 src/capabilities/        the Python reasoner, CLI, and local API server
@@ -125,6 +126,27 @@ references:                           # at least one
 ### Profile (`data/profiles/*.yaml`)
 
 A curated set of things a group is known to have made (`{ id: copper-saw }`) or done (`{ verb: cut, target: granite }`), including natural resources they had access to. Each item can carry its own references.
+
+### Crosswalk (`data/crosswalks/*.csv`)
+
+A hand-kept table that matches records in an upstream dataset to our ids ([ADR 0034](adr/0034-build-the-graph-from-upstream-datasets-and-a-curated-layer.md)). It is CSV rather than YAML because it is a table, and the build loads it as written. There is one so far:
+
+`mrds_sources.csv` matches USGS MRDS deposits to source kinds, which places each source on the map ([ADR 0041](adr/0041-place-sources-with-mrds-deposits-through-a-crosswalk.md)):
+
+| Column | Meaning |
+|---|---|
+| `source_id` | A thing with `kind: source` |
+| `field` | `ore` (the deposit's ore minerals) or `commodity` (its commodities) |
+| `value` | The MRDS name to match, as a whole list item, ignoring case (`Hematite`, `Limestone`) |
+| `deposit_type` | Optional: the deposit's type must also contain this (`placer` for tin gravel) |
+| `notes` | Why the match holds |
+
+```csv
+source_id,field,value,deposit_type,notes
+tin-gravel,ore,Cassiterite,placer,"Placers only: tin gravel is stream-sorted cassiterite, not a vein."
+```
+
+A deposit matching a row is an occurrence of that source kind, and one deposit can be an occurrence of several. Leave a source kind out when no rule fits it well: an unmapped source is curation work, but a wrong match puts false places on the map. The build fails if a row names something that isn't a source, or repeats another row.
 
 ### Job (`examples/jobs/*.yaml`)
 

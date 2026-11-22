@@ -22,6 +22,8 @@ dbt (data build tool) turns a folder of SQL `select` statements into a tested, d
 
 **Data tests.** Assertions about the data, declared in YAML beside a model's columns: `unique`, `not_null`, `accepted_values`, `relationships` (every value exists in another model), or any custom SQL query that returns the failing rows. A test passes when it finds no failing rows.
 
+**Seeds.** Small CSV files in the project that dbt loads as tables (`dbt seed`), often used for hand-kept lookup tables. We don't use them; see [Things to know](#things-to-know).
+
 **`dbt build`.** Runs every model, test, seed and snapshot in dependency order. If a test fails, everything downstream of it is skipped, so bad data doesn't flow further.
 
 **Jinja.** SQL files are templates: `{{ ref() }}`, `{{ source() }}`, `{{ config() }}`, `{{ env_var('X') }}`, loops and macros. dbt renders them to plain SQL before running; the compiled SQL is in `target/`.
@@ -32,19 +34,32 @@ dbt (data build tool) turns a folder of SQL `select` statements into a tested, d
 
 ## How we use it
 
-The dbt project in `pipeline/dbt` turns the raw curated documents into the built graph ([data pipeline](../data-pipeline.md)):
+The dbt project in `pipeline/dbt` turns the raw tables into the built graph ([data pipeline](../data-pipeline.md)):
 
 | Layer | Model | Materialization | Does |
 |---|---|---|---|
 | Source | `raw.curated_documents` | (loaded by Python) | Every YAML document, whole, as JSON. |
+| Source | `raw.mrds_sources` | (loaded by Python) | The crosswalk from MRDS deposits to our source kinds, from `data/crosswalks/`. |
+| Source | `raw.mrds_deposits`, `raw.upstream_snapshots` | (loaded by Python) | The MRDS snapshot as text, and where and when it was retrieved. |
 | Staging | `stg_curated__documents` | view | Pulls `kind` and `label` out of each document. |
+| Staging | `stg_mrds__deposits` | view | Types MRDS's columns, and splits its lists of minerals and commodities. |
 | Mart | `graph_nodes` | external Parquet | Adds provenance; written to `build/graph/graph_nodes.parquet`. |
+| Mart | `source_occurrences` | external Parquet | Matches deposits to source kinds through the crosswalk, with point geometries; written to `build/graph/source_occurrences.parquet` ([ADR 0041](../../adr/0041-place-sources-with-mrds-deposits-through-a-crosswalk.md)). |
 
-Tests check that read order and paths are unique, node types are known, kind, label and provenance are present, and ids are unique across every type of node.
+Tests check, among other things:
+
+- read order and paths are unique, and node types are known;
+- kind, label and provenance are present;
+- ids are unique across every type of node;
+- every crosswalk row names a source in the graph;
+- MRDS record ids are unique;
+- every occurrence is a valid point with a known state.
+
+The checks that compare two tables are *singular* tests: SQL files in `pipeline/dbt/tests/` that return the failing rows.
 
 The build calls dbt from Python, through `dbtRunner` (dbt's programmatic API), with the target and log paths inside the build directory, so nothing is written into the source tree. dbt's anonymous usage statistics are turned off. [Dagster](dagster.md) runs the same project through dagster-dbt, which turns each model into an asset and each test into an asset check.
 
-Why dbt: transformations become plain SQL with tests and lineage, each new input is one more source and a few models, and it is the standard tool on data platform teams. In M1 it gains seeds (the id crosswalk), more sources (upstream datasets) and more marts. In M9 the same project should run on Databricks.
+Why dbt: transformations become plain SQL with tests and lineage, each new input is one more source and a few models, and it is the standard tool on data platform teams. MRDS showed the pattern: one raw source, one staging model, one mart. In M9 the same project should run on Databricks.
 
 ## Where it lives
 
@@ -55,6 +70,7 @@ Why dbt: transformations become plain SQL with tests and lineage, each new input
 | Sources and their tests | `pipeline/dbt/models/staging/_sources.yml` |
 | Staging models and tests | `pipeline/dbt/models/staging/` |
 | Marts and tests | `pipeline/dbt/models/marts/` |
+| Singular tests | `pipeline/dbt/tests/` |
 | How the build runs dbt | `pipeline/src/capabilities_pipeline/build.py` (`run_dbt`) |
 | Compiled SQL, run results, logs | `build/dbt/target/`, `build/dbt/logs/` |
 
@@ -75,6 +91,9 @@ uv run dbt docs generate --project-dir pipeline/dbt --profiles-dir pipeline/dbt 
 - Always `ref()` and `source()`, never hard-coded table names. Otherwise dbt can't see the dependency.
 - Add tests for every assumption a later model or the app relies on.
 - Since dbt 1.10, generic test arguments go under `arguments:`, as in `_sources.yml`.
+- **Crosswalks are not seeds.** dbt reads seeds only from paths inside its project, and saves each seed's compiled SQL at `target/run/<project>/<seed path>`. With an absolute seed path, that is the seed's own path, so dbt overwrote the CSV with SQL. Our crosswalks are curated data in `data/crosswalks/`, read from whichever root a build uses, so Python loads them as raw tables ([ADR 0041](../../adr/0041-place-sources-with-mrds-deposits-through-a-crosswalk.md)).
+- An `external` model with no rows is written as **one row of nulls**, so the file keeps its column types; dbt-duckdb's own view filters it out. Anything else that reads the file must skip it too (we count `id`, not rows).
+- Lambdas in DuckDB 2.0 SQL are written `lambda x: trim(x)`; the old `x -> trim(x)` is an error.
 
 ## Further reading
 

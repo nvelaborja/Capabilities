@@ -3,20 +3,22 @@ views {
 
   view index {
     title 'Capabilities: the whole project'
-    description 'Everything that exists today: who uses it, the parts of the system, and how data flows from the curated YAML to the browser.'
+    description 'Everything that exists today: who uses it, the parts of the system, and how data flows from the curated YAML and upstream datasets to the browser.'
     include *
     include capabilities.*
     include capabilities.core.*, capabilities.pipeline.*
     exclude capabilities.core, capabilities.pipeline
-    style capabilities.artifact, capabilities.warehouse {
+    style capabilities.artifact, capabilities.warehouse, capabilities.snapshots {
       border dashed
     }
   }
 
   view pipeline {
     title 'The data pipeline'
-    description 'How `capabilities build`, or Dagster, turns the curated layer into the built graph the app reads (docs/architecture/data-pipeline.md).'
+    description 'How `capabilities build`, or Dagster, turns the curated layer and upstream snapshots into the built graph the app reads (docs/architecture/data-pipeline.md).'
+    include mrds
     include capabilities.curated
+    include capabilities.snapshots
     include capabilities.pipeline.*
     include capabilities.warehouse.*
     include capabilities.artifact.*
