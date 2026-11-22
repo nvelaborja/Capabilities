@@ -1,6 +1,6 @@
 # 0040. Orchestrate the build with Dagster, and keep a quick build without it
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-22
 
 ## Context
