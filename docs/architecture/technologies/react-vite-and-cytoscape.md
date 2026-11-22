@@ -25,6 +25,7 @@ The app shows the graph as a technology tree, the selection and what follows fro
 | Typed API client | `web/src/api/` |
 | Graph drawing, layout, focus mode, folding | `web/src/graph/` |
 | Detail pane | `web/src/detail/` |
+| The map of where things are found ([MapLibre](maplibre.md)), loaded with `React.lazy` only when opened | `web/src/map/` |
 | Side panes, chips, search, layout | `web/src/panes/`, `web/src/chips/`, `web/src/search/`, `web/src/layout/` |
 | State: selection history, links, theme | `web/src/state/` |
 | Tests (Vitest) | beside the code, `*.test.ts(x)` |

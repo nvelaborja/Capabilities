@@ -13,6 +13,10 @@ model {
     description 'Hosts the repository and pull requests, and runs CI (GitHub Actions): validate, build the graph, tests, lint and the web build.'
   }
 
+  openfreemap = external 'OpenFreeMap' {
+    description 'Free public vector tiles of OpenStreetMap data (ODbL), with light and dark styles. The browser fetches them when the map opens (ADR 0042).'
+  }
+
   mrds = external 'USGS MRDS' {
     description 'The Mineral Resources Data System: 304,632 mineral deposits worldwide, with coordinates, ore minerals and commodities. US public domain. Downloaded as mrds-csv.zip.'
   }
@@ -113,6 +117,10 @@ model {
         technology 'capabilities.reasoner, levels, views'
         description 'Answers Q1 (what would it take), Q2 (what else) and Q3 (could it be done), and shapes results for the UI.'
       }
+      places = component 'Places' {
+        technology 'capabilities.places, capabilities.built.load_occurrences'
+        description 'Where a material or source is found: the occurrences of every source it comes from, summarised per source, as GeoJSON.'
+      }
       validator = component 'Validator' {
         technology 'capabilities.validate, jsonschema'
         description 'Checks every curated file against its schema and every cross-reference.'
@@ -129,8 +137,8 @@ model {
     }
 
     web = container 'Web app' {
-      technology 'React, TypeScript, Vite, Cytoscape.js'
-      description 'web/: the graph, selection panes and detail pane, built to web/dist.'
+      technology 'React, TypeScript, Vite, Cytoscape.js, MapLibre GL JS'
+      description 'web/: the graph, selection panes and detail pane, and the map of where things are found (lazy-loaded), built to web/dist.'
     }
 
     diagrams = container 'Architecture diagrams' {
@@ -153,6 +161,10 @@ model {
   capabilities.api -> capabilities.diagrams 'hosts at /architecture/'
   capabilities.api -> capabilities.core.reasoner 'asks the three questions'
   capabilities.api -> capabilities.core.built 'loads the graph at start-up'
+  capabilities.api -> capabilities.core.places 'where a material or source is found (/api/occurrences)'
+  capabilities.core.places -> capabilities.artifact.occurrences 'loads every occurrence at start-up'
+  capabilities.core.places -> capabilities.artifact.manifest 'which upstream snapshots, and when'
+  capabilities.web -> openfreemap 'fetches basemap tiles when the map opens'
   capabilities.core.cli -> capabilities.core.reasoner 'asks the three questions'
   capabilities.core.cli -> capabilities.core.built 'loads the graph'
   capabilities.core.cli -> capabilities.core.validator 'validate'

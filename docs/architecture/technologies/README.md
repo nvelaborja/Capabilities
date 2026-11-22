@@ -22,6 +22,7 @@ One page per technology the project uses. Each page teaches the technology, enou
 | Dagster | Orchestration: the build as assets, with lineage, checks and run history | [dagster.md](dagster.md) |
 | FastAPI | The API server | [fastapi.md](fastapi.md) |
 | React, Vite and Cytoscape.js | The web app and the graph drawing | [react-vite-and-cytoscape.md](react-vite-and-cytoscape.md) |
+| MapLibre GL JS and OpenFreeMap | The map of where things are found, over OpenStreetMap tiles | [maplibre.md](maplibre.md) |
 | LikeC4 | Architecture diagrams as code | [likec4.md](likec4.md) |
 | GitHub Actions | Continuous integration | [github-actions.md](github-actions.md) |
 
@@ -31,7 +32,6 @@ These get a page in the pull request that introduces them ([ADR 0039](../../adr/
 
 | Technology | Milestone | Role |
 |---|---|---|
-| MapLibre GL | M1 | The map of where materials are found |
 | AI agents (Claude API) | M3 | Proposing and challenging curated facts, with an audit log |
 | Apache Iceberg | M5 | Table format on object storage: snapshots, time travel, schema evolution |
 | Apache Polaris | M5 | The Iceberg REST catalog shared by every engine |

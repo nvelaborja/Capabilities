@@ -47,3 +47,4 @@ Each file records one significant design decision: the context, what we decided,
 | [0039](0039-keep-architecture-docs-and-diagrams-current.md) | Keep architecture docs and diagrams current, and teach every technology (LikeC4, docs/architecture) | Accepted |
 | [0040](0040-orchestrate-the-build-with-dagster.md) | Orchestrate the build with Dagster, and keep a quick build without it | Accepted |
 | [0041](0041-place-sources-with-mrds-deposits-through-a-crosswalk.md) | Place sources with MRDS deposits, matched through a hand-kept crosswalk | Accepted |
+| [0042](0042-show-where-things-are-found-on-a-maplibre-map.md) | Show where things are found on a MapLibre map, over OpenFreeMap tiles | Proposed |

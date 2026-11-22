@@ -85,9 +85,14 @@ Direct dependencies. Each brings its own dependencies, all under permissive lice
 | [Dagster](https://github.com/dagster-io/dagster), with dagster-dbt, dagster-webserver and the `dg` CLI | Orchestrating the build as assets (ADR 0040) | Apache-2.0 |
 | [React](https://react.dev/) | The web app | MIT |
 | [Cytoscape.js](https://js.cytoscape.org/) | Drawing the graph | MIT |
+| [MapLibre GL JS](https://maplibre.org/) | The map of where things are found (ADR 0042) | BSD-3-Clause |
 | [Vite](https://vite.dev/), [Vitest](https://vitest.dev/), [TypeScript](https://www.typescriptlang.org/), [ESLint](https://eslint.org/) | Building and testing the web app | MIT, Apache-2.0 |
 | [LikeC4](https://likec4.dev/) | Architecture diagrams (ADR 0039) | MIT |
 | [pytest](https://pytest.org/), [uv](https://docs.astral.sh/uv/) | Testing and packaging | MIT, MIT or Apache-2.0 |
+
+## Map tiles
+
+The map's background ([ADR 0042](docs/adr/0042-show-where-things-are-found-on-a-maplibre-map.md)) is drawn from vector tiles served by [OpenFreeMap](https://openfreemap.org/) (free public instance; its code is MIT), using the [OpenMapTiles](https://openmaptiles.org/) schema. The map data is © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright), available under the Open Database License (ODbL). The map shows this attribution in its corner. Tiles are fetched by the viewer's browser and never stored in the project.
 
 ## Design
 

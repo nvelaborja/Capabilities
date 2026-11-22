@@ -41,6 +41,8 @@ Pick a preset such as Middle Kingdom Egypt on the right. **Selected** shows your
 
 The graph reads as a technology tree, primitives on the left. A coloured strip with an emoji shows what each node is, and its border shows where it stands. Busy nodes draw lines only to their 8 most advanced neighbours; click one to see all its lines, or use **Expand all**. Click any line to see why it is there: the routes behind it, the role and threshold of what it joins, and what its style and label mean. **Legend** in the graph toolbar explains the strips and borders. Drag the gaps between panes (or focus one and use the arrow keys) to resize them; double-click a gap to reset. Selected fits its chips up to half the column, again after every change to the selection, and Implied and reachable takes the rest. Pick Auto, Light or Dark in the header.
 
+**Where it's found**, in the details of a source or of a material extracted from one (hematite, malachite, granite…), swaps the graph for a map of every known place, from the USGS Mineral Resources Data System. A filled dot was worked by a known year, and a ring is present with no known working date. Groups of nearby places show a count; select one to zoom in, and select a place for its details and a link to its record ([ADR 0042](docs/adr/0042-show-where-things-are-found-on-a-maplibre-map.md)). The map needs an MRDS snapshot (see above) and fetches its background tiles from [OpenFreeMap](https://openfreemap.org/) when it opens.
+
 To work on the web app with live reload, run the API and the Vite dev server side by side:
 
 ```bash
@@ -68,6 +70,7 @@ The server hosts the web app at `/` (if built), the API under `/api`, and intera
 | `POST /api/explain` | What a node needs, one level deep, each requirement met / missing / unknown with a reason: the same body plus `"node": "<id>"`. Also what the node is (description, numbers, sources), each route's references, and what it leads to. Add `"all": true` for every certain need at every depth. Know-how ids work too |
 | `POST /api/explain-edge` | Why a line joins two nodes: the same body plus `"source"` and `"target"`. Each route behind it, the source's role and threshold, met or not and why; or the "is a" link |
 | `POST /api/check` | Q3: the same body plus `"job": "<id>"` or an inline `"job_spec"` |
+| `GET /api/occurrences/{id}` | Where a material or source is found: each source it comes from, with how many places are mapped and how many were worked, the datasets, and every place as GeoJSON points |
 
 ### Tests
 
