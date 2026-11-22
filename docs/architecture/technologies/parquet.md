@@ -32,7 +32,8 @@ The `document` and `provenance` columns hold JSON, so the app gets each node's f
 
 | What | Where |
 |---|---|
-| The built graph | `build/graph/graph_nodes.parquet` (generated) |
+| The built graph | `build/graph/graph_nodes.parquet` and `source_occurrences.parquet` (GeoParquet) (generated) |
+| Upstream snapshots | `build/upstream/<dataset>/<dataset>.parquet` (downloaded) |
 | How it is written | `pipeline/dbt/dbt_project.yml` (`+materialized: external`, `+format: parquet`) |
 | How it is read | `packages/core/src/capabilities/built.py` |
 

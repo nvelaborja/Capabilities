@@ -17,6 +17,7 @@ One page per technology the project uses. Each page teaches the technology, enou
 | YAML and JSON Schema | How the curated data is written and checked | [yaml-and-json-schema.md](yaml-and-json-schema.md) |
 | DuckDB | The analytical database the build runs in, and how the app reads the built graph | [duckdb.md](duckdb.md) |
 | Apache Parquet | The file format of the built graph | [parquet.md](parquet.md) |
+| DuckDB spatial and GeoParquet | Points for where sources are found, written as GeoParquet | [duckdb-spatial-and-geoparquet.md](duckdb-spatial-and-geoparquet.md) |
 | dbt | Transforms and tests the data inside DuckDB | [dbt.md](dbt.md) |
 | Dagster | Orchestration: the build as assets, with lineage, checks and run history | [dagster.md](dagster.md) |
 | FastAPI | The API server | [fastapi.md](fastapi.md) |
