@@ -1,6 +1,6 @@
 # Data pipeline
 
-Reference for how the graph is built: inputs, stages, tables, outputs, checks and commands. The diagram is the `pipeline` view at `/architecture/`. For background on the tools, see [DuckDB](technologies/duckdb.md), [dbt](technologies/dbt.md) and [Parquet](technologies/parquet.md). Decisions: [ADR 0034](../adr/0034-build-the-graph-from-upstream-datasets-and-a-curated-layer.md) (a built graph from a curated layer and, later, upstream datasets) and [ADR 0038](../adr/0038-serve-the-app-from-a-built-graph-artifact.md) (the artifact the app reads).
+Reference for how the graph is built: inputs, stages, tables, outputs, checks and commands. The diagram is the `pipeline` view at `/architecture/`. For background on the tools, see [DuckDB](technologies/duckdb.md), [dbt](technologies/dbt.md), [Parquet](technologies/parquet.md) and [Dagster](technologies/dagster.md). Decisions: [ADR 0034](../adr/0034-build-the-graph-from-upstream-datasets-and-a-curated-layer.md) (a built graph from a curated layer and, later, upstream datasets) [ADR 0038](../adr/0038-serve-the-app-from-a-built-graph-artifact.md) (the artifact the app reads) and [ADR 0040](../adr/0040-orchestrate-the-build-with-dagster.md) (Dagster, and the quick build without it).
 
 ## Summary
 
@@ -8,10 +8,10 @@ Reference for how the graph is built: inputs, stages, tables, outputs, checks an
 |---|---|
 | **Inputs** | The curated layer: `data/**/*.yaml` (quantities, things, verbs, routes, profiles), `examples/**/*.yaml` (jobs) and `schema/*.json`. No upstream datasets yet (milestone M1). |
 | **Output** | `build/graph/graph_nodes.parquet` (one row per node) and `build/graph/manifest.json`. |
-| **Run by** | `uv run capabilities build`, or automatically by `need`, `explore`, `check` and `serve` when the output is missing or stale. |
-| **Code** | `pipeline/src/capabilities_pipeline/build.py` (extract, load, run dbt, manifest) and `pipeline/dbt/` (the dbt project). Reading: `packages/core/src/capabilities/built.py`. |
+| **Run by** | `uv run capabilities build`, or automatically by `need`, `explore`, `check` and `serve` when the output is missing or stale. Or Dagster: the same steps as assets, with lineage, checks and run history (see [Orchestration](#orchestration-dagster)). |
+| **Code** | `pipeline/src/capabilities_pipeline/build.py` (extract, load, run dbt, manifest), `assets.py` and `definitions.py` (the same steps as Dagster assets), and `pipeline/dbt/` (the dbt project). Reading: `packages/core/src/capabilities/built.py`. |
 | **Engine** | DuckDB, through dbt Core and the dbt-duckdb adapter. |
-| **Time** | About 5 seconds, most of it dbt starting up. |
+| **Time** | About 5 seconds with `capabilities build`, most of it dbt starting up; about 20 seconds as a Dagster run, which starts a process per step. |
 
 ## Stages
 
@@ -28,7 +28,7 @@ schema/*.json ──┘   (Python)     raw.curated_documents ──▶ stg_curat
 
 ### 2. Load
 
-Every document goes into the DuckDB warehouse `build/warehouse.duckdb`, whole, as JSON. The table is replaced on every build.
+Every document goes into the DuckDB warehouse `build/warehouse.duckdb`, whole, as JSON. The fingerprint of the inputs (see [Freshness](#freshness)) is computed just before reading them and recorded beside them. Both tables are replaced on every build.
 
 **`raw.curated_documents`**
 
@@ -40,9 +40,16 @@ Every document goes into the DuckDB warehouse `build/warehouse.duckdb`, whole, a
 | `document` | json | The whole document. |
 | `path` | varchar | The file, relative to the repository root. |
 
+**`raw.loads`**
+
+| Column | Type | Meaning |
+|---|---|---|
+| `fingerprint` | varchar | The fingerprint of the inputs this load read. The manifest copies it, so an edit made while the build runs leaves the graph stale. |
+| `loaded_at` | timestamptz | When the load ran. |
+
 ### 3. Transform (dbt)
 
-The build runs `dbt build` on `pipeline/dbt` through dbt's Python API. `dbt build` runs each model and its tests in dependency order, and stops downstream models when a test fails.
+The build runs `dbt build` on `pipeline/dbt`: `capabilities build` through dbt's Python API, Dagster through dagster-dbt, which runs the dbt command line. `dbt build` runs each model and its tests in dependency order, and stops downstream models when a test fails.
 
 **Source tests** on `raw.curated_documents`: `ordinal` and `path` unique and not null; `node_type` not null and one of the six known types; `id` not null.
 
@@ -71,7 +78,7 @@ The mart's `external` materialization (a dbt-duckdb feature) writes the result t
 
 ### 4. Publish
 
-The build counts the rows in the Parquet file and writes **`build/graph/manifest.json`**:
+The build counts the rows in the Parquet file and writes **`build/graph/manifest.json`**, with the fingerprint recorded at load time:
 
 | Field | Meaning |
 |---|---|
@@ -82,6 +89,19 @@ The build counts the rows in the Parquet file and writes **`build/graph/manifest
 | `tables` | Row count per file, e.g. `{"graph_nodes.parquet": 167}`. |
 
 The manifest is written **last**. If anything fails earlier, no manifest matches the current inputs, so the failed build is never read as current.
+
+## Orchestration (Dagster)
+
+The same steps are Dagster assets ([Dagster](technologies/dagster.md)). `assets.py` defines them, and `definitions.py` is the module Dagster loads, building into the same build directory as `capabilities build`.
+
+| Asset | Group | Step | Checks |
+|---|---|---|---|
+| `raw/curated_documents` | raw | Load (`load_curated`). Its key is the dbt source's, so lineage runs into dbt. | The source tests above |
+| `stg_curated__documents` | staging | dbt view | `kind`, `label` not null |
+| `graph_nodes` | marts | dbt mart, written as Parquet | The mart tests above |
+| `graph_manifest` | marts | Publish (`write_manifest`) | None |
+
+Every dbt test is an asset check (14 today). Loading the definitions runs `dbt parse` first, so the asset list always matches the dbt project. dbt's files for each Dagster run go in `build/dbt/target/<run>/`.
 
 ## Freshness
 
@@ -109,11 +129,12 @@ While the curated layer is the only input, the built graph must equal the curate
 
 | Path | What |
 |---|---|
-| `build/warehouse.duckdb` | The warehouse: the raw table and the staging view. |
+| `build/warehouse.duckdb` | The warehouse: the raw tables and the staging view. |
 | `build/graph/` | The artifact the app reads. |
-| `build/dbt/target/`, `build/dbt/logs/dbt.log` | dbt's compiled SQL, run results, and log. |
-| `pipeline/dbt/dbt_project.yml` | Project settings: staging models are views, marts are external Parquet, and anonymous usage statistics are off. |
+| `build/dbt/target/`, `build/dbt/logs/dbt.log` | dbt's compiled SQL, run results, and log. Dagster runs each get a folder under `target/`. |
+| `pipeline/dbt/dbt_project.yml` | Project settings: staging models are views, marts are external Parquet, each layer's Dagster group, and anonymous usage statistics are off. |
 | `pipeline/dbt/profiles.yml` | The DuckDB connection: the warehouse path, and `external_root` (where external models are written), both from `$CAPABILITIES_BUILD_DIR`. |
+| `pipeline/pyproject.toml`, `[tool.dg]` | Where the `dg` command finds the Dagster definitions. |
 
 The build directory is, in order: `--build-dir`, then `$CAPABILITIES_BUILD_DIR`, then `build/` in the repository. `build/` is ignored by git. Tests always use a temporary directory.
 
@@ -132,6 +153,8 @@ uv run capabilities build                      # build into build/
 uv run capabilities --build-dir /tmp/b build   # build somewhere else
 uv run capabilities need steel                 # rebuilds first if stale
 duckdb build/warehouse.duckdb                  # explore the warehouse (needs the DuckDB CLI)
+cd pipeline && uv run dg dev                   # Dagster UI at http://localhost:3000
+cd pipeline && uv run dg launch --assets '*'   # a full build as a Dagster run
 ```
 
 To look at the output from Python:
@@ -145,7 +168,7 @@ duckdb.sql("select node_type, count(*) from 'build/graph/graph_nodes.parquet' gr
 
 | Milestone | Change to the pipeline |
 |---|---|
-| M1 | Upstream datasets (USGS MRDS, Pleiades, Wikidata) as more raw tables; an id crosswalk as a dbt seed; overrides and suppressions; `source_occurrences` and `curation_queue` marts; Dagster runs the build. |
+| M1 | Upstream datasets (USGS MRDS, Pleiades, Wikidata) as more raw tables; an id crosswalk as a dbt seed; overrides and suppressions; `source_occurrences` and `curation_queue` marts; Dagster assets that download upstream snapshots. (Dagster already runs the build.) |
 | M2 | Citation checks against OpenAlex and Crossref; a `reference_checks` mart. |
 | M3 | The agent curation stage and its append-only audit log. |
 | M5 | Raw and staging tables move to Apache Iceberg with an Apache Polaris catalog; the build still exports this artifact for the app. |

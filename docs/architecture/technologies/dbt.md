@@ -42,9 +42,9 @@ The dbt project in `pipeline/dbt` turns the raw curated documents into the built
 
 Tests check that read order and paths are unique, node types are known, kind, label and provenance are present, and ids are unique across every type of node.
 
-The build calls dbt from Python, through `dbtRunner` (dbt's programmatic API), with the target and log paths inside the build directory, so nothing is written into the source tree. dbt's anonymous usage statistics are turned off.
+The build calls dbt from Python, through `dbtRunner` (dbt's programmatic API), with the target and log paths inside the build directory, so nothing is written into the source tree. dbt's anonymous usage statistics are turned off. [Dagster](dagster.md) runs the same project through dagster-dbt, which turns each model into an asset and each test into an asset check.
 
-Why dbt: transformations become plain SQL with tests and lineage, each new input is one more source and a few models, and it is the standard tool on data platform teams. In M1 it gains seeds (the id crosswalk), more sources (upstream datasets) and more marts. In M8 the same project should run on Databricks.
+Why dbt: transformations become plain SQL with tests and lineage, each new input is one more source and a few models, and it is the standard tool on data platform teams. In M1 it gains seeds (the id crosswalk), more sources (upstream datasets) and more marts. In M9 the same project should run on Databricks.
 
 ## Where it lives
 

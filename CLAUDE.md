@@ -27,6 +27,7 @@ uv run capabilities need steel   # Q1
 uv run capabilities explore --profile middle-kingdom-egypt   # Q2
 uv run capabilities check granite-slab-saw-cut --profile middle-kingdom-egypt   # Q3
 uv run capabilities serve        # local API at http://127.0.0.1:8000/docs
+cd pipeline && uv run dg dev     # Dagster UI at http://localhost:3000: the build as assets, lineage, checks, runs
 ```
 
 Web app (`web/`, React + TypeScript + Cytoscape.js, see [ADR 0015](docs/adr/0015-build-the-web-front-end-with-react-and-cytoscape.md)); needs Node 22+:
@@ -48,7 +49,7 @@ npm run diagrams                 # live preview of the LikeC4 diagrams in docs/a
 - `examples/jobs/`: feasibility-check jobs; `examples/README.md` holds worked results that tests check
 - `packages/core/src/capabilities/`: `graph.py` (the in-memory graph; `Graph.from_curated` reads the YAML), `built.py` (reading the built graph, freshness), `validate.py`, `tristate.py`, `reasoner.py` (the three questions), `levels.py` (tech levels), `views.py` (display-ready shapes for the web UI), `credits.py` (the works cited in CREDITS.md), `cli.py`
 - `packages/api/src/capabilities_api/server.py`: the API under `/api`, which also hosts the web app
-- `pipeline/`: `src/capabilities_pipeline/build.py` (loads the curated layer into DuckDB, runs dbt, writes the manifest) and `dbt/` (sources, staging, marts written as Parquet). See [ADR 0038](docs/adr/0038-serve-the-app-from-a-built-graph-artifact.md)
+- `pipeline/`: `src/capabilities_pipeline/build.py` (loads the curated layer into DuckDB, runs dbt, writes the manifest), `assets.py` and `definitions.py` (the same steps as Dagster assets; `[tool.dg]` in `pipeline/pyproject.toml`) and `dbt/` (sources, staging, marts written as Parquet). See [ADR 0038](docs/adr/0038-serve-the-app-from-a-built-graph-artifact.md) and [ADR 0040](docs/adr/0040-orchestrate-the-build-with-dagster.md)
 - `web/src/`: `api/` (typed client), `graph/` (Cytoscape elements, styles, statuses, tech-tree layout, focus mode, hiding busy nodes' extra lines), `detail/` (detail pane for nodes and lines: route checklists, drill-down, expand-all dialog), `chips/` (node-like chips used in every list), `panes/` (side pane, lists, dialog), `search/`, `lib/bounded.ts` (top N, the rest summarised by type), `layout/` (resizable panes), `legend/`, `state/` (selection history and links, explore and explain hooks, breadcrumb trail, theme), `catalog.ts` (labels for any id)
 - Tests live beside each package (`packages/*/tests`, `pipeline/tests`); shared fixtures are in the root `conftest.py`
 - `build/`: generated (warehouse, built graph, dbt logs); never commit it

@@ -15,7 +15,7 @@ views {
 
   view pipeline {
     title 'The data pipeline'
-    description 'How `capabilities build` turns the curated layer into the built graph the app reads (docs/architecture/data-pipeline.md).'
+    description 'How `capabilities build`, or Dagster, turns the curated layer into the built graph the app reads (docs/architecture/data-pipeline.md).'
     include capabilities.curated
     include capabilities.pipeline.*
     include capabilities.warehouse.*
