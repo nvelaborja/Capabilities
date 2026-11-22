@@ -86,9 +86,10 @@ packages/api/      the local API server, which also hosts the web app
 pipeline/          builds the graph: loading, the dbt project (pipeline/dbt) and its tests
 web/               the web app (React, TypeScript, Cytoscape.js)
 build/             the built graph and the DuckDB warehouse (generated, not in git)
-docs/              data format, reasoning rules, and design decisions (docs/adr/)
+docs/              architecture and technology guides (docs/architecture/), data format, and design decisions (docs/adr/)
 ```
 
+- Architecture, the data pipeline, and a guide to every technology we use: [docs/architecture/](docs/architecture/README.md). With the app running, the diagrams are at http://127.0.0.1:8000/architecture/
 - Data format and reasoning rules: [docs/data-format.md](docs/data-format.md)
 - Worked examples of the three questions: [examples/README.md](examples/README.md)
 - Design decisions and why we made them: [docs/adr/](docs/adr/README.md)

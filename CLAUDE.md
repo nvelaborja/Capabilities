@@ -37,7 +37,8 @@ npm ci                           # install
 npm run dev                      # dev server on :5173, forwarding /api to `capabilities serve` on :8000
 npm test                         # Vitest
 npm run lint && npm run typecheck
-npm run build                    # web/dist, which `capabilities serve` hosts at /
+npm run build                    # web/dist (app, plus architecture diagrams in web/dist/architecture), which `capabilities serve` hosts at /
+npm run diagrams                 # live preview of the LikeC4 diagrams in docs/architecture/diagrams
 ```
 
 ## Layout
@@ -51,7 +52,13 @@ npm run build                    # web/dist, which `capabilities serve` hosts at
 - `web/src/`: `api/` (typed client), `graph/` (Cytoscape elements, styles, statuses, tech-tree layout, focus mode, hiding busy nodes' extra lines), `detail/` (detail pane for nodes and lines: route checklists, drill-down, expand-all dialog), `chips/` (node-like chips used in every list), `panes/` (side pane, lists, dialog), `search/`, `lib/bounded.ts` (top N, the rest summarised by type), `layout/` (resizable panes), `legend/`, `state/` (selection history and links, explore and explain hooks, breadcrumb trail, theme), `catalog.ts` (labels for any id)
 - Tests live beside each package (`packages/*/tests`, `pipeline/tests`); shared fixtures are in the root `conftest.py`
 - `build/`: generated (warehouse, built graph, dbt logs); never commit it
-- `docs/`: data format, reasoning rules, and ADRs
+- `docs/`: `architecture/` (overview, data pipeline, technology guides, LikeC4 diagrams), data format, reasoning rules, and ADRs
+
+## Architecture docs
+
+- Every pull request that changes the architecture, the data flow or the technology updates `docs/architecture/` in the same PR ([ADR 0039](docs/adr/0039-keep-architecture-docs-and-diagrams-current.md)): the LikeC4 model and views in `docs/architecture/diagrams/` (new parts go in the `index` view), the overview, the data pipeline reference if data flow changed, and a teaching page under `technologies/` for any new technology (same sections as the others, links to official docs checked to work).
+- Model only what exists; planned parts join the diagrams when they are built.
+- `cd web && npm run diagrams:check` validates the model; `npm run build` builds it into `web/dist/architecture`, which `capabilities serve` hosts at `/architecture/`.
 
 ## Data rules
 

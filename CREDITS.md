@@ -76,14 +76,15 @@ Direct dependencies. Each brings its own dependencies, all under permissive lice
 |---|---|---|
 | [PyYAML](https://pyyaml.org/) | Reading the data files | MIT |
 | [jsonschema](https://github.com/python-jsonschema/jsonschema) | Validating the data | MIT |
-| [FastAPI](https://fastapi.tiangolo.com/) and [Starlette](https://www.starlette.io/) | The local API | MIT, BSD-3-Clause |
-| [Uvicorn](https://www.uvicorn.org/) | Serving the API | BSD-3-Clause |
+| [FastAPI](https://fastapi.tiangolo.com/) and [Starlette](https://starlette.dev/) | The local API | MIT, BSD-3-Clause |
+| [Uvicorn](https://uvicorn.dev/) | Serving the API | BSD-3-Clause |
 | [Pydantic](https://docs.pydantic.dev/) | API models | MIT |
 | [DuckDB](https://duckdb.org/) | The build's warehouse, and reading the built graph | MIT |
 | [dbt Core](https://github.com/dbt-labs/dbt-core) and [dbt-duckdb](https://github.com/duckdb/dbt-duckdb) | Building the graph from its inputs (ADR 0038) | Apache-2.0 |
 | [React](https://react.dev/) | The web app | MIT |
 | [Cytoscape.js](https://js.cytoscape.org/) | Drawing the graph | MIT |
 | [Vite](https://vite.dev/), [Vitest](https://vitest.dev/), [TypeScript](https://www.typescriptlang.org/), [ESLint](https://eslint.org/) | Building and testing the web app | MIT, Apache-2.0 |
+| [LikeC4](https://likec4.dev/) | Architecture diagrams (ADR 0039) | MIT |
 | [pytest](https://pytest.org/), [uv](https://docs.astral.sh/uv/) | Testing and packaging | MIT, MIT or Apache-2.0 |
 
 ## Design
