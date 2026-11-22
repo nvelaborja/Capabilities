@@ -8,3 +8,13 @@ models:
         data_tests: [not_null]
       - name: label
         data_tests: [not_null]
+  - name: stg_mrds__deposits
+    description: MRDS deposits with typed columns, and their ore minerals and commodities as lists.
+    columns:
+      - name: record_id
+        data_tests: [unique, not_null]
+      - name: first_production_qualifier
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [before, after]

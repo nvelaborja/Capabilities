@@ -19,3 +19,40 @@ sources:
             data_tests: [not_null]
           - name: path
             data_tests: [unique, not_null]
+      - name: mrds_sources
+        description: >
+          The crosswalk from MRDS deposits to our source kinds (data/crosswalks/mrds_sources.csv, ADR 0041). A deposit
+          is an occurrence of a source kind when its ore minerals (field `ore`) or commodities (field `commodity`)
+          include the value, and, when deposit_type is set, its deposit type contains it.
+        columns:
+          - name: source_id
+            data_tests:
+              - not_null
+              - relationships:
+                  arguments:
+                    to: ref('stg_curated__documents')
+                    field: id
+          - name: field
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: [ore, commodity]
+          - name: value
+            data_tests: [not_null]
+          - name: notes
+            data_tests: [not_null]
+      - name: mrds_deposits
+        description: >
+          The USGS Mineral Resources Data System (MRDS) as downloaded, every column as text (ADR 0041). Empty when no
+          snapshot has been downloaded.
+        columns:
+          - name: dep_id
+            data_tests: [unique, not_null]
+      - name: upstream_snapshots
+        description: One row per upstream dataset loaded, with where and when it was retrieved, for provenance.
+        columns:
+          - name: dataset
+            data_tests: [unique, not_null]
+          - name: retrieved_at
+            data_tests: [not_null]

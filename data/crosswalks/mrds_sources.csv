@@ -1,0 +1,9 @@
+source_id,field,value,deposit_type,notes
+hematite-deposit,ore,Hematite,,Hematite is listed among the deposit's ore minerals.
+malachite-deposit,ore,Malachite,,Malachite is listed among the deposit's ore minerals.
+native-copper-deposit,ore,Copper,,"In MRDS's ore field, Copper is the mineral native copper, not the commodity."
+tin-gravel,ore,Cassiterite,placer,"Placers only: tin gravel is stream-sorted cassiterite, not a vein."
+diamond-gravel,commodity,Diamond,placer,"Placers only: the source is diamond-bearing gravel, not the rock diamonds formed in."
+flint-deposit,ore,Flint,,Flint is listed among the deposit's ore materials.
+granite-outcrop,commodity,Granite,,Granite is one of the site's commodities.
+limestone-outcrop,commodity,Limestone,,Limestone is one of the site's commodities.

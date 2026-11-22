@@ -10,7 +10,7 @@ from pathlib import Path
 import yaml
 
 from .credits import cited_works, credits_path, refreshed, works_cited_markdown
-from .built import build_dir_for, current_graph, run_build
+from .built import NODES_FILE, OCCURRENCES_FILE, build_dir_for, current_graph, run_build
 from .graph import Graph, LoadError, find_root
 from .reasoner import Backward, Selection, assess_job, closure, explore, need_tree
 from .validate import validate
@@ -99,8 +99,12 @@ def build_selection(graph: Graph, profile: str | None, select: list[str], desele
 
 def cmd_build(args, root: Path) -> int:
     manifest = run_build(root, build_dir_for(root, args.build_dir))
-    rows = sum(manifest["tables"].values())
-    print(f"Built the graph: {rows} nodes, from inputs {manifest['fingerprint'][:12]}.")
+    tables = manifest["tables"]
+    upstream = ", ".join(sorted(manifest.get("upstream", {}))) or "none downloaded"
+    print(
+        f"Built the graph: {tables[NODES_FILE]} nodes and {tables[OCCURRENCES_FILE]} source occurrences, "
+        f"from inputs {manifest['fingerprint'][:12]} (upstream datasets: {upstream})."
+    )
     return 0
 
 

@@ -1,7 +1,8 @@
 """Reading the built graph, the artifact the pipeline produces and the app reads (ADR 0038).
 
-A build directory holds `graph/graph_nodes.parquet` (one row per node, its full document as JSON, and its provenance)
-and `graph/manifest.json`, which records the fingerprint of the inputs it was built from. A build is current when
+A build directory holds `graph/graph_nodes.parquet` (one row per node, its full document as JSON, and its provenance),
+`graph/source_occurrences.parquet` (where sources are found, from upstream datasets, ADR 0036 and ADR 0041) and
+`graph/manifest.json`, which records the fingerprint of the inputs it was built from. A build is current when
 that fingerprint matches the inputs on disk now; otherwise the question commands and the server rebuild first.
 """
 
@@ -17,12 +18,16 @@ from pathlib import Path
 from .graph import Graph, LoadError
 
 # Bump when the artifact's shape changes, so older builds are rebuilt rather than misread.
-FORMAT_VERSION = 1
+FORMAT_VERSION = 2
 NODES_FILE = "graph_nodes.parquet"
+OCCURRENCES_FILE = "source_occurrences.parquet"
 MANIFEST_FILE = "manifest.json"
+SNAPSHOT_FILE = "snapshot.json"
 
 # Everything a build depends on: change any of these and the built graph is stale.
-DATA_PATTERNS = ("data/**/*.yaml", "examples/**/*.yaml", "schema/*.json")
+DATA_PATTERNS = ("data/**/*.yaml", "data/**/*.csv", "examples/**/*.yaml", "schema/*.json")
+# Upstream snapshots, under the build directory: each dataset's snapshot.json changes whenever its data is downloaded again.
+SNAPSHOT_PATTERNS = (f"*/{SNAPSHOT_FILE}",)
 # The pipeline's own code and dbt project, found where the pipeline package is installed rather than under the data root.
 CODE_PATTERNS = ("src/capabilities_pipeline/*.py", "dbt/**/*.sql", "dbt/**/*.yml")
 
@@ -39,10 +44,18 @@ def graph_dir(build_dir: Path) -> Path:
     return build_dir / "graph"
 
 
-def fingerprint(root: Path) -> str:
-    """A hash of every input file's path and bytes (the data and the pipeline's code), plus the artifact format."""
+def upstream_dir(build_dir: Path) -> Path:
+    """Where downloaded upstream snapshots are kept, one folder per dataset. A rebuild reads them; only Dagster downloads."""
+    return build_dir / "upstream"
+
+
+def fingerprint(root: Path, build_dir: Path | None = None) -> str:
+    """A hash of every input file's path and bytes (the data, the upstream snapshots in `build_dir`, and the pipeline's
+    code), plus the artifact format."""
     digest = hashlib.sha256(f"format {FORMAT_VERSION}\n".encode())
     add_files(digest, root, DATA_PATTERNS)
+    if build_dir:
+        add_files(digest, upstream_dir(build_dir), SNAPSHOT_PATTERNS)
     pipeline = pipeline_root()
     if pipeline:
         add_files(digest, pipeline, CODE_PATTERNS)
@@ -75,7 +88,7 @@ def read_manifest(build_dir: Path) -> dict | None:
 
 def is_current(root: Path, build_dir: Path) -> bool:
     manifest = read_manifest(build_dir)
-    return bool(manifest) and manifest.get("fingerprint") == fingerprint(root) and (graph_dir(build_dir) / NODES_FILE).is_file()
+    return bool(manifest) and manifest.get("fingerprint") == fingerprint(root, build_dir) and (graph_dir(build_dir) / NODES_FILE).is_file()
 
 
 def load_built(root: Path, build_dir: Path) -> Graph:

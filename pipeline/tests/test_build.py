@@ -14,7 +14,7 @@ from capabilities.built import (
 )
 from capabilities.graph import Graph
 from capabilities.reasoner import Selection, explore
-from capabilities_pipeline.build import BuildError, build, load_curated, run_dbt, write_manifest
+from capabilities_pipeline.build import BuildError, build, load_inputs, run_dbt, write_manifest
 
 BUCKETS = ("quantities", "things", "verbs", "routes", "profiles", "jobs")
 
@@ -44,7 +44,7 @@ class TestBuiltGraph:
 
     def test_the_manifest_records_the_inputs_and_how_many_nodes(self, repo_root, built_dir):
         manifest = json.loads((graph_dir(built_dir) / MANIFEST_FILE).read_text())
-        assert manifest["fingerprint"] == fingerprint(repo_root)
+        assert manifest["fingerprint"] == fingerprint(repo_root, built_dir)
         curated = Graph.from_curated(repo_root)
         assert manifest["tables"][NODES_FILE] == sum(len(getattr(curated, bucket)) for bucket in BUCKETS)
 
@@ -76,7 +76,7 @@ class TestFreshness:
 
     def test_an_edit_made_while_the_graph_builds_leaves_it_stale(self, data_copy, tmp_path):
         build_dir = tmp_path / "build"
-        load_curated(data_copy, build_dir)
+        load_inputs(data_copy, build_dir)
         route = data_copy / "data" / "routes" / "quarry-granite.yaml"
         route.write_text(route.read_text() + "\n# edited after loading\n")
         run_dbt(build_dir)

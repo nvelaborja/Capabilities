@@ -5,4 +5,6 @@ capabilities:
       type: duckdb
       path: "{{ env_var('CAPABILITIES_BUILD_DIR') }}/warehouse.duckdb"
       external_root: "{{ env_var('CAPABILITIES_BUILD_DIR') }}/graph"
+      # Geometry types and functions (ST_Point, ST_IsValid). DuckDB downloads the extension once, on first use.
+      extensions: [spatial]
       threads: 1
