@@ -4,6 +4,9 @@ __pycache__/
 .pytest_cache/
 dist/
 build/
+# dbt's default output folders, if dbt is run by hand with relative paths
+pipeline/dbt/target/
+pipeline/dbt/logs/
 *.egg-info/
 
 # macOS

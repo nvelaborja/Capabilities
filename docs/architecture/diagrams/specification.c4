@@ -1,0 +1,41 @@
+// The vocabulary of the architecture model: kinds of elements and the tags we use (ADR 0039).
+specification {
+  element actor {
+    style {
+      shape person
+      color indigo
+    }
+  }
+  element system
+  element container
+  element component {
+    style {
+      color sky
+    }
+  }
+  element store {
+    style {
+      shape storage
+      color green
+    }
+  }
+  element table {
+    style {
+      shape cylinder
+      color green
+    }
+  }
+  element file {
+    style {
+      shape document
+      color green
+    }
+  }
+  element external {
+    style {
+      color muted
+    }
+  }
+
+  tag generated
+}
