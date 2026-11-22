@@ -24,7 +24,7 @@ uv run capabilities explore --profile middle-kingdom-egypt --hypothetical hemati
 uv run capabilities check granite-slab-saw-cut --profile middle-kingdom-egypt   # Q3
 ```
 
-The data files in `data/` are the curated layer. `capabilities build` turns them into the built graph in `build/graph/` (Parquet tables and a manifest) with dbt on DuckDB ([ADR 0038](docs/adr/0038-serve-the-app-from-a-built-graph-artifact.md)). The questions and the server read the built graph and rebuild it first whenever the data has changed, so you rarely need to run `build` yourself.
+The data files in `data/` are the curated layer. `capabilities build` turns them into the built graph in `build/graph/` (Parquet tables and a manifest) with dbt on DuckDB ([ADR 0038](docs/adr/0038-serve-the-app-from-a-built-graph-artifact.md)). The questions and the server read the built graph and rebuild it first whenever the data has changed, so you rarely need to run `build` yourself. The same build runs as [Dagster](docs/architecture/technologies/dagster.md) assets too: `cd pipeline && uv run dg dev` opens a UI at http://localhost:3000 with the lineage from the YAML to the built graph, every dbt test as a check, and a history of runs ([ADR 0040](docs/adr/0040-orchestrate-the-build-with-dagster.md)).
 
 Every question command takes `--json` for machine-readable output. `explore` and `check` take `--profile`, `--select`, `--deselect`, and `--hypothetical`. Items are thing ids (`copper-saw`) or actions (`cut:granite`).
 
@@ -83,7 +83,7 @@ data/              the graph: quantities, things, verbs, routes, profiles
 examples/          example jobs and worked results
 packages/core/     the graph, reasoner, validator and CLI (`capabilities`), with its tests
 packages/api/      the local API server, which also hosts the web app
-pipeline/          builds the graph: loading, the dbt project (pipeline/dbt) and its tests
+pipeline/          builds the graph: loading, the dbt project (pipeline/dbt), the Dagster assets, and their tests
 web/               the web app (React, TypeScript, Cytoscape.js)
 build/             the built graph and the DuckDB warehouse (generated, not in git)
 docs/              architecture and technology guides (docs/architecture/), data format, and design decisions (docs/adr/)

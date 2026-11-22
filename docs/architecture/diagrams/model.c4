@@ -22,12 +22,16 @@ model {
     }
 
     pipeline = container 'Pipeline' {
-      technology 'Python, dbt Core, dbt-duckdb'
-      description 'pipeline/: builds the graph from its inputs. `capabilities build`.'
+      technology 'Python, dbt Core, dbt-duckdb, Dagster'
+      description 'pipeline/: builds the graph from its inputs, with `capabilities build` or as Dagster assets.'
 
       loader = component 'Loader' {
         technology 'Python (capabilities_pipeline.build)'
-        description 'Reads every curated document and loads it, whole, into a raw DuckDB table. Writes the manifest last.'
+        description 'Reads every curated document and loads it, whole, into a raw DuckDB table with the inputs fingerprint. Writes the manifest last.'
+      }
+      dagster = component 'Dagster assets' {
+        technology 'Dagster, dagster-dbt (assets.py, definitions.py)'
+        description 'The same steps as assets: the load, every dbt model, and the manifest, grouped raw, staging and marts. dbt tests are asset checks. `dg dev` shows lineage and run history.'
       }
       dbt = component 'dbt project' {
         technology 'dbt Core with the DuckDB adapter'
@@ -42,6 +46,9 @@ model {
 
       rawDocuments = table 'raw.curated_documents' {
         description 'One row per curated document: ordinal, node_type, id, document (JSON), path.'
+      }
+      rawLoads = table 'raw.loads' {
+        description 'The fingerprint of the inputs the last load read, and when. The manifest copies it.'
       }
       stgDocuments = table 'stg_curated__documents' {
         technology 'dbt view'
@@ -106,6 +113,7 @@ model {
   explorer -> capabilities.diagrams 'reads how it is built'
   contributor -> capabilities.curated 'edits data through pull requests'
   contributor -> capabilities.core.cli 'validates, builds and asks questions'
+  contributor -> capabilities.pipeline.dagster 'runs builds and reads lineage in the Dagster UI'
   github -> capabilities 'runs CI on every pull request'
 
   // Serving
@@ -125,8 +133,11 @@ model {
   capabilities.core.built -> capabilities.artifact.graphNodes 'reads every node'
   capabilities.pipeline.loader -> capabilities.curated 'reads every document'
   capabilities.pipeline.loader -> capabilities.warehouse.rawDocuments 'loads documents, whole'
+  capabilities.pipeline.loader -> capabilities.warehouse.rawLoads 'records the inputs fingerprint'
+  capabilities.pipeline.dagster -> capabilities.pipeline.loader 'runs the load and manifest as assets'
+  capabilities.pipeline.dagster -> capabilities.pipeline.dbt 'runs every model as an asset, tests as checks'
   capabilities.pipeline.loader -> capabilities.pipeline.dbt 'runs dbt build'
-  capabilities.pipeline.loader -> capabilities.artifact.manifest 'writes it last'
+  capabilities.pipeline.loader -> capabilities.artifact.manifest 'writes it last, with the loaded fingerprint'
   capabilities.pipeline.dbt -> capabilities.warehouse.rawDocuments 'source, with data tests'
   capabilities.pipeline.dbt -> capabilities.warehouse.stgDocuments 'builds the staging view'
   capabilities.pipeline.dbt -> capabilities.artifact.graphNodes 'writes the mart as Parquet, with data tests'
