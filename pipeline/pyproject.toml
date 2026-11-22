@@ -6,6 +6,10 @@ requires-python = ">=3.12"
 license = "PolyForm-Noncommercial-1.0.0"
 dependencies = [
     "capabilities",
+    "dagster>=1.13",
+    "dagster-dbt>=0.29",
+    "dagster-dg-cli>=1.13",
+    "dagster-webserver>=1.13",
     "dbt-core>=1.10",
     "dbt-duckdb>=1.9",
 ]
@@ -19,3 +23,12 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/capabilities_pipeline"]
+
+# The `dg` CLI (Dagster's project tool) finds the definitions here: `uv run dg dev` from pipeline/ or with --target-path.
+[tool.dg]
+directory_type = "project"
+
+[tool.dg.project]
+root_module = "capabilities_pipeline"
+code_location_target_module = "capabilities_pipeline.definitions"
+code_location_name = "capabilities"

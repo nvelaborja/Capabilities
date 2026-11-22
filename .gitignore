@@ -22,3 +22,6 @@ out/
 
 # Node
 node_modules/
+
+# Dagster: the temporary instance `dg dev` makes when DAGSTER_HOME is unset
+.tmp_dagster_home_*/

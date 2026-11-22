@@ -14,7 +14,7 @@ from capabilities.built import (
 )
 from capabilities.graph import Graph
 from capabilities.reasoner import Selection, explore
-from capabilities_pipeline.build import BuildError, build
+from capabilities_pipeline.build import BuildError, build, load_curated, run_dbt, write_manifest
 
 BUCKETS = ("quantities", "things", "verbs", "routes", "profiles", "jobs")
 
@@ -72,6 +72,17 @@ class TestFreshness:
         assert "building it now" in capsys.readouterr().err
         assert is_current(data_copy, build_dir)
         assert "quarry-granite" in graph.routes
+
+
+    def test_an_edit_made_while_the_graph_builds_leaves_it_stale(self, data_copy, tmp_path):
+        build_dir = tmp_path / "build"
+        load_curated(data_copy, build_dir)
+        route = data_copy / "data" / "routes" / "quarry-granite.yaml"
+        route.write_text(route.read_text() + "\n# edited after loading\n")
+        run_dbt(build_dir)
+        write_manifest(data_copy, build_dir)
+        # The manifest records the inputs that were loaded, so the edit isn't in the graph and it isn't current.
+        assert not is_current(data_copy, build_dir)
 
 
 class TestBuildFailures:
