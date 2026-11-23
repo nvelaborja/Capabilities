@@ -67,11 +67,13 @@ class TestWhereAThingIsFound:
         assert first["properties"]["state"] == "worked"
         assert first["properties"]["worked_by_year"] == 1860
         assert first["properties"]["url"].endswith("dep_id=1")
+        assert first["properties"]["dataset"] == "mrds"  # names the dataset in the popup's link
 
     def test_the_datasets_say_where_the_places_came_from_and_when(self, graph, places):
         assert places_view(graph, places, "hematite")["datasets"] == [{
             "id": "mrds",
             "label": "USGS Mineral Resources Data System (MRDS)",
+            "short": "MRDS",
             "home": "https://mrdata.usgs.gov/mrds/",
             "retrieved_at": "2026-11-22T21:58:22Z",
             "license": "US public domain (a work of the U.S. Geological Survey)",

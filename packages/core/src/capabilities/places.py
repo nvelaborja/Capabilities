@@ -16,13 +16,14 @@ DATASETS = {
     "mrds_deposits": {
         "id": "mrds",
         "label": "USGS Mineral Resources Data System (MRDS)",
+        "short": "MRDS",
         "home": "https://mrdata.usgs.gov/mrds/",
     },
 }
 
 # What each feature carries to the map: enough for its popup, and no more, since a material can have thousands.
 FEATURE_PROPERTIES = (
-    "id", "source_id", "name", "country", "admin_area", "development_status", "deposit_type", "worked_by_year", "state",
+    "id", "source_id", "dataset", "name", "country", "admin_area", "development_status", "deposit_type", "worked_by_year", "state",
     "record_id", "url",
 )
 
@@ -83,7 +84,7 @@ def datasets(snapshots: dict[str, dict]) -> list[dict]:
     """The upstream snapshots loaded into the build, with when they were retrieved."""
     known = []
     for name, snapshot in sorted(snapshots.items()):
-        about = DATASETS.get(name, {"id": name, "label": name, "home": snapshot.get("url")})
+        about = DATASETS.get(name, {"id": name, "label": name, "short": name, "home": snapshot.get("url")})
         known.append({**about, "retrieved_at": snapshot.get("retrieved_at"), "license": snapshot.get("license")})
     return known
 

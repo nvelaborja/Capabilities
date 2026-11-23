@@ -9,6 +9,7 @@ import { type GraphFocus, GraphView } from "./graph/GraphView";
 import { Splitter } from "./layout/Splitter";
 import { usePaneSizes } from "./layout/usePaneSizes";
 import { Legend } from "./legend/Legend";
+import { ErrorBoundary } from "./lib/ErrorBoundary";
 import { ConfirmDialog } from "./panes/ConfirmDialog";
 import { SidePane } from "./panes/SidePane";
 import { searchIndex, type SearchEntry } from "./search/match";
@@ -160,10 +161,22 @@ export function App() {
       )}
       <main className="app-graph">
         {mapped && (
-          <Suspense fallback={<p className="notice">Loading the map…</p>}>
-            {/* Keyed by id, so each material's map starts from "loading". */}
-            <MapView key={mapped} id={mapped} theme={theme} onClose={() => setMapped(null)} />
-          </Suspense>
+          // Keyed by id, so each material's map starts from "loading", and a failure clears when another is chosen.
+          <ErrorBoundary
+            key={mapped}
+            fallback={
+              <div className="notice">
+                <p className="error">Couldn't load the map.</p>
+                <button type="button" onClick={() => setMapped(null)}>
+                  Back to the graph
+                </button>
+              </div>
+            }
+          >
+            <Suspense fallback={<p className="notice">Loading the map…</p>}>
+              <MapView id={mapped} theme={theme} onClose={() => setMapped(null)} />
+            </Suspense>
+          </ErrorBoundary>
         )}
         {loaded && !mapped && (
           <GraphView

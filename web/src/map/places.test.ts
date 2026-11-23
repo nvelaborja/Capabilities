@@ -1,7 +1,18 @@
 import { describe, expect, it } from "vitest";
 
 import type { OccurrencesResponse, SourceSummary } from "../api/types";
-import { bounds, canMap, emptyReason, retrievedOn, sourceLine, stateText, whereText } from "./places";
+import {
+  bounds,
+  canMap,
+  emptyReason,
+  placesUnder,
+  recordLinkText,
+  retrievedOn,
+  safeLink,
+  sourceLine,
+  stateText,
+  whereText,
+} from "./places";
 
 const hematite: SourceSummary = { id: "hematite-deposit", label: "Hematite deposit", availability: "regional", regions: ["Widespread"], places: 2655, worked: 659 };
 
@@ -12,7 +23,7 @@ function response(overrides: Partial<OccurrencesResponse> = {}): OccurrencesResp
     kind: "material",
     origin: "extracted",
     sources: [hematite],
-    datasets: [{ id: "mrds", label: "USGS MRDS", home: null, retrieved_at: "2026-11-22T21:58:22Z", license: null }],
+    datasets: [{ id: "mrds", label: "USGS MRDS", short: "MRDS", home: null, retrieved_at: "2026-11-22T21:58:22Z", license: null }],
     features: {
       type: "FeatureCollection",
       features: [
@@ -101,5 +112,33 @@ describe("bounds", () => {
   it("is null with no places, or places spread over more than half the globe", () => {
     expect(bounds(response({ features: { type: "FeatureCollection", features: [] } }))).toBeNull();
     expect(bounds(response())).toBeNull(); // Colorado and Burma
+  });
+});
+
+describe("popup links", () => {
+  it("follows only http and https links from a dataset", () => {
+    expect(safeLink("https://mrdata.usgs.gov/mrds/show-mrds.php?dep_id=10008106")).toBe(
+      "https://mrdata.usgs.gov/mrds/show-mrds.php?dep_id=10008106",
+    );
+    expect(safeLink("http://example.org/a")).toBe("http://example.org/a");
+    expect(safeLink("javascript:alert(1)")).toBeNull();
+    expect(safeLink("data:text/html,<b>hi</b>")).toBeNull();
+    expect(safeLink("not a url")).toBeNull();
+    expect(safeLink(null)).toBeNull();
+  });
+
+  it("names the dataset the record is in", () => {
+    const { datasets } = response();
+    expect(recordLinkText("mrds", datasets)).toBe("Its record in MRDS ↗");
+    expect(recordLinkText("pleiades", datasets)).toBe("Its record in pleiades ↗");
+  });
+});
+
+describe("placesUnder", () => {
+  const place = (id: string, name: string | null) => ({ properties: { id, name } });
+
+  it("lists every place under a click once, by name", () => {
+    const under = placesUnder([place("b", "Tilt Cove"), place("a", "Betts Cove"), place("b", "Tilt Cove"), place("c", null)]);
+    expect(under.map((feature) => feature.properties.id)).toEqual(["c", "a", "b"]);
   });
 });

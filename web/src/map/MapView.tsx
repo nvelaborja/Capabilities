@@ -9,7 +9,17 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import type { OccurrencesResponse, PlaceProperties } from "../api/types";
 import type { Theme } from "../state/theme";
-import { bounds, emptyReason, retrievedOn, sourceLine, stateText, whereText } from "./places";
+import {
+  bounds,
+  emptyReason,
+  placesUnder,
+  recordLinkText,
+  retrievedOn,
+  safeLink,
+  sourceLine,
+  stateText,
+  whereText,
+} from "./places";
 
 // OpenFreeMap: free vector tiles from OpenStreetMap data, with no key and no cookies (ADR 0042). MapLibre adds the
 // attribution the tiles carry.
@@ -131,11 +141,17 @@ function tokens() {
     ink: read("--type-source-ink"),
     surface: read("--surface"),
     text: read("--text"),
+    backdrop: read("--backdrop"),
   };
 }
 
+type Colours = ReturnType<typeof tokens>;
+
+const PLACE_LAYERS = ["places-worked", "places-present"];
+
 function PlacesMap({ places, theme }: { places: OccurrencesResponse; theme: Theme }) {
   const container = useRef<HTMLDivElement>(null);
+  const [basemapFailed, setBasemapFailed] = useState(false);
 
   useEffect(() => {
     if (!container.current) return;
@@ -150,63 +166,21 @@ function PlacesMap({ places, theme }: { places: OccurrencesResponse; theme: Them
     });
     map.addControl(new NavigationControl({ showCompass: false }), "bottom-right");
 
-    map.on("load", () => {
-      map.addSource("places", {
-        type: "geojson",
-        data: places.features,
-        cluster: true,
-        clusterRadius: 40,
-        clusterMaxZoom: 8,
-        // How many places in a cluster are known to have been worked, for its label.
-        clusterProperties: { worked: ["+", ["case", ["==", ["get", "state"], "worked"], 1, 0]] },
-      });
-      map.addLayer({
-        id: "clusters",
-        type: "circle",
-        source: "places",
-        filter: ["has", "point_count"],
-        paint: {
-          "circle-color": colours.fill,
-          "circle-opacity": 0.85,
-          "circle-stroke-color": colours.line,
-          "circle-stroke-width": 1.5,
-          "circle-radius": ["step", ["get", "point_count"], 12, 25, 16, 250, 22, 1000, 28],
-        },
-      });
-      map.addLayer({
-        id: "cluster-count",
-        type: "symbol",
-        source: "places",
-        filter: ["has", "point_count"],
-        layout: { "text-field": ["get", "point_count_abbreviated"], "text-font": FONT, "text-size": 12 },
-        paint: { "text-color": colours.ink },
-      });
-      // Worked places are filled and present ones are rings, so the difference never rests on colour alone (ADR 0019).
-      map.addLayer({
-        id: "places-present",
-        type: "circle",
-        source: "places",
-        filter: ["all", ["!", ["has", "point_count"]], ["!=", ["get", "state"], "worked"]],
-        paint: {
-          "circle-radius": 5,
-          "circle-color": colours.surface,
-          "circle-stroke-color": colours.line,
-          "circle-stroke-width": 2.5,
-        },
-      });
-      map.addLayer({
-        id: "places-worked",
-        type: "circle",
-        source: "places",
-        filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "state"], "worked"]],
-        paint: {
-          "circle-radius": 6,
-          "circle-color": colours.fill,
-          "circle-stroke-color": colours.text,
-          "circle-stroke-width": 1.5,
-        },
+    // Without the basemap's style the map never loads, and the places would never be drawn. Fall back to a plain
+    // background once, so the places still show offline or when OpenFreeMap is down.
+    let styleArrived = false;
+    map.once("styledata", () => (styleArrived = true));
+    map.on("error", () => {
+      if (styleArrived) return;
+      styleArrived = true;
+      setBasemapFailed(true);
+      map.setStyle({
+        version: 8,
+        sources: {},
+        layers: [{ id: "background", type: "background", paint: { "background-color": colours.backdrop } }],
       });
     });
+    map.on("load", () => addPlaces(map, places, colours));
 
     map.on("click", "clusters", (event) => {
       const cluster = event.features?.[0];
@@ -218,18 +192,18 @@ function PlacesMap({ places, theme }: { places: OccurrencesResponse; theme: Them
         .then((zoom) => map.easeTo({ center, zoom }))
         .catch(() => {});
     });
-    for (const layer of ["places-worked", "places-present"]) {
-      map.on("click", layer, (event) => {
-        const place = event.features?.[0];
-        if (!place || place.geometry.type !== "Point") return;
-        new Popup({ maxWidth: "18rem" })
-          .setLngLat(place.geometry.coordinates as [number, number])
-          .setDOMContent(popupContent(place, places))
-          .addTo(map);
-      });
-    }
+    // Every place under the pointer, not just the top one: places that share a spot never separate however far you zoom.
+    map.on("click", PLACE_LAYERS, (event) => {
+      const under = placesUnder(event.features ?? []);
+      const first = under[0];
+      if (!first || first.geometry.type !== "Point") return;
+      new Popup({ maxWidth: "18rem" })
+        .setLngLat(first.geometry.coordinates as [number, number])
+        .setDOMContent(popupContent(under, places))
+        .addTo(map);
+    });
     // The pointer says what can be selected; selecting is a click or tap, never a hover (ADR 0019).
-    for (const layer of ["clusters", "places-worked", "places-present"]) {
+    for (const layer of ["clusters", ...PLACE_LAYERS]) {
       map.on("mouseenter", layer, () => (map.getCanvas().style.cursor = "pointer"));
       map.on("mouseleave", layer, () => (map.getCanvas().style.cursor = ""));
     }
@@ -237,14 +211,94 @@ function PlacesMap({ places, theme }: { places: OccurrencesResponse; theme: Them
     return () => map.remove();
   }, [places, theme]);
 
-  return <div ref={container} className="map-canvas" role="region" aria-label={`Map of where ${places.label.toLowerCase()} is found`} />;
+  return (
+    <>
+      <div ref={container} className="map-canvas" role="region" aria-label={`Map of where ${places.label.toLowerCase()} is found`} />
+      {basemapFailed && (
+        <p className="map-basemap-failed" role="status">
+          The background map couldn't be loaded, so the places are drawn without it.
+        </p>
+      )}
+    </>
+  );
 }
 
-/** The popup for one place, built from text nodes: upstream names never become HTML. */
-function popupContent(feature: MapGeoJSONFeature, places: OccurrencesResponse): HTMLElement {
-  const place = feature.properties as PlaceProperties;
+function addPlaces(map: MapLibreMap, places: OccurrencesResponse, colours: Colours) {
+  map.addSource("places", {
+    type: "geojson",
+    data: places.features,
+    cluster: true,
+    clusterRadius: 40,
+    clusterMaxZoom: 8,
+  });
+  map.addLayer({
+    id: "clusters",
+    type: "circle",
+    source: "places",
+    filter: ["has", "point_count"],
+    paint: {
+      "circle-color": colours.fill,
+      "circle-opacity": 0.85,
+      "circle-stroke-color": colours.line,
+      "circle-stroke-width": 1.5,
+      "circle-radius": ["step", ["get", "point_count"], 12, 25, 16, 250, 22, 1000, 28],
+    },
+  });
+  // Text needs the basemap's fonts; on the plain fallback, a cluster's size still says roughly how many it holds.
+  if (map.getStyle().glyphs) {
+    map.addLayer({
+      id: "cluster-count",
+      type: "symbol",
+      source: "places",
+      filter: ["has", "point_count"],
+      layout: { "text-field": ["get", "point_count_abbreviated"], "text-font": FONT, "text-size": 12 },
+      paint: { "text-color": colours.ink },
+    });
+  }
+  // Worked places are filled and present ones are rings, so the difference never rests on colour alone (ADR 0019).
+  map.addLayer({
+    id: "places-present",
+    type: "circle",
+    source: "places",
+    filter: ["all", ["!", ["has", "point_count"]], ["!=", ["get", "state"], "worked"]],
+    paint: {
+      "circle-radius": 5,
+      "circle-color": colours.surface,
+      "circle-stroke-color": colours.line,
+      "circle-stroke-width": 2.5,
+    },
+  });
+  map.addLayer({
+    id: "places-worked",
+    type: "circle",
+    source: "places",
+    filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "state"], "worked"]],
+    paint: {
+      "circle-radius": 6,
+      "circle-color": colours.fill,
+      "circle-stroke-color": colours.text,
+      "circle-stroke-width": 1.5,
+    },
+  });
+}
+
+/** The popup for the places under a click, built from text nodes: upstream names never become HTML. */
+function popupContent(features: MapGeoJSONFeature[], places: OccurrencesResponse): HTMLElement {
   const root = document.createElement("div");
   root.className = "map-popup";
+  if (features.length > 1) {
+    const heading = document.createElement("strong");
+    heading.className = "map-popup-count";
+    heading.textContent = `${features.length} places here`;
+    root.append(heading);
+  }
+  for (const feature of features) root.append(placeContent(feature.properties as PlaceProperties, places));
+  return root;
+}
+
+function placeContent(place: PlaceProperties, places: OccurrencesResponse): HTMLElement {
+  const root = document.createElement("div");
+  root.className = "map-popup-place";
   const add = (tag: string, text: string, className?: string) => {
     const element = document.createElement(tag);
     element.textContent = text;
@@ -259,9 +313,10 @@ function popupContent(feature: MapGeoJSONFeature, places: OccurrencesResponse): 
   if (source && places.sources.length > 1) add("span", source.label);
   const details = [place.development_status && `Status: ${place.development_status}`, place.deposit_type && `Type: ${place.deposit_type}`];
   for (const detail of details.filter(Boolean)) add("span", detail as string, "map-popup-detail");
-  if (place.url) {
-    const link = add("a", "The MRDS record ↗");
-    link.setAttribute("href", place.url);
+  const href = safeLink(place.url);
+  if (href) {
+    const link = add("a", recordLinkText(place.dataset, places.datasets));
+    link.setAttribute("href", href);
     link.setAttribute("target", "_blank");
     link.setAttribute("rel", "noreferrer");
   }

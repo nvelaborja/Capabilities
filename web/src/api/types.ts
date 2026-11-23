@@ -232,6 +232,8 @@ export type OccurrenceState = "worked" | "present";
 export interface PlaceProperties {
   id: string;
   source_id: string;
+  /** The id of the dataset the place came from, one of the response's `datasets`. */
+  dataset: string;
   name: string | null;
   country: string | null;
   admin_area: string | null;
@@ -262,6 +264,8 @@ export interface SourceSummary {
 export interface PlaceDataset {
   id: string;
   label: string;
+  /** A short name for links, such as "MRDS". */
+  short: string;
   home: string | null;
   retrieved_at: string | null;
   license: string | null;

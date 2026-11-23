@@ -18,7 +18,9 @@
 
 **Web workers.** Parsing tiles and clustering run in background web workers, so the page stays responsive. The worker is a separate script that MapLibre must be able to load. A bundler that moves MapLibre's code needs to emit that script and tell MapLibre where it is (`setWorkerUrl`).
 
-**Events and popups.** `map.on("click", "layer-id", handler)` gives the features under the pointer in that layer. A `Popup` is a small box anchored to a coordinate, filled with HTML or a DOM element.
+**Events and popups.** `map.on("click", "layer-id", handler)` gives the features under the pointer in that layer; pass a list of layer ids to hear several layers in one handler. A `Popup` is a small box anchored to a coordinate, filled with HTML or a DOM element.
+
+**Loading and errors.** The map fires `load` once its style and the first tiles are in, and `error` when something can't be fetched. If the style itself fails, `load` never fires, so anything added in a `load` handler never appears unless the map is given another style (`setStyle`).
 
 **Attribution.** Map data comes with credit requirements. OpenStreetMap's data is under the ODbL and must be credited. MapLibre shows the attribution the tiles carry in a control in the corner.
 
@@ -33,7 +35,7 @@ The map shows where a material or source is found ([ADR 0042](../../adr/0042-sho
    - places known to have been worked, as filled dots;
    - places present with no known working date, as rings;
    - the cluster labels.
-4. Selecting a cluster zooms in. Selecting a place opens a popup with its name, location, state in words, MRDS status and type, and a link to the MRDS record.
+4. Selecting a cluster zooms in. Selecting a place opens a popup with its name, location, state in words, MRDS status and type, and a link to its record in its dataset. When several places are under the pointer, as when they share coordinates, the popup lists them all.
 
 The panel over the map has one line per source, a key and the data source. It also explains an empty map: a material that is made, a source found almost everywhere, a source with no mapped places (with its curated regions instead), or no snapshot downloaded.
 
@@ -58,7 +60,9 @@ curl -s localhost:8000/api/occurrences/hematite | python3 -m json.tool | head -4
 - **Coordinates are longitude first**, in GeoJSON and everywhere in MapLibre.
 - **Colours come from `theme.css`.** `MapView` reads the CSS custom properties when the map is created. Changing the theme makes a new map, because a new basemap style replaces every layer.
 - **Shape, not colour, tells worked from present** (filled dot or ring), and the popup says it in words ([ADR 0019](../../adr/0019-desktop-first-mobile-ready.md)). Popups open on click or tap, never on hover.
-- **Upstream text is never HTML.** Popups are built from text nodes, because names come from a dataset we don't control.
+- **Upstream text is never HTML.** Popups are built from text nodes, because names come from a dataset we don't control. For the same reason a record link is followed only if it is http or https (`safeLink` in `places.ts`).
+- **Without the basemap, the places still draw.** If OpenFreeMap's style can't be loaded (offline, blocked, or down), `MapView` switches to a one-layer style with a plain background and says so on the map. That style has no fonts, so clusters show no counts.
+- **Places can share coordinates.** Clustering never separates them, so the place click handler takes every feature under the pointer (`placesUnder`), not just the first.
 - **MapLibre draws on animation frames.** In a hidden or background browser tab it draws nothing, which matters for automated screenshots, not for people.
 - **The worker must be bundled.** `import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url"` and `setWorkerUrl(workerUrl)`. Without them the console says "Worker failed to load" and the map stays blank.
 - **Keep the attribution control.** It is a condition of OpenStreetMap's license.

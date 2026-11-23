@@ -63,3 +63,30 @@ export function bounds(places: OccurrencesResponse): [number, number, number, nu
   if (east - west > 180) return null;
   return [west, Math.min(...latitudes), east, Math.max(...latitudes)];
 }
+
+/** A link to follow from a popup, or null: only http and https, since the address comes from a dataset we don't control. */
+export function safeLink(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.href : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The text of a place's link to its upstream record, naming the dataset it came from. */
+export function recordLinkText(datasetId: string, datasets: OccurrencesResponse["datasets"]): string {
+  const dataset = datasets.find((candidate) => candidate.id === datasetId);
+  return `Its record in ${dataset?.short ?? datasetId} ↗`;
+}
+
+/**
+ * The places under a click, each once and by name. Several places can share a spot (MRDS often records deposits of one
+ * district at the same coordinates), and a place can come back twice when it sits on a tile edge.
+ */
+export function placesUnder<T extends { properties: Record<string, unknown> }>(features: T[]): T[] {
+  const name = (feature: T) => String(feature.properties.name ?? "");
+  const unique = new Map(features.map((feature) => [feature.properties.id, feature]));
+  return [...unique.values()].sort((a, b) => name(a).localeCompare(name(b)));
+}

@@ -29,7 +29,8 @@ A map needs a basemap: land, borders and place names drawn from tiles. Tiles eit
 - MapLibre GL JS is loaded only when the map first opens. It is a separate 1 MB chunk, and its web worker is bundled as its own file, given to MapLibre with `setWorkerUrl`.
 - Places are clustered, and each cluster shows its count; selecting a cluster zooms in.
 - A single place is a **filled dot** when it is known to have been worked by a year, and a **ring** when it is present with no known working date. The shape carries the difference, the panel's key explains it, and the popup says it in words.
-- Selecting a place opens a popup, on click or tap and never on hover. It shows the place's name, where it is, its state in words, MRDS's development status and deposit type, and a link to the MRDS record. Upstream text is set as text, never as HTML.
+- Selecting a place opens a popup, on click or tap and never on hover. It shows the place's name, where it is, its state in words, MRDS's development status and deposit type, and a link to its record in the dataset it came from. Upstream text is set as text, never as HTML, and a link is followed only if it is http or https.
+- Places at the same coordinates never separate, however far you zoom (in MRDS, up to 10 deposits share one point). The popup therefore lists every place under the pointer ("7 places here").
 - A panel on the map gives one line per source:
   - its counts;
   - "found almost everywhere, so not mapped" for a ubiquitous source;
@@ -46,7 +47,7 @@ A map needs a basemap: land, borders and place names drawn from tiles. Tiles eit
 ## Consequences
 
 - The M1 requirement "selecting hematite shows its deposits on the map" is met: 2,655 places, 659 of them known to have been worked.
-- The map works only with network access to OpenFreeMap. Offline, the places still draw on a blank background, and the panel still gives the counts.
+- The background map needs network access to OpenFreeMap. If its style can't be loaded, the map switches to a plain background in the theme's colour, draws the places on it without cluster counts (text needs the basemap's fonts), and says the background map couldn't be loaded. The panel still gives the counts.
 - OpenFreeMap sees the IP address and map area of anyone who opens the map, as any tile server would. If the app is hosted for others, the README or an about page should say so, or we self-host the tiles (below).
 - The web bundle grows by about 1 MB of JavaScript and 520 KB of worker, but only for people who open the map.
 - Profile areas, polity borders and a time control (M4) go on this same map. The occurrence states are already in place for "worked by the profile's date".

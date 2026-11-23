@@ -124,11 +124,11 @@ class TestOccurrences:
         """A server on a build with the 14-record MRDS sample."""
         return TestClient(create_app(repo_root, web_dist=tmp_path_factory.mktemp("no-web-build"), build_dir=mrds_built_dir))
 
-    def test_a_materials_places_are_the_occurrences_of_its_sources_as_geojson(self, mapped):
+    def test_a_materials_places_are_the_occurrences_of_its_sources_as_geojson(self, mapped, graph):
         body = mapped.get("/api/occurrences/hematite").json()
         assert body["sources"] == [{
             "id": "hematite-deposit", "label": "Hematite deposit", "availability": "regional",
-            "regions": body["sources"][0]["regions"], "places": 3, "worked": 1,
+            "regions": graph.things["hematite-deposit"]["regions"], "places": 3, "worked": 1,
         }]
         records = {f["properties"]["record_id"]: f for f in body["features"]["features"]}
         assert set(records) == {"10001442", "10003682", "10008106"}
