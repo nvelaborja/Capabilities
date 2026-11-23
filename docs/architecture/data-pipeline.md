@@ -215,6 +215,7 @@ A build is current when `manifest.json` exists, its `fingerprint` equals the fin
 | Reader | Reads | Why |
 |---|---|---|
 | `need`, `explore`, `check`, `serve` | The built graph (`load_built` via `current_graph`) | They answer questions from what the pipeline built. From M1 this includes upstream data. |
+| `serve`, for the map | `source_occurrences.parquet` (`load_occurrences`) and the manifest's `upstream` | Where each source is found, for `GET /api/occurrences/{id}` ([ADR 0042](../adr/0042-show-where-things-are-found-on-a-maplibre-map.md)). It reads the longitude and latitude columns, so the server needs no spatial extension. |
 | `validate` | The curated YAML (`Graph.from_curated`) | It checks what people wrote, file by file. |
 | `credits` | The curated YAML | The works cited are in the curated layer. |
 | Reasoner and view tests | The curated YAML, or small graphs built in the test | Fast, and no build needed. |
@@ -274,7 +275,7 @@ duckdb.sql("""
 
 | Milestone | Change to the pipeline |
 |---|---|
-| M1 | Done: Dagster runs the build; MRDS, the MRDS crosswalk and `source_occurrences`. Still to come: an API endpoint and a map for occurrences; Pleiades and Wikidata, with a Wikidata crosswalk; overrides and suppressions; upstream nodes in `graph_nodes`; a `curation_queue` mart. |
+| M1 | Done: Dagster runs the build; MRDS, the MRDS crosswalk and `source_occurrences`, served by `GET /api/occurrences/{id}` to the map. Still to come: Pleiades and Wikidata, with a Wikidata crosswalk; overrides and suppressions; upstream nodes in `graph_nodes`; a `curation_queue` mart. |
 | M2 | Citation checks against OpenAlex and Crossref; a `reference_checks` mart. |
 | M3 | The agent curation stage and its append-only audit log. |
 | M5 | Raw and staging tables move to Apache Iceberg with an Apache Polaris catalog; the build still exports this artifact for the app. |

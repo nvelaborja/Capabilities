@@ -23,9 +23,9 @@ Data flows one way, left to right. People edit the **curated layer**; **upstream
 | Upstream datasets | `build/upstream/` (downloaded) | [Parquet](technologies/parquet.md) | Snapshots of public datasets, each recorded with where and when it was retrieved, its hash and its license. Today: USGS MRDS mineral deposits ([ADR 0041](../adr/0041-place-sources-with-mrds-deposits-through-a-crosswalk.md)). |
 | Pipeline | `pipeline/` | [Python](technologies/python-and-uv.md), [DuckDB](technologies/duckdb.md), [dbt](technologies/dbt.md), [Dagster](technologies/dagster.md) | Builds the graph. A Python loader puts every curated document, crosswalk and upstream snapshot into DuckDB tables; a dbt project transforms and tests them, and writes the results as [Parquet](technologies/parquet.md), using [DuckDB's spatial extension](technologies/duckdb-spatial-and-geoparquet.md) for locations. Dagster downloads the upstream snapshots and runs the same steps as assets, with lineage, checks and run history. |
 | Built graph | `build/graph/` (generated) | [Parquet](technologies/parquet.md), [GeoParquet](technologies/duckdb-spatial-and-geoparquet.md), JSON | The artifact the app reads: one row per node, where each source kind is found (occurrences, with point geometries), and a manifest saying which inputs it was built from ([ADR 0038](../adr/0038-serve-the-app-from-a-built-graph-artifact.md)). |
-| Core library | `packages/core/` | [Python](technologies/python-and-uv.md) | The in-memory graph, the reasoner (Q1–Q3, tech levels, display shapes), the validator, and the `capabilities` command-line tool. |
+| Core library | `packages/core/` | [Python](technologies/python-and-uv.md) | The in-memory graph, the reasoner (Q1–Q3, tech levels, display shapes), where things are found (for the map), the validator, and the `capabilities` command-line tool. |
 | API server | `packages/api/` | [FastAPI](technologies/fastapi.md) | JSON endpoints under `/api`, interactive docs at `/docs`, and static hosting for the web app at `/` and these diagrams at `/architecture/`. |
-| Web app | `web/` | [React, TypeScript, Vite, Cytoscape.js](technologies/react-vite-and-cytoscape.md) | The interactive graph, selection panes and detail pane. |
+| Web app | `web/` | [React, TypeScript, Vite, Cytoscape.js](technologies/react-vite-and-cytoscape.md), [MapLibre GL JS](technologies/maplibre.md) | The interactive graph, selection panes and detail pane, and a map of where materials and sources are found, over [OpenFreeMap](technologies/maplibre.md) tiles. |
 | Architecture docs | `docs/architecture/` | [LikeC4](technologies/likec4.md) | These pages and the diagrams, built into a static site served by the API server. |
 | CI | `.github/workflows/ci.yml` | [GitHub Actions](technologies/github-actions.md) | On every pull request: validate the data, build the graph, run every test, lint, type-check and build the web app and diagrams. |
 
@@ -38,6 +38,8 @@ Take "what else could Middle Kingdom Egypt do?" (Q2) in the browser:
 3. **Reasoner.** It computes what the selection implies (what it must have needed), what becomes reachable (repeatedly adding everything whose requirements are met until nothing changes, a *fixed point*), and what is one raw ingredient away. Ranges are compared with three answers: yes, no, or maybe ([ADR 0007](../adr/0007-compare-ranges-with-three-answers.md)).
 4. **Views.** The result is shaped for display: a status for every node, what implies what, groups for the side panes.
 5. **Browser.** The web app colours each node's border by status and lists the results as chips.
+
+**Where it's found** takes a shorter path: `GET /api/occurrences/hematite` returns the places of every source hematite is extracted from, which the server loaded from `source_occurrences.parquet` at start-up, and the web app draws them on a MapLibre map ([ADR 0042](../adr/0042-show-where-things-are-found-on-a-maplibre-map.md)).
 
 The command line takes the same path without the browser and server: `uv run capabilities explore --profile middle-kingdom-egypt` calls the same reasoner on the same built graph.
 
@@ -67,6 +69,7 @@ The [ADRs](../adr/README.md) record every significant decision. The ones that sh
 | Dagster orchestrates the build as assets; `capabilities build` runs the same steps without it. | [0040](../adr/0040-orchestrate-the-build-with-dagster.md) |
 | Sources are placed by occurrences in a geospatial layer, not drawn as graph nodes. | [0036](../adr/0036-place-sources-and-profiles-in-space-and-time.md) |
 | MRDS deposits become occurrences of source kinds through a hand-kept crosswalk. | [0041](../adr/0041-place-sources-with-mrds-deposits-through-a-crosswalk.md) |
+| A MapLibre map over OpenFreeMap tiles shows where things are found. | [0042](../adr/0042-show-where-things-are-found-on-a-maplibre-map.md) |
 
 ## Repository layout
 
@@ -86,4 +89,4 @@ The Python code is a [uv workspace](technologies/python-and-uv.md): three packag
 
 ## What comes next
 
-The [data platform plan](../adr/0033-build-a-python-data-platform-around-the-graph.md) adds, milestone by milestone: the rest of the upstream datasets and a map of where materials are found (M1), citation checks (M2), AI agents that propose curated facts (M3), places and dates for sources and profiles (M4), Apache Iceberg tables with an Apache Polaris catalog (M5), Kubernetes (M6) and Kafka for usage events (M7). Each one updates this page, the diagrams, and adds a technology page.
+The [data platform plan](../adr/0033-build-a-python-data-platform-around-the-graph.md) adds, milestone by milestone: the rest of the upstream datasets (M1), citation checks (M2), AI agents that propose curated facts (M3), places and dates for sources and profiles (M4), Apache Iceberg tables with an Apache Polaris catalog (M5), Kubernetes (M6) and Kafka for usage events (M7). Each one updates this page, the diagrams, and adds a technology page.

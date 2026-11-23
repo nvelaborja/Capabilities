@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useReducer, useState } from "react";
 
 import { api } from "./api/client";
 import type { GraphResponse, Profile } from "./api/types";
@@ -9,6 +9,7 @@ import { type GraphFocus, GraphView } from "./graph/GraphView";
 import { Splitter } from "./layout/Splitter";
 import { usePaneSizes } from "./layout/usePaneSizes";
 import { Legend } from "./legend/Legend";
+import { ErrorBoundary } from "./lib/ErrorBoundary";
 import { ConfirmDialog } from "./panes/ConfirmDialog";
 import { SidePane } from "./panes/SidePane";
 import { searchIndex, type SearchEntry } from "./search/match";
@@ -21,6 +22,9 @@ import { decodeSelection, encodeSelection } from "./state/url";
 import { useExplore } from "./state/useExplore";
 import { usePresetItems } from "./state/usePresetItems";
 import { useSelectionHistory } from "./state/useSelectionHistory";
+
+// MapLibre is large, so the map loads only when it is first opened.
+const MapView = lazy(() => import("./map/MapView").then((module) => ({ default: module.MapView })));
 
 type Loaded<T> = { status: "loading" } | { status: "ready"; value: T } | { status: "failed"; error: string };
 
@@ -42,6 +46,8 @@ export function App() {
   const [trail, navigate] = useReducer(trailReducer, []);
   const [centerSeq, setCenterSeq] = useState({ center: false, seq: 0 });
   const [isolated, setIsolated] = useState<string | null>(null);
+  // The material or source shown on the map in place of the graph, if any.
+  const [mapped, setMapped] = useState<string | null>(null);
   // undefined: no confirmation pending. null or an id: the preset waiting to replace an edited selection.
   const [pendingPreset, setPendingPreset] = useState<string | null | undefined>(undefined);
 
@@ -149,10 +155,30 @@ export function App() {
           onAdd={add}
           onRemove={remove}
           onIsolate={setIsolated}
+          mapped={mapped}
+          onShowMap={setMapped}
         />
       )}
       <main className="app-graph">
-        {loaded && (
+        {mapped && (
+          // Keyed by id, so each material's map starts from "loading", and a failure clears when another is chosen.
+          <ErrorBoundary
+            key={mapped}
+            fallback={
+              <div className="notice">
+                <p className="error">Couldn't load the map.</p>
+                <button type="button" onClick={() => setMapped(null)}>
+                  Back to the graph
+                </button>
+              </div>
+            }
+          >
+            <Suspense fallback={<p className="notice">Loading the map…</p>}>
+              <MapView id={mapped} theme={theme} onClose={() => setMapped(null)} />
+            </Suspense>
+          </ErrorBoundary>
+        )}
+        {loaded && !mapped && (
           <GraphView
             graph={loaded}
             explore={explore.data}

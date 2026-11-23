@@ -8,14 +8,16 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import APIRouter, FastAPI, HTTPException, Query
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from capabilities import __version__
-from capabilities.built import current_graph
+from capabilities.built import build_dir_for, current_graph, load_occurrences, read_manifest
 from capabilities.graph import Graph, find_root
 from capabilities.levels import compute_levels
+from capabilities.places import NotPlaceable, Places, places_view
 from capabilities.reasoner import Backward, Selection, assess_job, closure, explore, need_tree
 from capabilities.views import StatusContext, UnknownNode, explain, explain_edge, explore_view, graph_view, parse_action
 
@@ -58,14 +60,18 @@ npm run build</code></pre>
 
 def create_app(root: Path | None = None, web_dist: Path | None = None, build_dir: Path | None = None) -> FastAPI:
     root = root or find_root()
+    build_dir = build_dir_for(root, build_dir)
     graph = current_graph(root, build_dir)
     levels = compute_levels(graph)
+    places = Places.from_rows(load_occurrences(build_dir), (read_manifest(build_dir) or {}).get("upstream", {}))
     api = APIRouter(prefix="/api")
     app = FastAPI(
         title="Capabilities",
         version=__version__,
         description="What would it take to make X? What else is within reach? Could this job have been done this way?",
     )
+    # A material's places can run to a few megabytes of GeoJSON, which compresses about tenfold.
+    app.add_middleware(GZipMiddleware, minimum_size=1024)
 
     def selection(request: SelectionRequest) -> tuple[Selection, Selection]:
         selected = Selection()
@@ -144,6 +150,15 @@ def create_app(root: Path | None = None, web_dist: Path | None = None, build_dir
                 raise HTTPException(422, f"Unknown action {key!r}; expected verb:target, e.g. cut:limestone")
             extra.append(parse_action(key))
         return graph_view(graph, levels, extra)
+
+    @api.get("/occurrences/{thing_id}")
+    def occurrences(thing_id: str) -> dict:
+        """Where a material or source is found: each source it comes from, with how many places are known and how many
+        are known to have been worked, and every place as GeoJSON points (ADR 0036, ADR 0041)."""
+        try:
+            return places_view(graph, places, thing_id)
+        except NotPlaceable:
+            raise HTTPException(404, f"{thing_id!r} is not a material or a source") from None
 
     @api.post("/explore")
     def explore_endpoint(request: SelectionRequest) -> dict:

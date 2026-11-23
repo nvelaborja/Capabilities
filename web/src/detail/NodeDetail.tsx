@@ -4,6 +4,7 @@ import type { About, ExplainResponse, ExploreResponse, SelectionRequest } from "
 import type { Catalog } from "../catalog";
 import { CHIP_ICONS, NodeChip } from "../chips/NodeChip";
 import { STATUS_LABELS } from "../legend/Legend";
+import { canMap } from "../map/places";
 import { useExplain } from "../state/useExplain";
 import { DetailShell } from "./DetailShell";
 import { ExpandAllDialog } from "./ExpandAllDialog";
@@ -31,6 +32,8 @@ interface NodeDetailProps extends DetailContext {
   onAdd: (id: string) => void;
   onRemove: (id: string) => void;
   onIsolate: (id: string | null) => void;
+  mapped: string | null;
+  onShowMap: (id: string | null) => void;
 }
 
 /**
@@ -38,7 +41,8 @@ interface NodeDetailProps extends DetailContext {
  * Requirements drill down; the breadcrumb leads back.
  */
 export function NodeDetail(props: NodeDetailProps) {
-  const { id, catalog, explore, selection, crumbs, isolated, onBack, onDrill, onClose, onAdd, onRemove, onIsolate } = props;
+  const { id, catalog, explore, selection, crumbs, isolated, mapped, onBack, onDrill, onClose, onAdd, onRemove, onIsolate, onShowMap } =
+    props;
   const { data, loading, error } = useExplain(selection, id);
   const [expanding, setExpanding] = useState<string | null>(null);
 
@@ -88,6 +92,11 @@ export function NodeDetail(props: NodeDetailProps) {
           {onGraph && (
             <button type="button" aria-pressed={isolated === id} onClick={() => onIsolate(isolated === id ? null : id)}>
               {isolated === id ? "Show whole graph" : "Focus"}
+            </button>
+          )}
+          {canMap(entry.kind, data?.about.origin) && (
+            <button type="button" aria-pressed={mapped === id} onClick={() => onShowMap(mapped === id ? null : id)}>
+              {mapped === id ? "Back to the graph" : "Where it's found"}
             </button>
           )}
         </>

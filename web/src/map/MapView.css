@@ -1,0 +1,221 @@
+.map-view {
+  position: absolute;
+  inset: 0;
+  background: var(--backdrop);
+}
+
+.map-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.map-panel {
+  position: absolute;
+  z-index: 5;
+  top: 0.75rem;
+  left: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: min(21rem, calc(100% - 1.5rem));
+  max-height: calc(100% - 1.5rem);
+  overflow: auto;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  font-size: 0.9rem;
+}
+
+.map-panel p,
+.map-panel ul {
+  margin: 0;
+}
+
+.map-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.map-panel-head h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.map-panel-head button {
+  flex: none;
+  padding: 0.25rem 0.65rem;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: var(--on-accent);
+  cursor: pointer;
+}
+
+.map-panel-head button:focus-visible {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 2px;
+}
+
+.map-sources {
+  padding-left: 1.1rem;
+}
+
+.map-empty {
+  padding: 0.5rem 0.65rem;
+  border-left: 3px solid var(--type-source-line);
+  background: var(--type-source-tint);
+  color: var(--type-source-ink);
+}
+
+.map-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0;
+  list-style: none;
+  color: var(--text-muted);
+}
+
+.map-legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.map-key {
+  flex: none;
+  display: inline-block;
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 50%;
+}
+
+.map-key-worked {
+  border: 2px solid var(--text);
+  background: var(--type-source-fill);
+}
+
+.map-key-present {
+  border: 3px solid var(--type-source-line);
+  background: var(--surface);
+}
+
+.map-key-cluster {
+  width: 1.1rem;
+  height: 1.1rem;
+  border: 2px solid var(--type-source-line);
+  background: var(--type-source-fill);
+  opacity: 0.85;
+}
+
+.map-key-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.map-key-details summary {
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.map-key-details[open] summary {
+  margin-bottom: 0.35rem;
+}
+
+.map-dataset {
+  margin-top: 0.35rem !important;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.map-dataset a {
+  color: var(--accent);
+}
+
+/* MapLibre's popup, in the app's colours. */
+.map-view .maplibregl-popup-content {
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+
+.map-view .maplibregl-popup-tip {
+  border-top-color: var(--surface-raised);
+  border-bottom-color: var(--surface-raised);
+}
+
+.map-view .maplibregl-popup-close-button {
+  color: var(--text-muted);
+}
+
+.map-popup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 16rem;
+  overflow: auto;
+  font-size: 0.85rem;
+}
+
+.map-popup-place {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+/* Several places in one popup: a rule between each. */
+.map-popup-place + .map-popup-place {
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.map-popup-count {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.map-popup-where,
+.map-popup-detail {
+  color: var(--text-muted);
+}
+
+.map-popup-worked {
+  font-weight: 600;
+}
+
+.map-popup a {
+  margin-top: 0.25rem;
+  color: var(--accent);
+}
+
+.map-basemap-failed {
+  position: absolute;
+  z-index: 5;
+  top: 0.75rem;
+  right: 0.75rem;
+  max-width: min(18rem, calc(100% - 1.5rem));
+  margin: 0;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  color: var(--text-muted);
+  box-shadow: var(--shadow);
+  font-size: 0.85rem;
+}
+
+@media (max-width: 40rem) {
+  .map-panel {
+    top: auto;
+    bottom: 0.75rem;
+    max-height: 45%;
+  }
+}

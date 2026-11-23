@@ -1,4 +1,15 @@
-import type { EdgeRequest, EdgeResponse, ExplainRequest, ExplainResponse, ExploreResponse, GraphResponse, Profile, ProfileDetail, SelectionRequest } from "./types";
+import type {
+  EdgeRequest,
+  EdgeResponse,
+  ExplainRequest,
+  ExplainResponse,
+  ExploreResponse,
+  GraphResponse,
+  OccurrencesResponse,
+  Profile,
+  ProfileDetail,
+  SelectionRequest,
+} from "./types";
 
 export class ApiError extends Error {
   readonly status: number;
@@ -51,5 +62,10 @@ export const api = {
 
   explainEdge(request: EdgeRequest, signal?: AbortSignal): Promise<EdgeResponse> {
     return postJson<EdgeResponse>("/api/explain-edge", request, signal);
+  },
+
+  /** Where a material or source is found: its sources and every mapped place (ADR 0042). */
+  occurrences(id: string, signal?: AbortSignal): Promise<OccurrencesResponse> {
+    return request<OccurrencesResponse>(`/api/occurrences/${encodeURIComponent(id)}`, { signal });
   },
 };

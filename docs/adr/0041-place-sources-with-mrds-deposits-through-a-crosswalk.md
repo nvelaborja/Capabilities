@@ -1,6 +1,6 @@
 # 0041. Place sources with MRDS deposits, matched through a hand-kept crosswalk
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-22
 
 ## Context

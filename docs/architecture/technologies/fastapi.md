@@ -19,7 +19,7 @@ FastAPI is a Python web framework for building HTTP APIs. You write ordinary fun
 `packages/api/src/capabilities_api/server.py` creates the app (`create_app`):
 
 - It loads the built graph once at start-up, through `current_graph`, rebuilding first if stale, and computes tech levels.
-- JSON endpoints under `/api` answer the three questions and feed the web app: `/api/graph`, `/api/explore`, `/api/explain`, `/api/explain-edge`, `/api/need/{id}`, `/api/check` and more. The [README](../../../README.md) has the full table.
+- JSON endpoints under `/api` answer the three questions and feed the web app: `/api/graph`, `/api/explore`, `/api/explain`, `/api/explain-edge`, `/api/need/{id}`, `/api/check`, `/api/occurrences/{id}` (where things are found, as GeoJSON for the [map](maplibre.md)) and more. Responses over 1 KB are gzip-compressed (`GZipMiddleware`). The [README](../../../README.md) has the full table.
 - It hosts the built web app (`web/dist`) at `/`, and with it the architecture diagrams at `/architecture/`.
 
 Why FastAPI: typed request models catch bad input at the edge, the generated docs make the API easy to explore, and it is small and quick to learn ([ADR 0013](../../adr/0013-use-python-for-the-reasoner-cli-and-server.md)).

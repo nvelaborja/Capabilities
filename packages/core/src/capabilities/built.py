@@ -106,6 +106,29 @@ def load_built(root: Path, build_dir: Path) -> Graph:
     return Graph.from_documents(root, ((node_type, json.loads(document), provenance) for node_type, document, provenance in rows))
 
 
+# The occurrence columns the app uses. The geometry is left out: the longitude and latitude columns hold the same point,
+# and reading them needs no spatial extension.
+OCCURRENCE_COLUMNS = (
+    "id", "source_id", "dataset", "record_id", "name", "longitude", "latitude", "country", "admin_area",
+    "development_status", "deposit_type", "worked_by_year", "state", "matched_on", "url",
+)
+
+
+def load_occurrences(build_dir: Path) -> list[dict]:
+    """Where sources are found (ADR 0036, ADR 0041), one dictionary per occurrence, ordered by source and record."""
+    import duckdb
+
+    path = graph_dir(build_dir) / OCCURRENCES_FILE
+    if not path.is_file():
+        return []
+    relation = duckdb.sql(
+        # dbt-duckdb writes an empty table as one row of nulls, which `id is not null` skips.
+        f"select {', '.join(OCCURRENCE_COLUMNS)} from read_parquet(?) where id is not null order by source_id, record_id",
+        params=[str(path)],
+    )
+    return [dict(zip(OCCURRENCE_COLUMNS, row)) for row in relation.fetchall()]
+
+
 def current_graph(root: Path, build_dir: Path | None = None) -> Graph:
     """The built graph, rebuilt first if the inputs changed since the last build."""
     build_dir = build_dir_for(root, build_dir)
