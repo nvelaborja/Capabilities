@@ -64,8 +64,8 @@ def write_manifest(root: Path, build_dir: Path) -> dict:
 
 def load_inputs(root: Path, build_dir: Path) -> dict:
     """Every input into its raw table, and the inputs' fingerprint into raw.loads. Parsing them into columns is dbt's
-    job. Returns how many curated documents, crosswalk rows and suppressions were loaded, and each upstream snapshot
-    (None for a dataset with none)."""
+    job. Returns how many curated documents, crosswalk rows and suppressions were loaded, and the snapshot of each
+    upstream dataset used, with which copy (a download or the cold backup). Stops if a dataset has no copy (ADR 0044)."""
     # Taken before anything is read, so an edit made while loading leaves the graph stale.
     inputs = fingerprint(root, build_dir)
     graph_dir(build_dir).mkdir(parents=True, exist_ok=True)
@@ -74,7 +74,7 @@ def load_inputs(root: Path, build_dir: Path) -> dict:
         documents = load_curated_documents(connection, root)
         crosswalks = load_tables(connection, root / "data" / "crosswalks")
         suppressions = load_tables(connection, root / "data" / "suppressions")
-        snapshots = load_upstream(connection, build_dir)
+        snapshots = load_upstream(connection, root, build_dir)
         connection.execute("create or replace table raw.loads (fingerprint varchar, loaded_at timestamptz)")
         connection.execute("insert into raw.loads values (?, now())", [inputs])
     return {"documents": documents, "crosswalks": crosswalks, "suppressions": suppressions, "upstream": snapshots}
@@ -123,9 +123,9 @@ def loaded_snapshots(build_dir: Path) -> dict[str, dict]:
     with duckdb.connect(str(build_dir / WAREHOUSE_FILE)) as connection:
         rows = connection.execute(
             "select dataset, url, strftime(retrieved_at at time zone 'UTC', '%Y-%m-%dT%H:%M:%SZ'), sha256, row_count, "
-            "license from raw.upstream_snapshots order by dataset"
+            "license, copy from raw.upstream_snapshots order by dataset"
         ).fetchall()
-    keys = ("url", "retrieved_at", "sha256", "rows", "license")
+    keys = ("url", "retrieved_at", "sha256", "rows", "license", "copy")
     return {dataset: dict(zip(keys, values)) for dataset, *values in rows}
 
 

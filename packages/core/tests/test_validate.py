@@ -102,6 +102,12 @@ class TestBrokenData:
         messages = [i.message for i in validate(data_copy) if i.severity == "error"]
         assert any("'reason' is a required property" in message for message in messages), messages
 
+    def test_an_override_must_replace_a_quantity_read_from_wikidata(self, data_copy, write_override):
+        path = write_override(data_copy)
+        path.write_text(path.read_text().replace("quantity: hardness_mohs", "quantity: toughness_mpa_sqrt_m"))
+        messages = [i.message for i in validate(data_copy) if i.severity == "error"]
+        assert any("toughness_mpa_sqrt_m isn't read from Wikidata" in message for message in messages), messages
+
     def test_a_well_formed_override_is_valid(self, data_copy, write_override):
         write_override(data_copy)
         assert [str(i) for i in validate(data_copy) if i.severity == "error"] == []

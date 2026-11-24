@@ -227,6 +227,9 @@ class _Checker:
                 self.error(where, f"unknown thing {thing!r}")
             if quantity not in self.g.quantities:
                 self.error(where, f"unknown quantity {quantity!r}")
+            elif not self.g.quantities[quantity].get("wikidata"):
+                # Nothing upstream gives this quantity, so there is no upstream value to replace.
+                self.error(where, f"{quantity} isn't read from Wikidata: correct the curated value in {thing}'s file instead")
             self.check_range(f"{where}.value", override["value"])
             self.check_range(f"{where}.replaces.value", override["replaces"]["value"])
             # Two overrides of one value would leave the build to pick between them.

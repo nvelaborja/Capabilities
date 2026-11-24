@@ -30,7 +30,7 @@ from dagster_dbt import (
 )
 
 from .build import DBT_PROJECT, dbt_environment, dbt_target_path, load_inputs, write_manifest
-from .upstream import MRDS, WIKIDATA, fetch
+from .upstream import MRDS, WIKIDATA, Dataset, fetch_or_fall_back
 
 
 class UpstreamDownloads(ConfigurableResource):
@@ -60,11 +60,8 @@ def definitions(root: Path, build_dir: Path) -> Definitions:
         description="A snapshot of the USGS Mineral Resources Data System (MRDS): downloaded, converted to Parquet "
         "unchanged, and recorded with its retrieval time, hash and license (ADR 0041).",
     )
-    def mrds_snapshot(downloads: UpstreamDownloads) -> MaterializeResult:
-        snapshot = fetch(MRDS, build_dir, downloads.mrds_url)
-        return MaterializeResult(
-            metadata={key: snapshot[key] for key in ("rows", "retrieved_at", "sha256", "url", "license")}
-        )
+    def mrds_snapshot(context: AssetExecutionContext, downloads: UpstreamDownloads) -> MaterializeResult:
+        return download(context, MRDS, downloads.mrds_url)
 
     @asset(
         key=AssetKey(["upstream", WIKIDATA.name]),
@@ -72,11 +69,19 @@ def definitions(root: Path, build_dir: Path) -> Definitions:
         description="A snapshot of Wikidata's quantity statements (such as Mohs hardness) for the items in the Wikidata "
         "crosswalk: a SPARQL query, its result kept unchanged as Parquet, with the query itself (ADR 0043).",
     )
-    def wikidata_snapshot(downloads: UpstreamDownloads) -> MaterializeResult:
-        snapshot = fetch(WIKIDATA, build_dir, downloads.wikidata_url, root=root)
-        return MaterializeResult(
-            metadata={key: snapshot[key] for key in ("rows", "items", "retrieved_at", "sha256", "url", "license")}
-        )
+    def wikidata_snapshot(context: AssetExecutionContext, downloads: UpstreamDownloads) -> MaterializeResult:
+        return download(context, WIKIDATA, downloads.wikidata_url)
+
+    def download(context: AssetExecutionContext, dataset: Dataset, url: str) -> MaterializeResult:
+        """Download a dataset. Offline, or when its server is down, the build goes on with the cold backup (ADR 0044),
+        and the run says so: the asset's metadata names the copy used and the error."""
+        snapshot, error = fetch_or_fall_back(dataset, root, build_dir, url)
+        metadata = {key: snapshot[key] for key in ("rows", "retrieved_at", "sha256", "url", "license")}
+        metadata["copy"] = snapshot.get("copy", "download")
+        if error:
+            context.log.warning(f"Couldn't download {dataset.name} ({error}); using the cold backup of {snapshot['retrieved_at']}.")
+            metadata["download_error"] = error
+        return MaterializeResult(metadata=metadata)
 
     # The raw tables are the dbt sources' assets, so the lineage runs from the inputs through every model.
     raw = {key.path[-1]: key for key in get_asset_keys_by_output_name_for_source([graph_models], "raw").values()}
@@ -87,7 +92,7 @@ def definitions(root: Path, build_dir: Path) -> Definitions:
         "suppressed_records": "Upstream records the curated layer leaves out, with why (data/suppressions).",
         MRDS.name: "The MRDS snapshot, loaded into DuckDB as text (empty if it was never downloaded).",
         WIKIDATA.name: "The Wikidata snapshot, loaded into DuckDB as text (empty if it was never downloaded).",
-        "upstream_snapshots": "Where and when each upstream snapshot was retrieved, for provenance.",
+        "upstream_snapshots": "Where and when each upstream snapshot was retrieved, and which copy was used, for provenance.",
     }
 
     downloads_behind = {
@@ -120,11 +125,8 @@ def definitions(root: Path, build_dir: Path) -> Definitions:
         )
         for dataset in (MRDS, WIKIDATA):
             snapshot = loaded["upstream"][dataset.name]
-            yield MaterializeResult(asset_key=raw[dataset.name], metadata={"rows": snapshot["rows"] if snapshot else 0})
-        yield MaterializeResult(
-            asset_key=raw["upstream_snapshots"],
-            metadata={"datasets": sum(1 for snapshot in loaded["upstream"].values() if snapshot)},
-        )
+            yield MaterializeResult(asset_key=raw[dataset.name], metadata={"rows": snapshot["rows"], "copy": snapshot["copy"]})
+        yield MaterializeResult(asset_key=raw["upstream_snapshots"], metadata={"datasets": len(loaded["upstream"])})
 
     @asset(
         deps=[get_asset_key_for_model([graph_models], name) for name in ("graph_nodes", "graph_facts", "source_occurrences")],

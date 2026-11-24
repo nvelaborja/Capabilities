@@ -1,0 +1,9 @@
+{
+  "dataset": "mrds_deposits",
+  "url": "https://mrdata.usgs.gov/mrds/mrds-csv.zip",
+  "retrieved_at": "2026-11-22T21:58:22Z",
+  "last_modified": "Tue, 23 Aug 2022 21:10:12 GMT",
+  "sha256": "31be4baaa86b082787bc74989146183db21badf7157db39b3f0a6fe0b38a5477",
+  "rows": 304632,
+  "license": "US public domain (a work of the U.S. Geological Survey)"
+}

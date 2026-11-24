@@ -25,9 +25,13 @@ FACTS_FILE = "graph_facts.parquet"
 OCCURRENCES_FILE = "source_occurrences.parquet"
 MANIFEST_FILE = "manifest.json"
 SNAPSHOT_FILE = "snapshot.json"
+# Cold backups of every upstream dataset, kept in git, so the graph builds offline or when a download fails (ADR 0044).
+BACKUP_DIR = "snapshots"
 
 # Everything a build depends on: change any of these and the built graph is stale.
-DATA_PATTERNS = ("data/**/*.yaml", "data/**/*.csv", "examples/**/*.yaml", "schema/*.json")
+DATA_PATTERNS = (
+    "data/**/*.yaml", "data/**/*.csv", "examples/**/*.yaml", "schema/*.json", f"{BACKUP_DIR}/*/{SNAPSHOT_FILE}",
+)
 # Upstream snapshots, under the build directory: each dataset's snapshot.json changes whenever its data is downloaded again.
 SNAPSHOT_PATTERNS = (f"*/{SNAPSHOT_FILE}",)
 # The pipeline's own code and dbt project, found where the pipeline package is installed rather than under the data root.
@@ -161,6 +165,16 @@ def current_graph(root: Path, build_dir: Path | None = None) -> Graph:
         print("The built graph is missing or out of date; building it now…", file=sys.stderr)
         run_build(root, build_dir)
     return load_built(root, build_dir)
+
+
+def run_backup(root: Path, build_dir: Path) -> dict[str, dict | None]:
+    """Make each downloaded snapshot its dataset's cold backup, when it is newer (ADR 0044). Returns, by dataset, the
+    snapshot backed up, or None when the backup was already as new."""
+    try:
+        from capabilities_pipeline.upstream import DATASETS, back_up
+    except ImportError as exc:  # the core package can be installed alone
+        raise LoadError("Backing up snapshots needs the pipeline package. Run `uv sync` in the repository.") from exc
+    return {dataset.name: back_up(dataset, root, build_dir) for dataset in DATASETS}
 
 
 def run_build(root: Path, build_dir: Path) -> dict:

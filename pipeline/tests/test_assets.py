@@ -109,3 +109,17 @@ class TestMaterializing:
         materialized = {event.asset_key for event in result.get_asset_materialization_events()}
         assert {RAW, CROSSWALK, MRDS_RAW, SNAPSHOTS_RAW, MRDS_SNAPSHOT, OCCURRENCES, MANIFEST} <= materialized
         assert {WIKIDATA_SNAPSHOT, WIKIDATA_RAW, WIKIDATA_CROSSWALK, SUPPRESSIONS, FACTS} <= materialized
+
+    def test_offline_a_download_falls_back_to_the_cold_backup_and_says_so(self, dagster_build, wikidata_endpoint):
+        from capabilities_pipeline.assets import UpstreamDownloads
+
+        defs, _ = dagster_build
+        # Port 9 refuses connections, as a server that is down or a network that is off would.
+        downloads = UpstreamDownloads(mrds_url="http://127.0.0.1:9/mrds-csv.zip", wikidata_url=wikidata_endpoint.url)
+        snapshots = [asset for asset in defs.assets if MRDS_SNAPSHOT in asset.keys]
+        result = materialize(snapshots, resources={**defs.resources, "downloads": downloads})
+        assert result.success
+        (event,) = result.get_asset_materialization_events()
+        metadata = event.materialization.metadata
+        assert metadata["copy"].value == "backup"
+        assert "download_error" in metadata

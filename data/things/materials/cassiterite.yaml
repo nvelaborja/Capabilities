@@ -4,9 +4,3 @@ label: Cassiterite
 origin: extracted
 is_a: [tin-ore]
 description: Tin oxide, the main ore of tin. Tin sources were scarce in the ancient Near East and Mediterranean, so tin was widely traded.
-quantities:
-  hardness_mohs: [6, 7]
-references:
-  - citation: "Klein, C. & Dutrow, B. (2007). Manual of Mineral Science, 23rd ed. Wiley."
-    supports: Mohs hardness value.
-    status: unverified

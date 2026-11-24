@@ -243,7 +243,8 @@ class TestExplain:
     def test_about_says_what_a_thing_is_and_where_it_is_found(self, graph, levels):
         about = explain(graph, levels, context_for(graph, egypt(graph)), "granite")["about"]
         assert about["description"].startswith("A hard, coarse-grained igneous rock")
-        assert {"id": "hardness_mohs", "label": "Hardness", "value": "5–7 Mohs", "source": {"layer": "curated"}} in about["quantities"]
+        hardness = next(quantity for quantity in about["quantities"] if quantity["id"] == "hardness_mohs")
+        assert (hardness["label"], hardness["value"], hardness["source"]["layer"]) == ("Hardness", "5–7 Mohs", "upstream")
         assert about["origin"] == "extracted" and "availability" not in about
         assert about["member_of"] == [{"id": "stone", "label": "Stone"}]
         assert about["references"][0]["doi"] == "10.1007/3-7643-7712-7_2"

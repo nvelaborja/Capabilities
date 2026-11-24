@@ -20,13 +20,23 @@ def repo_root() -> Path:
 
 
 @pytest.fixture(scope="session")
-def graph() -> Graph:
+def graph(built_dir) -> Graph:
+    """The graph the app reads: the curated layer built with the upstream datasets' cold backups (ADR 0044)."""
+    from capabilities.built import load_built
+
+    return load_built(REPO_ROOT, built_dir)
+
+
+@pytest.fixture(scope="session")
+def curated_graph() -> Graph:
+    """The curated YAML alone, as people wrote it."""
     return Graph.from_curated(REPO_ROOT)
 
 
 @pytest.fixture(scope="session")
 def built_dir(tmp_path_factory) -> Path:
-    """The repository's graph, built once per test run into a temporary directory (never the repo's build/)."""
+    """The repository's graph, built once per test run into a temporary directory (never the repo's build/). Nothing is
+    downloaded, so it uses the cold backups in snapshots/, as CI and a fresh clone do."""
     from capabilities.built import run_build
 
     build_dir = tmp_path_factory.mktemp("build")
@@ -123,6 +133,9 @@ def data_copy(tmp_path: Path) -> Path:
     """A throwaway copy of the schemas and data, for tests that break files on purpose."""
     for directory in ("schema", "data", "examples"):
         shutil.copytree(REPO_ROOT / directory, tmp_path / directory)
+    # The cold backups of the upstream datasets, which every build needs (ADR 0044). Linked, not copied: no test changes
+    # them, and MRDS's is 15 MB.
+    (tmp_path / "snapshots").symlink_to(REPO_ROOT / "snapshots", target_is_directory=True)
     return tmp_path
 
 

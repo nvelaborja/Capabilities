@@ -1,9 +1,10 @@
 """Upstream datasets: downloading a snapshot of each, and loading it into the warehouse (ADR 0034, ADR 0041, ADR 0043).
 
 A snapshot is the dataset as downloaded, converted to Parquet without changing a value, plus `snapshot.json`: where and
-when it was retrieved, a hash of the download, and its license. Only Dagster downloads (`assets.py`); a build reads
-whatever snapshots are already in the build directory, and loads an empty table for a dataset that has none, so the
-graph still builds with no network.
+when it was retrieved, a hash of the download, and its license. Only Dagster downloads (`assets.py`), into
+build/upstream/. Every dataset is required (ADR 0044): a build uses the newest copy of each, the latest download or the
+cold backup kept in git under snapshots/, and stops if a dataset has neither. `capabilities backup` makes the latest
+downloads the cold backups.
 """
 
 from __future__ import annotations
@@ -12,6 +13,7 @@ import csv
 import hashlib
 import json
 import tempfile
+import urllib.error
 import urllib.parse
 import urllib.request
 import zipfile
@@ -21,7 +23,8 @@ from pathlib import Path
 
 import duckdb
 import yaml
-from capabilities.built import SNAPSHOT_FILE, upstream_dir
+from capabilities.built import BACKUP_DIR, SNAPSHOT_FILE, upstream_dir
+from capabilities.graph import LoadError
 
 # Some servers (USGS among them) refuse Python's default user agent. This one is deliberately generic.
 USER_AGENT = "dataset-snapshot/1.0"
@@ -155,7 +158,7 @@ def quantity_properties(root: Path) -> dict[str, str]:
     for path in sorted((root / "data" / "quantities").glob("*.yaml")):
         quantity = yaml.safe_load(path.read_text(encoding="utf-8"))
         if quantity.get("wikidata"):
-            properties[quantity["wikidata"]] = quantity["id"]
+            properties[quantity["wikidata"]["property"]] = quantity["id"]
     return properties
 
 
@@ -192,37 +195,118 @@ def to_parquet(dataset: Dataset, csv: Path, parquet: Path) -> int:
         return connection.execute("select count(*) from read_parquet(?)", [str(parquet)]).fetchall()[0][0]
 
 
-def snapshot_of(dataset: Dataset, build_dir: Path) -> dict | None:
-    path = dataset.directory(build_dir) / SNAPSHOT_FILE
-    if not path.is_file() or not dataset.parquet(build_dir).is_file():
+class MissingSnapshot(LoadError):
+    """A dataset has neither a download nor a cold backup: the graph can't be built without it (ADR 0044)."""
+
+
+@dataclass(frozen=True)
+class Copy:
+    """One copy of a dataset's snapshot: where it is, which kind it is, and its snapshot.json."""
+
+    dataset: Dataset
+    directory: Path
+    kind: str  # "download" (build/upstream/) or "backup" (snapshots/ in the repository)
+    snapshot: dict
+
+    @property
+    def parquet(self) -> Path:
+        return self.directory / f"{self.dataset.name}.parquet"
+
+
+def backup_directory(dataset: Dataset, root: Path) -> Path:
+    """Where the dataset's cold backup is kept: snapshots/<dataset>/ in the repository, in git."""
+    return root / BACKUP_DIR / dataset.name
+
+
+def copy_in(dataset: Dataset, directory: Path, kind: str) -> Copy | None:
+    path = directory / SNAPSHOT_FILE
+    if not path.is_file() or not (directory / f"{dataset.name}.parquet").is_file():
         return None
-    return json.loads(path.read_text(encoding="utf-8"))
+    return Copy(dataset, directory, kind, json.loads(path.read_text(encoding="utf-8")))
 
 
-def load_upstream(connection: duckdb.DuckDBPyConnection, build_dir: Path) -> dict[str, dict | None]:
-    """Each dataset's snapshot into its raw table, or an empty table when there is no snapshot, and every snapshot's
-    metadata into raw.upstream_snapshots (for provenance). Returns each dataset's snapshot metadata, or None."""
+def snapshot_of(dataset: Dataset, build_dir: Path) -> dict | None:
+    """The downloaded snapshot in the build directory, if there is one."""
+    copy = copy_in(dataset, dataset.directory(build_dir), "download")
+    return copy.snapshot if copy else None
+
+
+def best_copy(dataset: Dataset, root: Path, build_dir: Path) -> Copy | None:
+    """The newest copy of the dataset: the latest download, or the cold backup when it is newer or there is no
+    download (offline, or a download that failed)."""
+    copies = [
+        copy for copy in (
+            copy_in(dataset, dataset.directory(build_dir), "download"),
+            copy_in(dataset, backup_directory(dataset, root), "backup"),
+        ) if copy
+    ]
+    return max(copies, key=lambda copy: copy.snapshot["retrieved_at"], default=None)
+
+
+def load_upstream(connection: duckdb.DuckDBPyConnection, root: Path, build_dir: Path) -> dict[str, dict]:
+    """Each dataset's newest copy into its raw table, and every snapshot's metadata into raw.upstream_snapshots (for
+    provenance). Every dataset is required: with no copy of one, nothing is loaded and the build stops (ADR 0044).
+    Returns each dataset's snapshot metadata, with which copy was used."""
+    copies = {dataset.name: best_copy(dataset, root, build_dir) for dataset in DATASETS}
+    missing = [name for name, copy in copies.items() if copy is None]
+    if missing:
+        raise MissingSnapshot(
+            "No copy of " + ", ".join(missing) + ": every upstream dataset is required. Download it "
+            + " or ".join(f"(`cd pipeline && uv run dg launch --assets 'upstream/{name}'`)" for name in missing)
+            + f", or restore its cold backup in {BACKUP_DIR}/ from git."
+        )
     connection.execute(
-        "create or replace table raw.upstream_snapshots "
-        "(dataset varchar, url varchar, retrieved_at timestamptz, sha256 varchar, row_count bigint, license varchar)"
+        "create or replace table raw.upstream_snapshots (dataset varchar, url varchar, retrieved_at timestamptz, "
+        "sha256 varchar, row_count bigint, license varchar, copy varchar)"
     )
-    snapshots = {}
-    for dataset in DATASETS:
-        snapshot = snapshots[dataset.name] = snapshot_of(dataset, build_dir)
-        if snapshot:
+    for copy in copies.values():
+        connection.execute(
+            f"create or replace table {copy.dataset.table} as select * from read_parquet(?)", [str(copy.parquet)]
+        )
+        snapshot = copy.snapshot
+        connection.execute(
+            "insert into raw.upstream_snapshots values (?, ?, ?, ?, ?, ?, ?)",
+            [copy.dataset.name, snapshot["url"], snapshot["retrieved_at"], snapshot["sha256"], snapshot["rows"],
+             snapshot["license"], copy.kind],
+        )
+    return {name: {**copy.snapshot, "copy": copy.kind} for name, copy in copies.items()}
+
+
+def back_up(dataset: Dataset, root: Path, build_dir: Path) -> dict | None:
+    """Make the downloaded snapshot the dataset's cold backup, when it is newer than the backup. The Parquet is
+    rewritten with stronger compression; every value, and the snapshot's record of the download, stay the same.
+    Returns the snapshot backed up, or None when there was nothing newer to back up."""
+    download = copy_in(dataset, dataset.directory(build_dir), "download")
+    backup = copy_in(dataset, backup_directory(dataset, root), "backup")
+    if download is None or (backup and backup.snapshot["retrieved_at"] >= download.snapshot["retrieved_at"]):
+        return None
+    directory = backup_directory(dataset, root)
+    directory.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=directory) as scratch:
+        compressed = Path(scratch) / "backup.parquet"
+        with duckdb.connect() as connection:
             connection.execute(
-                f"create or replace table {dataset.table} as select * from read_parquet(?)",
-                [str(dataset.parquet(build_dir))],
+                f"copy (select * from read_parquet(?)) to '{compressed}' (format parquet, compression zstd, "
+                "compression_level 19)",
+                [str(download.parquet)],
             )
-            connection.execute(
-                "insert into raw.upstream_snapshots values (?, ?, ?, ?, ?, ?)",
-                [dataset.name, snapshot["url"], snapshot["retrieved_at"], snapshot["sha256"], snapshot["rows"],
-                 snapshot["license"]],
-            )
-        else:
-            columns = ", ".join(f"{column} varchar" for column in dataset.columns)
-            connection.execute(f"create or replace table {dataset.table} ({columns})")
-    return snapshots
+        compressed.replace(directory / f"{dataset.name}.parquet")
+    # Written last, as with a download: a backup that failed part-way leaves the old snapshot.json in place.
+    (directory / SNAPSHOT_FILE).write_text(json.dumps(download.snapshot, indent=2) + "\n", encoding="utf-8")
+    return download.snapshot
+
+
+def fetch_or_fall_back(dataset: Dataset, root: Path, build_dir: Path, url: str | None = None) -> tuple[dict, str | None]:
+    """Download the dataset; if the network fails (offline, or the server is down) and there is a cold backup, use
+    that instead. Returns the snapshot the build will use, and the error that made it fall back, if any. Any other
+    failure, such as changed columns, is raised: that needs a change to the code, not a backup."""
+    try:
+        return fetch(dataset, build_dir, url, root=root), None
+    except (urllib.error.URLError, TimeoutError, ConnectionError) as error:
+        backup = copy_in(dataset, backup_directory(dataset, root), "backup")
+        if backup is None:
+            raise
+        return {**backup.snapshot, "copy": "backup"}, str(error)
 
 
 def sha256(path: Path) -> str:

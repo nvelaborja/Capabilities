@@ -4,10 +4,3 @@ label: Tin bronze
 origin: produced
 is_a: [metal]
 description: An alloy of copper with roughly 10% tin. Harder than copper and easier to cast, because it melts at a lower temperature.
-quantities:
-  hardness_mohs: 3
-references:
-  - citation: "Wikidata: bronze (Q34095), Mohs hardness (P1088). Retrieved 2026-11-24."
-    url: https://www.wikidata.org/wiki/Q34095
-    supports: "Mohs hardness 3 (ADR 0043: the upstream value, used over our own)."
-    status: secondary

@@ -80,14 +80,14 @@ class TestChoosingAValue:
         assert upstream["url"] == "https://www.wikidata.org/wiki/Q41177"
         assert upstream["retrieved_at"].endswith("Z")
 
-    def test_a_curated_value_that_agrees_is_not_a_disagreement(self, wikidata_build):
+    def test_a_value_only_upstream_gives_has_no_curated_value_beside_it(self, wikidata_build):
         hematite = hardness(wikidata_build, "hematite")
-        assert (hematite["curated_value"], hematite["disagrees"]) == ([5.5, 6.5], False)
+        assert (hematite["layer"], hematite["curated_value"], hematite["disagrees"]) == ("upstream", None, False)
 
     def test_a_curated_value_that_disagrees_is_kept_beside_it(self, data_copy, tmp_path, wikidata_endpoint):
         # given: a curated granite hardness that differs from Wikidata's 5–7
         granite_file = data_copy / "data" / "things" / "materials" / "granite.yaml"
-        granite_file.write_text(granite_file.read_text().replace("hardness_mohs: [5, 7]", "hardness_mohs: [6, 7]"))
+        granite_file.write_text(granite_file.read_text().replace("quantities:\n", "quantities:\n  hardness_mohs: [6, 7]\n"))
         # when: building with the Wikidata snapshot
         granite = hardness(build_with_wikidata(data_copy, tmp_path / "build", wikidata_endpoint), "granite")
         # then: Wikidata's value is used, and ours is kept beside it as a disagreement
@@ -100,8 +100,20 @@ class TestChoosingAValue:
         flint = hardness(wikidata_build, "flint")
         assert (flint["layer"], flint["value"], flint["upstream"]) == ("curated", [6.5, 7], None)
 
-    def test_without_a_snapshot_every_value_is_curated(self, built_dir):
-        assert {fact["layer"] for fact in facts(built_dir).values()} == {"curated"}
+
+
+class TestUnits:
+    def test_a_value_in_another_unit_than_the_quantity_expects_fails_the_build(
+        self, data_copy, tmp_path, wikidata_endpoint
+    ):
+        from capabilities_pipeline.build import BuildError
+
+        # given: hardness is expected in some other unit than Wikidata's "1" (Q199)
+        quantity = data_copy / "data" / "quantities" / "hardness_mohs.yaml"
+        quantity.write_text(quantity.read_text().replace("unit: Q199", "unit: Q11573"))
+        # when, then: the build stops rather than read the values unconverted
+        with pytest.raises(BuildError, match="wikidata_units_match"):
+            build_with_wikidata(data_copy, tmp_path / "build", wikidata_endpoint)
 
 
 class TestOverridesAndSuppressions:
@@ -126,8 +138,9 @@ class TestOverridesAndSuppressions:
         suppressions.write_text(
             suppressions.read_text() + 'wikidata,Q41177,"Test: the item describes granite in general."\n', encoding="utf-8"
         )
-        granite = hardness(build_with_wikidata(data_copy, tmp_path / "build", wikidata_endpoint), "granite")
-        assert (granite["layer"], granite["value"], granite["upstream"]) == ("curated", [5, 7], None)
+        build_dir = build_with_wikidata(data_copy, tmp_path / "build", wikidata_endpoint)
+        # Granite's hardness came only from that item, so it has none now.
+        assert "granite/quantities.hardness_mohs" not in facts(build_dir)
 
     def test_an_override_of_a_value_only_the_curated_layer_gives_fails_the_build(
         self, data_copy, tmp_path, wikidata_endpoint, write_override

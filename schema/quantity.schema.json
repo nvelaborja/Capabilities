@@ -33,9 +33,14 @@
       }
     },
     "wikidata": {
-      "description": "The Wikidata property holding this quantity (P1088 for Mohs hardness). Things crosswalked to Wikidata take their value from it (ADR 0043).",
-      "type": "string",
-      "pattern": "^P[0-9]+$"
+      "description": "Where Wikidata holds this quantity: the property (P1088 for Mohs hardness) and the unit its values must be in. Things crosswalked to Wikidata take their value from it (ADR 0043); a value in another unit fails the build rather than be read as ours.",
+      "type": "object",
+      "required": ["property", "unit"],
+      "additionalProperties": false,
+      "properties": {
+        "property": { "type": "string", "pattern": "^P[0-9]+$" },
+        "unit": { "description": "The Wikidata item of the unit, such as Q199 (\"1\", no unit) for Mohs.", "type": "string", "pattern": "^Q[0-9]+$" }
+      }
     },
     "notes": { "type": "string" },
     "references": { "$ref": "urn:capabilities:schema:defs#/$defs/references" },
