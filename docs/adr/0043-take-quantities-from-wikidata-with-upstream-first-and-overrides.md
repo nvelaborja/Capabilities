@@ -1,6 +1,6 @@
 # 0043. Take quantities from Wikidata, upstream first, with overrides
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-23
 - **Supersedes:** in part, [0034](0034-build-the-graph-from-upstream-datasets-and-a-curated-layer.md) (the rule that the curated layer always wins)
 
@@ -45,7 +45,7 @@ The curated values are early and lightly sourced: most cite one textbook, unveri
 
 - Every quantity value in the graph has provenance, as 0034 asked.
 - With the 2026-11-24 snapshot, granite's hardness is 5–7, limonite's 1.5–6, copper's 3 and tin bronze's 3. The worked examples in `examples/README.md` give the same answers with and without the snapshot, checked by running `need`, `explore` and `check` on both builds.
-- The four disagreements are visible in the app and in `graph_facts` (`disagrees`). They are the first candidates for the curation queue (milestone 1, slice 4b): each wants a decision, an override with a reference, or a corrected curated value.
+- The four disagreements were settled when this was accepted: the curated values of granite, limonite, copper and tin bronze now match Wikidata, and cite the Wikidata item instead of the work that backed the old value. The curated values stay rather than being deleted, so a build without a Wikidata snapshot (as in CI) gives the same answers. Later disagreements show in the app and in `graph_facts` (`disagrees`), and go to the curation queue (milestone 1, slice 4b).
 - Answers can change when Wikidata changes. The snapshot is what makes a build reproducible; downloading again is a deliberate step, and `graph_facts` shows what moved.
 - The build directory's format version is now 3, because of the new file.
 - Wikidata is edited by anyone. Best-ranked statements, a snapshot, visible provenance and overrides are the guard against a bad edit, not trust in any one value.
