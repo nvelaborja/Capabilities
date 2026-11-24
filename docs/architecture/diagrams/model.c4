@@ -273,4 +273,71 @@ model {
   capabilities.warehouse.stgMrds -> capabilities.artifact.occurrences 'deposits with coordinates, as points'
   capabilities.warehouse.rawCrosswalk -> capabilities.artifact.occurrences 'match rules'
   capabilities.warehouse.rawSnapshots -> capabilities.artifact.occurrences 'retrieval time, for provenance'
+
+  // Lineage: the data, stage to stage, the way it flows (view pipeline).
+  mrds -[lineage]-> capabilities.snapshots 'mrds-csv.zip, as Parquet'
+  wikidata -[lineage]-> capabilities.snapshots 'two query results, as Parquet'
+  capabilities.snapshots -[lineage]-> capabilities.backups 'capabilities backup, when newer'
+  capabilities.curated -[lineage]-> capabilities.warehouse.rawDocuments 'every document, whole'
+  capabilities.curated -[lineage]-> capabilities.warehouse.rawCrosswalk 'mrds_sources.csv'
+  capabilities.curated -[lineage]-> capabilities.warehouse.rawWikidataCrosswalk 'wikidata_things.csv'
+  capabilities.curated -[lineage]-> capabilities.warehouse.rawOreMinerals 'ore_minerals.csv'
+  capabilities.curated -[lineage]-> capabilities.warehouse.rawSuppressions 'suppressed_records.csv'
+  capabilities.curated -[lineage]-> capabilities.warehouse.rawLoads 'the inputs fingerprint'
+  capabilities.snapshots -[lineage]-> capabilities.warehouse.rawMrds 'the download, if newest'
+  capabilities.snapshots -[lineage]-> capabilities.warehouse.rawWikidata 'the download, if newest'
+  capabilities.snapshots -[lineage]-> capabilities.warehouse.rawWikidataItems 'the download, if newest'
+  capabilities.backups -[lineage]-> capabilities.warehouse.rawMrds 'the backup, if newest'
+  capabilities.backups -[lineage]-> capabilities.warehouse.rawWikidata 'the backup, if newest'
+  capabilities.backups -[lineage]-> capabilities.warehouse.rawWikidataItems 'the backup, if newest'
+  capabilities.backups -[lineage]-> capabilities.warehouse.rawSnapshots 'which copy, and when retrieved'
+  capabilities.snapshots -[lineage]-> capabilities.warehouse.rawSnapshots 'which copy, and when retrieved'
+  capabilities.warehouse.rawLoads -[lineage]-> capabilities.artifact.manifest 'the fingerprint, written last'
+  capabilities.warehouse.rawSnapshots -[lineage]-> capabilities.artifact.manifest 'the copies used'
+  capabilities.artifact.graphNodes -[lineage]-> capabilities.artifact.manifest 'its row count'
+  capabilities.artifact.graphFacts -[lineage]-> capabilities.artifact.manifest 'its row count'
+  capabilities.artifact.occurrences -[lineage]-> capabilities.artifact.manifest 'its row count'
+  capabilities.artifact.queue -[lineage]-> capabilities.artifact.manifest 'its row count'
+  capabilities.artifact.graphNodes -[lineage]-> capabilities.core.built 'every node'
+  capabilities.artifact.graphFacts -[lineage]-> capabilities.core.built 'where each value came from'
+  capabilities.artifact.manifest -[lineage]-> capabilities.core.built 'is the build current?'
+
+  // The build as a series of stages, like a deployment pipeline (view pipeline-overview). `capabilities build` runs
+  // stages 2 to 4; Dagster's "materialize all" runs 1b to 4. Each stage names the parts that do it, in the detailed
+  // pipeline view.
+  stageCurated = stage '1a Curated layer' {
+    technology 'git: YAML, CSV'
+    description 'The inputs people write: things, routes, quantities, overrides, crosswalks and suppressions, reviewed in pull requests.'
+  }
+  stageDownload = stage '1b Download upstream' {
+    technology 'Dagster'
+    description 'Dagster only: downloads MRDS and the two Wikidata queries (Downloader). If the network fails, it uses the cold backup instead.'
+  }
+  stageLoad = stage '2 Load' {
+    technology 'Python, DuckDB'
+    description 'Loads every input into raw DuckDB tables (Loader). For each upstream dataset it takes the newest copy, download or cold backup, and stops if a dataset has neither.'
+  }
+  stageTransform = stage '3a Transform' {
+    technology 'dbt'
+    description 'dbt builds the staging views and the marts: graph nodes, quantity facts, source occurrences and the curation queue, written as Parquet. Paired with 3b: dbt runs each model\'s tests right after it.'
+  }
+  stageTest = stage '3b Test' {
+    technology 'dbt data tests, Dagster asset checks'
+    description 'Column and singular data tests on every source, staging view and mart. A failure stops the build before it is published.'
+  }
+  stagePublish = stage '4 Publish' {
+    technology 'manifest.json'
+    description 'The Loader writes the manifest last, with the fingerprint of the inputs: only now is the build current, and the app will read it.'
+  }
+  stageServe = stage '5 Serve' {
+    technology 'FastAPI, React'
+    description 'The API server loads the built graph at start-up (rebuilding first if the inputs changed) and serves the web app.'
+  }
+
+  stageCurated -> stageLoad 'curated documents'
+  stageDownload -> stageLoad 'upstream snapshots'
+  stageLoad -> stageTransform 'raw tables'
+  stageTransform -> stageTest 'models'
+  stageTest -> stagePublish 'all tests pass'
+  stagePublish -> stageServe 'built graph'
 }

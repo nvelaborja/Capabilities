@@ -125,6 +125,18 @@ class TestBrokenData:
         warnings = [f"{i.where}: {i.message}" for i in validate(data_copy) if i.severity == "warning"]
         assert "thing stray-ore: no route produces it" in warnings
 
+    def test_a_class_whose_members_all_come_from_the_ore_crosswalk_has_members(self, repo_root):
+        # given: copper sulphide ore has no curated members; chalcocite, bornite and chalcopyrite join in the build
+        warnings = [f"{i.where}: {i.message}" for i in validate(repo_root) if i.severity == "warning"]
+        # then: it isn't reported as empty
+        assert "thing copper-sulphide-ore: category has no members" not in warnings
+
+    def test_warns_about_a_class_with_no_members_anywhere(self, data_copy):
+        # given: a class that neither a curated thing nor an ore crosswalk row belongs to
+        (data_copy / "data/things/categories/empty-ore.yaml").write_text("id: empty-ore\nkind: category\nlabel: X\n")
+        warnings = [f"{i.where}: {i.message}" for i in validate(data_copy) if i.severity == "warning"]
+        assert "thing empty-ore: category has no members" in warnings
+
     def test_warns_about_a_regional_material_without_a_source(self, data_copy):
         # given: an ore marked natural and regional, so it would be free to anyone who selects it, with no extraction
         (data_copy / "data/things/materials/loose-ore.yaml").write_text(

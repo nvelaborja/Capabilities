@@ -9,7 +9,7 @@ from pathlib import Path
 from jsonschema import Draft202012Validator
 from referencing import Registry, Resource
 
-from .graph import HELD_KINDS, THING_DIRS, Document, Graph, achieved_id, achieved_kind, load_documents
+from .graph import HELD_KINDS, THING_DIRS, Document, Graph, achieved_id, achieved_kind, load_documents, ore_crosswalk_rows
 
 
 @dataclass(frozen=True)
@@ -36,7 +36,9 @@ def validate(root: Path) -> list[Issue]:
         # Cross-references assume schema-valid documents.
         return issues
     graph = Graph.from_curated(root)
-    return issues + _Checker(graph).run()
+    # Some classes' members join only in the build, from the ore crosswalk (copper sulphide ore's are all upstream).
+    upstream_classes = {row["class"] for row in ore_crosswalk_rows(root) if row["class"] != "none"}
+    return issues + _Checker(graph, upstream_classes).run()
 
 
 def _schema_and_file_checks(root: Path, documents: list[Document]) -> list[Issue]:
@@ -63,8 +65,9 @@ def _schema_and_file_checks(root: Path, documents: list[Document]) -> list[Issue
 
 
 class _Checker:
-    def __init__(self, graph: Graph) -> None:
+    def __init__(self, graph: Graph, upstream_classes: set[str] = frozenset()) -> None:
         self.g = graph
+        self.upstream_classes = upstream_classes
         self.issues: list[Issue] = []
 
     def error(self, where: str, message: str) -> None:
@@ -248,7 +251,7 @@ class _Checker:
                 self.warn(f"thing {thing_id}", "regional natural material: give it a source and an extraction route (ADR 0032)")
             if thing["kind"] == "source" and not any(source_used(route, thing_id) for route in self.g.routes.values()):
                 self.warn(f"thing {thing_id}", "no route extracts anything from this source")
-            if thing["kind"] == "category" and not self.g.members(thing_id):
+            if thing["kind"] == "category" and not self.g.members(thing_id) and thing_id not in self.upstream_classes:
                 self.warn(f"thing {thing_id}", "category has no members")
             if thing["kind"] in ("technique", "knowledge") and thing_id not in used_techniques:
                 self.warn(f"thing {thing_id}", "no route uses this technique")
