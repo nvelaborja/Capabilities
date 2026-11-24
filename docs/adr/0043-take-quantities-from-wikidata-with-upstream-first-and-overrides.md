@@ -1,6 +1,6 @@
 # 0043. Take quantities from Wikidata, upstream first, with overrides
 
-- **Status:** Accepted
+- **Status:** Accepted; keeping curated values that match upstream superseded by [0044](0044-require-every-upstream-dataset-with-cold-backups-in-git.md)
 - **Date:** 2026-11-23
 - **Supersedes:** in part, [0034](0034-build-the-graph-from-upstream-datasets-and-a-curated-layer.md) (the rule that the curated layer always wins)
 

@@ -46,7 +46,7 @@ Each file records one significant design decision: the context, what we decided,
 | [0038](0038-serve-the-app-from-a-built-graph-artifact.md) | Serve the app from a built graph artifact (Parquet tables and a manifest, built by dbt) | Accepted |
 | [0039](0039-keep-architecture-docs-and-diagrams-current.md) | Keep architecture docs and diagrams current, and teach every technology (LikeC4, docs/architecture) | Accepted |
 | [0040](0040-orchestrate-the-build-with-dagster.md) | Orchestrate the build with Dagster, and keep a quick build without it | Accepted |
-| [0041](0041-place-sources-with-mrds-deposits-through-a-crosswalk.md) | Place sources with MRDS deposits, matched through a hand-kept crosswalk | Accepted |
+| [0041](0041-place-sources-with-mrds-deposits-through-a-crosswalk.md) | Place sources with MRDS deposits, matched through a hand-kept crosswalk | Accepted; building without a snapshot superseded by 0044 |
 | [0042](0042-show-where-things-are-found-on-a-maplibre-map.md) | Show where things are found on a MapLibre map, over OpenFreeMap tiles | Accepted |
-| [0043](0043-take-quantities-from-wikidata-with-upstream-first-and-overrides.md) | Take quantities from Wikidata, upstream first, with overrides | Accepted |
-| [0044](0044-require-every-upstream-dataset-with-cold-backups-in-git.md) | Require every upstream dataset, with cold backups in git | Proposed |
+| [0043](0043-take-quantities-from-wikidata-with-upstream-first-and-overrides.md) | Take quantities from Wikidata, upstream first, with overrides | Accepted; keeping curated values that match upstream superseded by 0044 |
+| [0044](0044-require-every-upstream-dataset-with-cold-backups-in-git.md) | Require every upstream dataset, with cold backups in git | Accepted |

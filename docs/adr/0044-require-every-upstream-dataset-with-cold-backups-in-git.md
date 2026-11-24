@@ -1,6 +1,6 @@
 # 0044. Require every upstream dataset, with cold backups in git
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-24
 - **Supersedes:** in part, [0041](0041-place-sources-with-mrds-deposits-through-a-crosswalk.md) (a build without a snapshot loads an empty table) and [0043](0043-take-quantities-from-wikidata-with-upstream-first-and-overrides.md) (curated values that match upstream stay)
 
