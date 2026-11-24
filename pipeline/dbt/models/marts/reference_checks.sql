@@ -20,8 +20,9 @@ works as (
         citation,
         max(doi) as doi,
         list_sort(list(distinct url) filter (where url is not null)) as urls,
-        list_sort(list(distinct status)) as statuses,
-        bool_and(status = 'verified') as verified,
+        -- Copied routes follow their template, where the work is read (stg_references__cited).
+        list_sort(list(distinct status) filter (where not copied)) as statuses,
+        coalesce(bool_and(status = 'verified') filter (where not copied), false) as verified,
         list_sort(list(distinct node_id)) as cited_by,
         count(distinct node_id) filter (where node_type = 'route') as routes
     from uses
@@ -53,7 +54,9 @@ scored as (
         ) as title_score,
         -- Unknown (null) when the candidate lists no authors, which is common for books.
         case when candidates.plain_authors <> '' then
-            cited.cited_surname <> '' and contains(candidates.plain_authors, cited.cited_surname) end as author_matches,
+            -- A whole word: Fall isn't Fallon. Both are plain text, so the surname is safe in a pattern.
+            cited.cited_surname <> ''
+                and regexp_matches(candidates.plain_authors, '\b' || cited.cited_surname || '\b') end as author_matches,
         abs(candidates.year - cited.cited_year) <= 1 as year_matches,
         coalesce(candidates.type in ('book-review', 'review', 'peer-review'), false) as is_review,
         cited.cited_year
@@ -84,19 +87,26 @@ best as (
     ) = 1
 ),
 
--- A free copy: OpenAlex's, for the work matched or the same DOI.
+-- A free copy: OpenAlex's, for the work found or the same DOI. Not for a review or a possible match: a copy of those
+-- may not be the work.
 free_copies as (
     select best.citation, any_value(coalesce(openalex.pdf_url, openalex.oa_url)) as free_copy
     from best
     join judged as openalex on openalex.citation = best.citation and openalex.service = 'openalex'
         and (openalex.record_id = best.record_id or openalex.doi = best.doi)
         and coalesce(openalex.pdf_url, openalex.oa_url) is not null
-    where best.verdict is not null
+    where best.verdict = 'found'
     group by best.citation
 ),
 
+-- Looked up the way it is cited now: by its DOI, or by searching when it has none. A DOI added or changed since the
+-- download makes the work not checked yet, rather than keep the old answer.
 looked_up as (
-    select distinct citation from {{ ref('stg_references__candidates') }}
+    select distinct candidates.citation
+    from {{ ref('stg_references__candidates') }} as candidates
+    join works on works.citation = candidates.citation
+    where (works.doi is null and candidates.lookup = 'search')
+        or (candidates.lookup = 'doi' and lower(candidates.query) = lower(works.doi))
 ),
 
 links as (

@@ -12,3 +12,9 @@
 {% macro word_overlap(a, b) -%}
     coalesce(len(list_intersect({{ a }}, {{ b }}))::double / nullif(len(list_distinct(list_concat({{ a }}, {{ b }}))), 0), 0)
 {%- endmacro %}
+
+-- Without whitespace of any kind at either end, as Python's str.strip() leaves it: the download and the mart must
+-- read a citation the same way.
+{% macro trim_space(column) -%}
+    regexp_replace({{ column }}, '^\s+|\s+$', '', 'g')
+{%- endmacro %}

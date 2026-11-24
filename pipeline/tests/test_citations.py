@@ -5,19 +5,52 @@ backup, and links are answered from it too. `built_dir` and `graph` are built fr
 the real results of 2026-11-24.
 """
 
+from contextlib import contextmanager
+from types import SimpleNamespace
+
 import duckdb
 import pytest
 
-from capabilities.built import load_queue, load_reference_checks
+from capabilities.built import load_built, load_queue, load_reference_checks
 from capabilities.views import references
 from capabilities_pipeline.build import build
 
 TYLECOTE = "Tylecote, R. F. (1992). A History of Metallurgy, 2nd ed. Institute of Materials."
 FALL = "Fall, A. et al. (2014). Sliding Friction on Wet and Dry Sand. Physical Review Letters 112, 175502."
 NICHOLSON = "Nicholson, P. T. & Shaw, I. (eds.) (2000). Ancient Egyptian Materials and Technology. Cambridge University Press."
+CRADDOCK = "Craddock, P. T. (1995). Early Metal Mining and Production. Edinburgh University Press."
+HAMILTON = "Hamilton, E. G. (2007)."
 KLEMM = "Klemm, R. & Klemm, D. D. (2008). Stones and Quarries in Ancient Egypt. British Museum Press."
 CRUCIBLE = "Crucible process. Encyclopaedia Britannica."
 SARAYDAR_DOI = "10.2307/278680"
+
+
+@contextmanager
+def misbehaving_service(answer: str):
+    """A service that is always busy (503), or always answers with a web page instead of JSON."""
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.server.requests.append(self.path)
+            body = b"<html>Service unavailable</html>"
+            self.send_response(503 if answer == "busy" else 200)
+            self.send_header("Content-Type", "text/html")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    server.requests = []
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        yield SimpleNamespace(url=f"http://127.0.0.1:{server.server_port}", requests=server.requests)
+    finally:
+        server.shutdown()
 
 
 def rows(parquet) -> list[tuple]:
@@ -76,6 +109,31 @@ class TestLookingUp:
         assert "abstract" not in COLUMNS
         assert "abstract" not in _crossref_row({"DOI": "10.1/x", "title": ["T"], "abstract": "<jats:p>…</jats:p>"})
 
+    @pytest.mark.parametrize(("url", "state"), [
+        ("file:///etc/hosts", "not a web address"),  # never opened
+        ("ftp://example.org/a.pdf", "not a web address"),
+        ("http://[::1", "unreachable: Invalid IPv6 URL"),  # malformed: one bad link doesn't stop the others
+    ])
+    def test_only_web_addresses_are_opened_and_a_bad_one_is_a_state_not_a_crash(self, url, state):
+        from capabilities_pipeline.citations import Lookups
+
+        assert Lookups("", "", "test", pause_s=0).open_link(url) == state
+
+    @pytest.mark.parametrize("answer", ["busy", "not json"])
+    def test_a_service_that_stays_busy_or_answers_garbage_is_retried_then_falls_back(self, answer, tmp_path, repo_root,
+                                                                                     lookups_offline):
+        from dataclasses import replace
+
+        from capabilities_pipeline.upstream import REFERENCES, fetch_or_fall_back
+
+        with misbehaving_service(answer) as service:
+            dataset = replace(REFERENCES, crossref_url=service.url)
+            with lookups_offline():
+                snapshot, error = fetch_or_fall_back(dataset, repo_root, tmp_path, service.url)
+        assert snapshot["copy"] == "backup"
+        assert error
+        assert len(service.requests) == 4  # the first try and three retries, then it gives up
+
     def test_offline_the_lookups_fall_back_to_the_cold_backup(self, tmp_path, repo_root, lookups_offline):
         from dataclasses import replace
 
@@ -100,6 +158,10 @@ class TestChecks:
         assert (fall["result"], fall["match_service"], fall["match_year"]) == ("found", "openalex", 2014)
         assert fall["free_copy"] == "http://link.aps.org/pdf/10.1103/PhysRevLett.112.175502"
 
+    def test_only_the_work_itself_offers_a_free_copy(self, checks):
+        # A copy of a review, or of a possible match, may not be the work cited.
+        assert {check["result"] for check in checks.values() if check["free_copy"]} == {"found"}
+
     def test_a_book_known_only_by_its_reviews_says_so(self, checks):
         assert checks[NICHOLSON]["result"] == "review_found"
 
@@ -120,45 +182,85 @@ class TestChecks:
         assert checks[CRUCIBLE]["links"] == {"https://www.britannica.com/technology/crucible-process": "refused"}
 
 
+def verify(path, citation: str) -> None:
+    """Marks the reference to `citation` in a YAML file verified, as a reader would."""
+    text = path.read_text()
+    at = text.index(citation)
+    path.write_text(text[:at] + text[at:].replace("status: unverified", "status: verified", 1))
+
+
 @pytest.fixture(scope="module")
 def changed(tmp_path_factory, repo_root, fetch_references):
-    """A copy of the data in which Fall's DOI is wrong (Saraydar's), Klemm is verified, and a citation is added after
-    the works were looked up."""
+    """A copy of the data in which, before the works are looked up, Fall's DOI is wrong (Saraydar's), and Klemm,
+    Craddock (in both curated routes that cite it) and Hamilton (in the ore crosswalk) are verified; and after it,
+    Tylecote gains a DOI and a new citation is added."""
+    import csv
+    import io
     import shutil
 
     root = tmp_path_factory.mktemp("data")
     for directory in ("schema", "data", "examples"):
         shutil.copytree(repo_root / directory, root / directory)
     (root / "snapshots").symlink_to(repo_root / "snapshots", target_is_directory=True)
-    sledge = root / "data" / "routes" / "move-on-sledge.yaml"
+    routes = root / "data" / "routes"
+    sledge = routes / "move-on-sledge.yaml"
     sledge.write_text(sledge.read_text().replace("doi: 10.1103/PhysRevLett.112.175502", f"doi: {SARAYDAR_DOI}"))
-    quarry = root / "data" / "routes" / "quarry-limestone.yaml"
-    text = quarry.read_text()
-    klemm = text.index(KLEMM)
-    quarry.write_text(text[:klemm] + text[klemm:].replace("status: unverified", "status: verified", 1))
+    verify(routes / "quarry-limestone.yaml", KLEMM)
+    verify(routes / "mine-hematite.yaml", CRADDOCK)
+    verify(routes / "mine-malachite.yaml", CRADDOCK)
+    crosswalk = root / "data" / "crosswalks" / "ore_minerals.csv"
+    rows = list(csv.DictReader(crosswalk.open(newline="", encoding="utf-8")))
+    for row in rows:
+        if row["citation"].startswith(HAMILTON):
+            row["status"] = "verified"
+    out = io.StringIO()
+    writer = csv.DictWriter(out, fieldnames=list(rows[0]), lineterminator="\n")
+    writer.writeheader()
+    writer.writerows(rows)
+    crosswalk.write_text(out.getvalue(), encoding="utf-8")
     build_dir = tmp_path_factory.mktemp("build")
     fetch_references(build_dir, root=root)
-    # Cited after the lookup: no download since.
+    # Changed after the lookup: no download since.
+    crucible = routes / "make-crucible.yaml"
+    text = crucible.read_text()
+    line_end = text.index("\n", text.index(TYLECOTE))
+    crucible.write_text(text[:line_end] + f"\n    doi: {SARAYDAR_DOI}" + text[line_end:])
+    quarry = routes / "quarry-limestone.yaml"
     quarry.write_text(quarry.read_text() + '  - citation: "Someone, A. (2026). A work cited today."\n'
                       "    supports: Nothing yet.\n    status: unverified\n")
     build(root, build_dir)
-    return build_dir
-
+    return root, build_dir
 
 
 class TestChangesSinceTheLookup:
     def test_a_doi_that_leads_to_a_different_work_is_flagged(self, changed):
-        fall = load_reference_checks(changed)[FALL]
+        fall = load_reference_checks(changed[1])[FALL]
         assert fall["result"] == "doi_disagrees"
         assert fall["match_title"].startswith("A Quantitative Comparison of Efficiency")
 
     def test_a_work_cited_after_the_lookup_is_not_checked_yet_and_the_build_goes_on(self, changed):
-        assert load_reference_checks(changed)["Someone, A. (2026). A work cited today."]["result"] == "not_checked_yet"
+        assert load_reference_checks(changed[1])["Someone, A. (2026). A work cited today."]["result"] == "not_checked_yet"
+
+    def test_a_doi_added_after_the_lookup_isnt_judged_by_the_old_search(self, changed):
+        assert load_reference_checks(changed[1])[TYLECOTE]["result"] == "not_checked_yet"
 
     def test_a_work_verified_everywhere_it_is_cited_leaves_the_reading_queue(self, changed):
-        reading = {item["label"] for item in load_queue(changed) if item["kind"] == "unread_reference"}
+        reading = {item["label"] for item in load_queue(changed[1]) if item["kind"] == "unread_reference"}
         assert KLEMM not in reading
         assert TYLECOTE in reading
+
+    def test_copied_routes_follow_their_template_so_a_work_read_there_leaves_the_queue(self, changed):
+        # given: Craddock verified in the two curated routes; the nine mining routes copied from them still say
+        # unverified, since what it supports there is about another mineral (ADR 0045)
+        reading = {item["label"] for item in load_queue(changed[1]) if item["kind"] == "unread_reference"}
+        assert CRADDOCK not in reading
+
+    def test_the_ore_crosswalk_records_how_far_its_references_were_checked(self, changed):
+        root, build_dir = changed
+        reading = {item["label"] for item in load_queue(build_dir) if item["kind"] == "unread_reference"}
+        assert not any(label.startswith(HAMILTON) for label in reading)
+        magnetite = load_built(root, build_dir).things["magnetite"]
+        assert [ref["status"] for ref in magnetite["references"]] == ["verified"]
 
 
 class TestReadingQueue:

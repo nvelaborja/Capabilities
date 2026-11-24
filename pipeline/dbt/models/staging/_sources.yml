@@ -118,6 +118,12 @@ sources:
             data_tests: [not_null]
           - name: supports
             data_tests: [not_null]
+          - name: status
+            description: How far the reference has been checked; empty means unverified (ADR 0047).
+            data_tests:
+              - accepted_values:
+                  arguments:
+                    values: [unverified, secondary, verified]
       - name: wikidata_items
         description: >
           The English label and description, and the chemical formula, of every crosswalked Wikidata item, as the

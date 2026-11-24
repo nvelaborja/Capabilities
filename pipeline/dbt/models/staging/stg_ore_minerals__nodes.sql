@@ -41,7 +41,9 @@ templates as (
 
 reference as (
     select id, json_array(json_object(
-        'citation', citation, 'url', url, 'supports', supports, 'status', 'unverified'
+        'citation', citation, 'url', url, 'supports', supports,
+        -- The crosswalk's own status for its reference (ADR 0047); unverified when it gives none.
+        'status', coalesce(nullif(trim(status), ''), 'unverified')
     )) as "references"
     from ores
 ),

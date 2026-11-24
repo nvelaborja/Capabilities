@@ -12,6 +12,7 @@ is the work cited, and nothing changes a reference's status: a person reads the 
 from __future__ import annotations
 
 import csv
+import http.client
 import json
 import os
 import re
@@ -36,6 +37,7 @@ YEAR = re.compile(r"\((\d{4})\)[.:,]?\s*")
 # An edition, or the summary a secondary reference was read in: not part of the title.
 EDITION = re.compile(r"(,\s*\d+(st|nd|rd|th) ed\.?|,\s+as summari[sz]ed in .*)$")
 TIMEOUT_S = 60
+ATTEMPTS = 4
 
 
 @dataclass(frozen=True)
@@ -146,10 +148,12 @@ class Lookups:
             self.rows.append({**common, "rank": str(rank), **candidate})
 
     def _get(self, url: str, pause_s: float) -> tuple[str, dict | None]:
-        """A JSON response and its status. A work that isn't there (404) is an answer; being told to slow down, or a
-        server error, is retried a few times and then raised, so the download falls back to the cold backup."""
+        """A JSON response and its status. A work that isn't there (404) is an answer. Being told to slow down, a server
+        error, a response cut short or one that isn't JSON is retried a few times and then raised as a URLError, so the
+        download falls back to the cold backup rather than keep half an answer."""
         request = urllib.request.Request(url, headers={"User-Agent": self.user_agent, "Accept": "application/json"})
-        for attempt in range(4):
+        problem: Exception | None = None
+        for attempt in range(ATTEMPTS):
             pause(pause_s * (2 ** attempt if attempt else 1))
             try:
                 with urllib.request.urlopen(request, timeout=TIMEOUT_S) as response:
@@ -157,21 +161,29 @@ class Lookups:
             except urllib.error.HTTPError as error:
                 if error.code in (400, 404, 410):
                     return str(error.code), None
-                if attempt == 3:
-                    raise
-        raise AssertionError("unreachable")
+                problem = error
+            except (http.client.HTTPException, json.JSONDecodeError) as error:
+                problem = error
+        if isinstance(problem, urllib.error.URLError):
+            raise problem
+        raise urllib.error.URLError(f"no usable answer after {ATTEMPTS} attempts: {problem!r}")
 
     def open_link(self, url: str) -> str:
-        """Whether a link still loads: its HTTP status after redirects, or why it couldn't be reached."""
-        request = urllib.request.Request(url, headers={"User-Agent": self.user_agent})
-        pause(self.pause_s / 4)
+        """Whether a link still loads: its HTTP status after redirects, or why it couldn't be reached. Only web addresses
+        are opened: urllib would also read file:// and ftp:// ones, and a reference has no business pointing there."""
         try:
+            if urllib.parse.urlsplit(url).scheme.lower() not in ("http", "https"):
+                return "not a web address"
+            pause(self.pause_s / 4)
+            request = urllib.request.Request(url, headers={"User-Agent": self.user_agent})
             with urllib.request.urlopen(request, timeout=TIMEOUT_S) as response:
                 response.read(1)
                 return str(response.status)
         except urllib.error.HTTPError as error:
             return str(error.code)
-        except (urllib.error.URLError, TimeoutError, ConnectionError) as error:
+        # A malformed address (ValueError), a connection dropped mid-answer (HTTPException): one bad link mustn't stop
+        # the rest from being checked.
+        except (urllib.error.URLError, TimeoutError, ConnectionError, http.client.HTTPException, ValueError) as error:
             return f"unreachable: {getattr(error, 'reason', error)}"
 
 
