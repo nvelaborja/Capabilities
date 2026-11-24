@@ -1,0 +1,9 @@
+{
+  "dataset": "pleiades_places",
+  "url": "https://atlantides.org/downloads/pleiades/dumps/pleiades-places-latest.csv.gz",
+  "retrieved_at": "2026-11-24T17:34:07Z",
+  "sha256": "a4b25fa20fa5214efe7d1df463633bfa662d0badc162ecfba288fe2422f13592",
+  "rows": 42544,
+  "license": "CC BY 3.0 (Pleiades: a gazetteer of past places, https://pleiades.stoa.org)",
+  "last_modified": "Tue, 24 Nov 2026 12:08:08 GMT"
+}

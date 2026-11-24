@@ -1,5 +1,7 @@
--- Where each source kind is found (ADR 0036): MRDS deposits matched to our source kinds by the crosswalk (ADR 0041).
--- One row per source kind and deposit, so a deposit with both hematite and malachite is an occurrence of each.
+-- Where each source kind is found (ADR 0036): MRDS deposits matched to our source kinds by the crosswalk (ADR 0041), and
+-- Pleiades' ancient mines and quarries matched by its rules (ADR 0046). One row per source kind and record, so a deposit
+-- with both hematite and malachite is an occurrence of each. A Pleiades copper mine doesn't say which ore was mined, so
+-- it is an occurrence of the ore class, not of a mineral's deposits.
 with deposits as (
     select * from {{ ref('stg_mrds__deposits') }}
     -- A deposit without coordinates can't be placed, so it isn't an occurrence.
@@ -21,6 +23,37 @@ snapshot as (
     select retrieved_at from {{ source('raw', 'upstream_snapshots') }} where dataset = 'mrds_deposits'
 ),
 
+pleiades_snapshot as (
+    select retrieved_at from {{ source('raw', 'upstream_snapshots') }} where dataset = 'pleiades_places'
+),
+
+workings as (
+    select * from {{ ref('stg_pleiades__workings') }}
+    -- Unlocated places have no point to draw.
+    where latitude is not null and longitude is not null
+        and record_id not in (
+            select record_id from {{ source('raw', 'suppressed_records') }} where dataset = 'pleiades'
+        )
+),
+
+-- A working matches a rule when it is of the rule's kind and names its word: as a tag, or whole in its title or
+-- description.
+pleiades_matches as (
+    select
+        rules.target as source_id,
+        case when list_contains(workings.materials, lower(rules.word)) then 'tag' else 'text' end
+            || ': ' || lower(rules.word) as matched_on,
+        workings.*
+    from workings
+    join {{ source('raw', 'pleiades_sources') }} as rules
+        on list_contains(workings.kinds, rules.places)
+        and (
+            list_contains(workings.materials, lower(rules.word))
+            or regexp_matches(workings.text, '\b' || lower(rules.word) || '\b')
+        )
+    qualify row_number() over (partition by rules.target, workings.record_id order by matched_on) = 1
+),
+
 matches as (
     select
         crosswalk.source_id,
@@ -38,8 +71,9 @@ matches as (
         and (crosswalk.deposit_type is null or deposits.deposit_type ilike '%' || crosswalk.deposit_type || '%')
     -- Two crosswalk rows can match the same deposit to the same source kind (by ore and by commodity): keep one.
     qualify row_number() over (partition by crosswalk.source_id, deposits.record_id order by matched_on) = 1
-)
+),
 
+mrds as (
 select
     source_id || '/mrds/' || record_id as id,
     source_id,
@@ -60,6 +94,11 @@ select
     -- The year by which it is known to have been worked: its first production, unless that only says "after" a year.
     case when first_production_qualifier is distinct from 'after' then first_production_year end as worked_by_year,
     case when worked_by_year is not null then 'worked' else 'present' end as state,
+    null::integer as attested_from,
+    null::integer as attested_to,
+    null::varchar[] as periods,
+    -- MRDS doesn't say how precise its coordinates are.
+    null::boolean as approximate,
     matched_on,
     record_quality,
     url,
@@ -72,4 +111,49 @@ select
     ) as provenance
 from matches
 cross join snapshot
-order by source_id, record_id
+),
+
+pleiades as (
+select
+    source_id || '/pleiades/' || record_id as id,
+    source_id,
+    'pleiades' as dataset,
+    record_id,
+    name,
+    st_point(longitude, latitude) as geometry,
+    longitude,
+    latitude,
+    null as country,
+    null as admin_area,
+    null as development_status,
+    null as deposit_type,
+    null::varchar[] as ore_minerals,
+    null::varchar[] as commodities,
+    null::integer as first_production_year,
+    null as first_production_qualifier,
+    -- Worked when it is attested, perhaps only in modern times, which still shows the material was there to be used.
+    -- The year it was certainly worked by needs each period's end year (M4).
+    null::integer as worked_by_year,
+    'worked' as state,
+    attested_from,
+    attested_to,
+    periods,
+    location_precision <> 'precise' as approximate,
+    matched_on,
+    null as record_quality,
+    url,
+    json_object(
+        'layer', 'upstream',
+        'dataset', 'pleiades',
+        'record', record_id,
+        'url', url,
+        'retrieved_at', strftime(pleiades_snapshot.retrieved_at at time zone 'UTC', '%Y-%m-%dT%H:%M:%SZ')
+    ) as provenance
+from pleiades_matches
+cross join pleiades_snapshot
+)
+
+select * from mrds
+union all by name
+select * from pleiades
+order by source_id, dataset, record_id

@@ -25,6 +25,10 @@ model {
     description 'The free knowledge base of Wikimedia, CC0. Its SPARQL endpoint (query.wikidata.org) answers two queries about the items our things and ore minerals are matched to: their quantity statements (Mohs hardness, ADR 0043), and their labels, descriptions and formulas (ADR 0045).'
   }
 
+  pleiades = external 'Pleiades' {
+    description 'A community-built gazetteer of ancient places, CC BY 3.0. Its daily dump (pleiades-places-latest.csv.gz) holds every place, with its types, tags, location and the periods it is attested in; its mines and quarries place our sources and ore classes (ADR 0046).'
+  }
+
   capabilities = system 'Capabilities' {
     description 'A free, non-commercial knowledge graph of what it physically takes to make and do things, with a reasoner that answers three questions.'
 
@@ -95,6 +99,12 @@ model {
       rawMrds = table 'raw.mrds_deposits' {
         description 'The MRDS snapshot, all 46 columns as text.'
       }
+      rawPleiades = table 'raw.pleiades_places' {
+        description 'The Pleiades snapshot, all 26 columns as text.'
+      }
+      rawPleiadesRules = table 'raw.pleiades_sources' {
+        description 'Rules placing Pleiades mines and quarries (data/crosswalks/pleiades_sources.csv): a target source or ore class, a kind of place and a word.'
+      }
       rawSnapshots = table 'raw.upstream_snapshots' {
         description 'Each snapshot loaded: dataset, URL, retrieval time, hash, rows, license.'
       }
@@ -120,6 +130,10 @@ model {
       stgMrds = table 'stg_mrds__deposits' {
         technology 'dbt view'
         description 'MRDS deposits typed: coordinates as numbers, ore minerals and commodities as lists, first production year and qualifier.'
+      }
+      stgPleiades = table 'stg_pleiades__workings' {
+        technology 'dbt view'
+        description 'Pleiades mines and quarries: the kinds of place, the materials they name (tags) and their text, location and precision, attested years and periods.'
       }
     }
 
@@ -239,6 +253,13 @@ model {
   capabilities.pipeline.dagster -> capabilities.pipeline.downloader 'downloads MRDS and Wikidata as assets'
   capabilities.pipeline.downloader -> mrds 'downloads mrds-csv.zip (HTTPS)'
   capabilities.pipeline.downloader -> wikidata 'one SPARQL query for the crosswalked items (HTTPS)'
+  capabilities.pipeline.downloader -> pleiades 'downloads the daily dump of places (HTTPS)'
+  capabilities.pipeline.loader -> capabilities.warehouse.rawPleiades 'loads the newest copy of Pleiades'
+  capabilities.pipeline.loader -> capabilities.warehouse.rawPleiadesRules 'loads the rules, as text'
+  capabilities.warehouse.rawPleiades -> capabilities.warehouse.stgPleiades 'mines and quarries, typed'
+  capabilities.warehouse.stgPleiades -> capabilities.artifact.occurrences 'ancient mines and quarries, as points'
+  capabilities.warehouse.rawPleiadesRules -> capabilities.artifact.occurrences 'match rules'
+  capabilities.warehouse.stgPleiades -> capabilities.artifact.queue 'unmatched mines and quarries'
   capabilities.pipeline.downloader -> capabilities.curated 'reads the crosswalk and quantities to build the query'
   capabilities.pipeline.downloader -> capabilities.snapshots 'writes Parquet, then snapshot.json'
   capabilities.pipeline.dagster -> capabilities.pipeline.loader 'runs the load and manifest as assets'
@@ -277,6 +298,10 @@ model {
   // Lineage: the data, stage to stage, the way it flows (view pipeline).
   mrds -[lineage]-> capabilities.snapshots 'mrds-csv.zip, as Parquet'
   wikidata -[lineage]-> capabilities.snapshots 'two query results, as Parquet'
+  pleiades -[lineage]-> capabilities.snapshots 'the daily dump, as Parquet'
+  capabilities.curated -[lineage]-> capabilities.warehouse.rawPleiadesRules 'pleiades_sources.csv'
+  capabilities.snapshots -[lineage]-> capabilities.warehouse.rawPleiades 'the download, if newest'
+  capabilities.backups -[lineage]-> capabilities.warehouse.rawPleiades 'the backup, if newest'
   capabilities.snapshots -[lineage]-> capabilities.backups 'capabilities backup, when newer'
   capabilities.curated -[lineage]-> capabilities.warehouse.rawDocuments 'every document, whole'
   capabilities.curated -[lineage]-> capabilities.warehouse.rawCrosswalk 'mrds_sources.csv'
@@ -311,7 +336,7 @@ model {
   }
   stageDownload = stage '1b Download upstream' {
     technology 'Dagster'
-    description 'Dagster only: downloads MRDS and the two Wikidata queries (Downloader). If the network fails, it uses the cold backup instead.'
+    description 'Dagster only: downloads MRDS, the two Wikidata queries and Pleiades (Downloader). If the network fails, it uses the cold backup instead.'
   }
   stageLoad = stage '2 Load' {
     technology 'Python, DuckDB'

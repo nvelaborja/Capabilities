@@ -30,7 +30,7 @@ from dagster_dbt import (
 )
 
 from .build import DBT_PROJECT, dbt_environment, dbt_target_path, load_inputs, write_manifest
-from .upstream import MRDS, WIKIDATA, WIKIDATA_ITEMS, Dataset, fetch_or_fall_back
+from .upstream import MRDS, PLEIADES, WIKIDATA, WIKIDATA_ITEMS, Dataset, fetch_or_fall_back
 
 
 class UpstreamDownloads(ConfigurableResource):
@@ -38,6 +38,7 @@ class UpstreamDownloads(ConfigurableResource):
 
     mrds_url: str = MRDS.url
     wikidata_url: str = WIKIDATA.url
+    pleiades_url: str = PLEIADES.url
 
 
 def definitions(root: Path, build_dir: Path) -> Definitions:
@@ -81,6 +82,15 @@ def definitions(root: Path, build_dir: Path) -> Definitions:
     def wikidata_items_snapshot(context: AssetExecutionContext, downloads: UpstreamDownloads) -> MaterializeResult:
         return download(context, WIKIDATA_ITEMS, downloads.wikidata_url)
 
+    @asset(
+        key=AssetKey(["upstream", PLEIADES.name]),
+        group_name="upstream",
+        description="A snapshot of every place in Pleiades, the gazetteer of ancient places: the daily CSV dump, kept "
+        "unchanged as Parquet. Its mines and quarries become occurrences, with the dates they are attested (ADR 0046).",
+    )
+    def pleiades_snapshot(context: AssetExecutionContext, downloads: UpstreamDownloads) -> MaterializeResult:
+        return download(context, PLEIADES, downloads.pleiades_url)
+
     def download(context: AssetExecutionContext, dataset: Dataset, url: str) -> MaterializeResult:
         """Download a dataset. Offline, or when its server is down, the build goes on with the cold backup (ADR 0044),
         and the run says so: the asset's metadata names the copy used and the error."""
@@ -103,6 +113,9 @@ def definitions(root: Path, build_dir: Path) -> Definitions:
         MRDS.name: "The MRDS snapshot, loaded into DuckDB as text.",
         WIKIDATA.name: "The Wikidata quantities snapshot, loaded into DuckDB as text.",
         WIKIDATA_ITEMS.name: "The Wikidata items snapshot (labels, descriptions, formulas), loaded into DuckDB as text.",
+        PLEIADES.name: "The Pleiades places snapshot, loaded into DuckDB as text.",
+        "pleiades_sources": "The hand-kept crosswalk of rules matching Pleiades mines and quarries to our sources and ore "
+        "classes (data/crosswalks).",
         "upstream_snapshots": "Where and when each upstream snapshot was retrieved, and which copy was used, for provenance.",
     }
 
@@ -110,7 +123,8 @@ def definitions(root: Path, build_dir: Path) -> Definitions:
         MRDS.name: [mrds_snapshot],
         WIKIDATA.name: [wikidata_snapshot],
         WIKIDATA_ITEMS.name: [wikidata_items_snapshot],
-        "upstream_snapshots": [mrds_snapshot, wikidata_snapshot, wikidata_items_snapshot],
+        PLEIADES.name: [pleiades_snapshot],
+        "upstream_snapshots": [mrds_snapshot, wikidata_snapshot, wikidata_items_snapshot, pleiades_snapshot],
     }
 
     @multi_asset(
@@ -136,7 +150,10 @@ def definitions(root: Path, build_dir: Path) -> Definitions:
         yield MaterializeResult(
             asset_key=raw["suppressed_records"], metadata={"records": loaded["suppressions"]["suppressed_records"]}
         )
-        for dataset in (MRDS, WIKIDATA, WIKIDATA_ITEMS):
+        yield MaterializeResult(
+            asset_key=raw["pleiades_sources"], metadata={"rules": loaded["crosswalks"]["pleiades_sources"]}
+        )
+        for dataset in (MRDS, WIKIDATA, WIKIDATA_ITEMS, PLEIADES):
             snapshot = loaded["upstream"][dataset.name]
             yield MaterializeResult(asset_key=raw[dataset.name], metadata={"rows": snapshot["rows"], "copy": snapshot["copy"]})
         yield MaterializeResult(asset_key=raw["upstream_snapshots"], metadata={"datasets": len(loaded["upstream"])})
@@ -161,6 +178,6 @@ def definitions(root: Path, build_dir: Path) -> Definitions:
         )
 
     return Definitions(
-        assets=[mrds_snapshot, wikidata_snapshot, wikidata_items_snapshot, raw_tables, graph_models, graph_manifest],
+        assets=[mrds_snapshot, wikidata_snapshot, wikidata_items_snapshot, pleiades_snapshot, raw_tables, graph_models, graph_manifest],
         resources={"dbt": DbtCliResource(project_dir=project), "downloads": UpstreamDownloads()},
     )

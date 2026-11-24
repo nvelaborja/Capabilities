@@ -1,0 +1,8 @@
+target,places,word,notes
+granite-outcrop,quarry,granite,A quarry whose title or description names granite.
+limestone-outcrop,quarry,limestone,A quarry whose title or description names limestone.
+copper-ore,mine,copper,"A copper mine: which ore isn't recorded, so the place belongs to the class."
+iron-ore,mine,iron,"An iron mine: which ore isn't recorded, so the place belongs to the class."
+tin-ore,mine,tin,"A tin mine: which ore isn't recorded, so the place belongs to the class."
+copper-sulphide-ore,mine,copper,"A copper mine, for the sulphide ores too: chalcopyrite isn't in the copper ore class, and the place doesn't say which ore was mined."
+flint-deposit,mine,flint,A flint mine.

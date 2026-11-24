@@ -49,6 +49,36 @@ sources:
         columns:
           - name: dep_id
             data_tests: [unique, not_null]
+      - name: pleiades_sources
+        description: >
+          Rules matching Pleiades mines and quarries to our sources and ore classes (data/crosswalks/pleiades_sources.csv,
+          ADR 0046). A place matches a rule when it is of the rule's kind (mine or quarry) and its title or description
+          names the word, whole. A rule's target is a source, or an ore class when the place doesn't say which ore.
+        columns:
+          - name: target
+            data_tests:
+              - not_null
+              - relationships:
+                  arguments:
+                    to: ref('stg_curated__documents')
+                    field: id
+          - name: places
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: [mine, quarry]
+          - name: word
+            data_tests: [not_null]
+          - name: notes
+            data_tests: [not_null]
+      - name: pleiades_places
+        description: >
+          Every place in Pleiades, the gazetteer of ancient places, as downloaded from its daily dump, every column as
+          text (ADR 0046). CC BY 3.0.
+        columns:
+          - name: id
+            data_tests: [unique, not_null]
       - name: wikidata_things
         description: >
           The crosswalk from our things to Wikidata items (data/crosswalks/wikidata_things.csv, ADR 0043). It says which
@@ -116,7 +146,7 @@ sources:
               - not_null
               - accepted_values:
                   arguments:
-                    values: [mrds, wikidata]
+                    values: [mrds, wikidata, pleiades]
           - name: record_id
             data_tests: [not_null]
           - name: reason

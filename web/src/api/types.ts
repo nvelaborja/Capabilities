@@ -254,7 +254,7 @@ export interface ExplainRequest extends SelectionRequest {
 
 // ---------------------------------------------------------------- /api/occurrences/{id}
 
-/** Worked: known to have been worked by a year. Present: there, with no known working date (ADR 0041). */
+/** Worked: known to have been worked (by a year, or in its attested periods). Present: no known working date (ADR 0041). */
 export type OccurrenceState = "worked" | "present";
 
 export interface PlaceProperties {
@@ -269,6 +269,15 @@ export interface PlaceProperties {
   deposit_type: string | null;
   worked_by_year: number | null;
   state: OccurrenceState;
+  /** Pleiades: the years it is attested from and to (negative is BC), and the named periods (ADR 0046). */
+  attested_from: number | null;
+  attested_to: number | null;
+  /** A list from the API; a JSON string once MapLibre has handled the feature. */
+  periods: string[] | string | null;
+  /** Pleiades gives only a rough area, or places it by a related place. */
+  approximate: boolean | null;
+  /** A place of the ore class, not of one mineral's deposits: which ore isn't recorded. */
+  class_level: boolean;
   record_id: string;
   url: string | null;
 }
@@ -287,6 +296,8 @@ export interface SourceSummary {
   /** How many places are mapped, and how many of those are known to have been worked. */
   places: number;
   worked: number;
+  /** The places of an ore class the material belongs to, where which ore was mined isn't recorded (ADR 0046). */
+  class_level: boolean;
 }
 
 export interface PlaceDataset {
@@ -295,6 +306,8 @@ export interface PlaceDataset {
   /** A short name for links, such as "MRDS". */
   short: string;
   home: string | null;
+  /** What its places are, in a sentence, and any terms of use. */
+  note: string;
   retrieved_at: string | null;
   license: string | null;
 }

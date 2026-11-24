@@ -6,7 +6,7 @@ Reference for how the graph is built: inputs, stages, tables, outputs, checks an
 
 | | |
 |---|---|
-| **Inputs** | The curated layer: `data/**/*.yaml` (quantities, things, verbs, routes, profiles, overrides), `data/crosswalks/*.csv`, `data/suppressions/*.csv`, `examples/**/*.yaml` (jobs) and `schema/*.json`. A copy of every upstream dataset (USGS MRDS, and Wikidata's quantity statements and item descriptions): the latest download in `build/upstream/` or the cold backup in `snapshots/`, whichever is newer. Every dataset is required ([ADR 0044](../adr/0044-require-every-upstream-dataset-with-cold-backups-in-git.md)). |
+| **Inputs** | The curated layer: `data/**/*.yaml` (quantities, things, verbs, routes, profiles, overrides), `data/crosswalks/*.csv`, `data/suppressions/*.csv`, `examples/**/*.yaml` (jobs) and `schema/*.json`. A copy of every upstream dataset (USGS MRDS, Wikidata's quantity statements and item descriptions, and Pleiades' places): the latest download in `build/upstream/` or the cold backup in `snapshots/`, whichever is newer. Every dataset is required ([ADR 0044](../adr/0044-require-every-upstream-dataset-with-cold-backups-in-git.md)). |
 | **Output** | `build/graph/graph_nodes.parquet` (one row per node), `build/graph/graph_facts.parquet` (where each quantity value comes from), `build/graph/source_occurrences.parquet` (where sources are found, GeoParquet), `build/graph/curation_queue.parquet` (the gaps the build found) and `build/graph/manifest.json`. |
 | **Run by** | `uv run capabilities build`, or automatically by `need`, `explore`, `check` and `serve` when the output is missing or stale. Or Dagster: the same steps as assets, plus downloading upstream snapshots, with lineage, checks and run history (see [Orchestration](#orchestration-dagster)). Only Dagster downloads. |
 | **Code** | `pipeline/src/capabilities_pipeline/build.py` (extract, load, run dbt, manifest), `upstream.py` (downloading and loading snapshots), `assets.py` and `definitions.py` (the same steps as Dagster assets), and `pipeline/dbt/` (the dbt project). Reading: `packages/core/src/capabilities/built.py`. |
@@ -29,6 +29,8 @@ Wikidata ──▶ build/upstream/wikidata_quantities/ ▶ raw.wikidata_quantiti
 data/suppressions/*.csv ─────────────────────────▶ raw.suppressed_records ─────────────────────────────────────────┘  (and source_occurrences)
 data/crosswalks/mrds_sources.csv ────────────────▶ raw.mrds_sources ─────────────────────────────┐
 USGS MRDS ──▶ build/upstream/mrds_deposits/ ─────▶ raw.mrds_deposits ──▶ stg_mrds__deposits ─────┼─▶ source_occurrences ──────▶ source_occurrences.parquet
+data/crosswalks/pleiades_sources.csv ────────────▶ raw.pleiades_sources ─────────────────────────┤
+Pleiades ──▶ build/upstream/pleiades_places/ ────▶ raw.pleiades_places ──▶ stg_pleiades__workings ┤
              (Parquet + snapshot.json)            raw.upstream_snapshots ────────────────────────┘                             manifest.json (last)
 ```
 
@@ -55,11 +57,13 @@ The `upstream/wikidata_quantities` asset sends one SPARQL query to `https://quer
 
 The `upstream/wikidata_items` asset sends a second query for the same items: each one's English label and description, and its chemical formula (P274), one row per formula. It names and describes the upstream ore minerals ([ADR 0045](../adr/0045-bring-ore-minerals-in-from-upstream-roast-sulphides-and-queue-the-gaps.md)). Its result, `wikidata_items.parquet`, has the columns `item`, `label`, `description` and `formula`.
 
+The `upstream/pleiades_places` asset downloads `https://atlantides.org/downloads/pleiades/dumps/pleiades-places-latest.csv.gz`, the daily dump of every place in Pleiades (6.5 MB compressed; 42,544 places on 2026-11-24), checks its 26 columns and keeps it unchanged as `pleiades_places.parquet` ([ADR 0046](../adr/0046-place-ancient-mines-and-quarries-from-pleiades.md)). DuckDB reads the gzip directly, so the file hashed is the file converted. License: CC BY 3.0.
+
 USGS refuses Python's default user agent, so downloads send a generic one (`dataset-snapshot/1.0`), and so does the Wikidata query.
 
 **When a download fails.** If the network fails (offline, a refused connection, a timeout) and the dataset has a cold backup, the asset uses the backup instead: it logs a warning and records `copy: backup` and the `download_error` in its metadata, and the run goes on (`fetch_or_fall_back`). Any other failure, such as changed columns, fails the asset.
 
-**Cold backups.** `snapshots/<dataset>/` in the repository holds a copy of each dataset, in git: the Parquet, every value unchanged but compressed with zstd (MRDS: 15 MB, down from 32 MB), and the same `snapshot.json` as the download. `uv run capabilities backup` replaces a backup with a newer download (`back_up`); commit the result. Nothing in a build downloads: a build reads the downloads and the backups ([ADR 0044](../adr/0044-require-every-upstream-dataset-with-cold-backups-in-git.md)).
+**Cold backups.** `snapshots/<dataset>/` in the repository holds a copy of each dataset, in git: the Parquet, every value unchanged but compressed with zstd (MRDS: 15 MB, down from 32 MB; Pleiades: 5.1 MB), and the same `snapshot.json` as the download. `uv run capabilities backup` replaces a backup with a newer download (`back_up`); commit the result. Nothing in a build downloads: a build reads the downloads and the backups ([ADR 0044](../adr/0044-require-every-upstream-dataset-with-cold-backups-in-git.md)).
 
 ### 1a. Extract
 
@@ -99,6 +103,10 @@ Every table is replaced on every build. The crosswalks and suppressions are load
 
 **`raw.mrds_deposits`**: the MRDS snapshot as downloaded, all 46 columns as text (`dep_id`, `site_name`, `latitude`, `longitude`, `country`, `state`, `commod1`–`commod3`, `dep_type`, `dev_stat`, `ore`, `yfp_ba`, `yr_fst_prd`, `score`, `url` and the rest).
 
+**`raw.pleiades_sources`**: the rules `data/crosswalks/pleiades_sources.csv`: `target`, `places` (`mine` or `quarry`), `word`, `notes`.
+
+**`raw.pleiades_places`**: the Pleiades snapshot as downloaded, all 26 columns as text (`id`, `title`, `description`, `featureTypes`, `tags`, `reprLat`, `reprLong`, `locationPrecision`, `minDate`, `maxDate`, `timePeriodsKeys` and the rest).
+
 **`raw.upstream_snapshots`**
 
 | Column | Type | Meaning |
@@ -126,7 +134,9 @@ The build runs `dbt build` on `pipeline/dbt`: `capabilities build` through dbt's
 - `raw.wikidata_quantities`: `item`, `property` and `amount` are not null.
 - `raw.ore_minerals`: `id` is unique; `wikidata` and `mrds_ore` are unique and not null; `class` is one of the ore classes or `none`; `citation` and `supports` are not null.
 - `raw.wikidata_items`: `item` is not null.
-- `raw.suppressed_records`: `dataset` is `mrds` or `wikidata`; `record_id` and `reason` are not null.
+- `raw.suppressed_records`: `dataset` is `mrds`, `wikidata` or `pleiades`; `record_id` and `reason` are not null.
+- `raw.pleiades_sources`: `target` is not null and names a curated node; `places` is `mine` or `quarry`; `word` and `notes` are not null.
+- `raw.pleiades_places`: `id` is unique and not null.
 - `raw.mrds_sources`: `source_id` is not null and names a curated node; `field` is `ore` or `commodity`; `value` and `notes` are not null.
 - `raw.mrds_deposits`: `dep_id` is unique and not null.
 - `raw.upstream_snapshots`: `dataset` is unique and not null; `retrieved_at` is not null.
@@ -136,6 +146,7 @@ The build runs `dbt build` on `pipeline/dbt`: `capabilities build` through dbt's
 - `crosswalk_maps_to_sources`: every crosswalk row names a source.
 - `crosswalk_rows_are_distinct`: no rule is listed twice.
 - `stg_mrds_coordinates_are_numbers`: no published coordinate fails to read as a number.
+- `pleiades_rules_target_sources_or_classes`: every Pleiades rule's target is a source or a class.
 - `occurrences_are_valid_points`: every occurrence is a valid point within latitude ±90 and longitude ±180.
 - `ore_minerals_are_new_and_well_formed`: a row that builds nodes has an id that clashes with no curated node (nor its `-deposit` and `mine-` ids) and a `mined_like` that is a curated route whose label names the material it mines; a rejected row has neither.
 - `crosswalked_items_are_in_the_wikidata_items_snapshot`: every item either crosswalk names (rejected rows aside) is in the items snapshot; one added since the last download stops the build until it is downloaded again.
@@ -191,6 +202,19 @@ Each node's provenance is `{"layer": "upstream", "crosswalk": "data/crosswalks/o
 
 Tests: `record_id` is unique and not null; `first_production_qualifier` is `before`, `after` or null.
 
+**`stg_pleiades__workings`** (view). One row per Pleiades place typed as a mine (`mine-2`), a quarry (`quarry`) or the deprecated "mine, quarry" (`mine`); 830 on 2026-11-24.
+
+| Column | From |
+|---|---|
+| `record_id`, `name`, `description`, `url` | `id`, `title` (null when "Untitled"), `description`, and `https://pleiades.stoa.org/places/<id>` |
+| `kinds` | `mine` and/or `quarry`: the deprecated type is both |
+| `materials` | `tags`, lower case, without DARE's bookkeeping (`dare:…`) and tags that repeat the type |
+| `text` | Title and description, lower case, with "Iron Age" removed, for matching a whole word |
+| `latitude`, `longitude` | `reprLat`, `reprLong`, as numbers |
+| `location_precision` | `locationPrecision`: `precise`, `rough`, `related` or `unlocated` |
+| `attested_from`, `attested_to` | `minDate`, `maxDate`, as integers (negative is BC) |
+| `periods` | `timePeriodsKeys`, split into a list |
+
 **`graph_facts`** (mart, written as Parquet). Where each quantity value comes from ([ADR 0043](../adr/0043-take-quantities-from-wikidata-with-upstream-first-and-overrides.md)): one row per thing and quantity that has a value from any layer.
 
 | Column | Meaning |
@@ -219,25 +243,27 @@ With the 2026-11-24 snapshots there are 30 facts: 18 from Wikidata and 12 curate
 
 Tests: `ordinal` unique and not null; `id` unique and not null, across every type of node; `provenance` not null.
 
-**`source_occurrences`** (mart, written as GeoParquet). Where each source kind is found ([ADR 0036](../adr/0036-place-sources-and-profiles-in-space-and-time.md)). It has one row per source kind and MRDS deposit, for every deposit with coordinates that matches a crosswalk rule and isn't suppressed. The rules are those of `mrds_sources`, plus one per upstream ore mineral: its deposit is every MRDS deposit listing it as an ore. A deposit that matches two source kinds appears twice.
+**`source_occurrences`** (mart, written as GeoParquet). Where each source kind is found ([ADR 0036](../adr/0036-place-sources-and-profiles-in-space-and-time.md)). It has one row per source kind and record, for every MRDS deposit or Pleiades mine or quarry with coordinates that matches a rule and isn't suppressed. MRDS's rules are those of `mrds_sources`, plus one per upstream ore mineral: its deposit is every MRDS deposit listing it as an ore. Pleiades' are those of `pleiades_sources`: a place matches when it is of the rule's kind and names its word as a tag or whole in its title or description. A Pleiades copper, iron or tin mine is an occurrence of the ore class (copper ore and copper sulphide ore, iron ore, tin ore), since it doesn't say which ore ([ADR 0046](../adr/0046-place-ancient-mines-and-quarries-from-pleiades.md)). A record that matches two source kinds appears twice.
 
 | Column | Meaning |
 |---|---|
-| `id` | `<source_id>/mrds/<record_id>`, e.g. `hematite-deposit/mrds/10008106`. |
-| `source_id` | The source kind. |
-| `dataset`, `record_id` | `mrds`, and the MRDS `dep_id`. |
+| `id` | `<source_id>/<dataset>/<record_id>`, e.g. `hematite-deposit/mrds/10008106`, `copper-ore/pleiades/707452`. |
+| `source_id` | The source kind, or the ore class for a Pleiades mine. |
+| `dataset`, `record_id` | `mrds` and the MRDS `dep_id`, or `pleiades` and the place's id. |
 | `name`, `country`, `admin_area`, `development_status`, `deposit_type`, `ore_minerals`, `commodities`, `record_quality`, `url` | From staging. |
 | `geometry` | A point, `ST_Point(longitude, latitude)`, in WGS 84 longitude and latitude (`OGC:CRS84`). |
 | `longitude`, `latitude` | The same point as numbers, for readers without a spatial library. |
 | `first_production_year`, `first_production_qualifier` | As MRDS gives them. |
 | `worked_by_year` | The year by which it is known to have been worked: the first production year, unless production began only "after" it. |
-| `state` | `worked` if `worked_by_year` is known, otherwise `present` ("present, not known to be worked by then"). |
-| `matched_on` | The crosswalk rule that matched, e.g. `ore: Hematite`. |
-| `provenance` | `{"layer": "upstream", "dataset": "mrds", "record": ..., "url": ..., "retrieved_at": ...}`. |
+| `state` | MRDS: `worked` if `worked_by_year` is known, otherwise `present` ("present, not known to be worked by then"). Pleiades: always `worked`, with `worked_by_year` empty (it needs each period's end year; M4). |
+| `attested_from`, `attested_to`, `periods` | Pleiades: the years it is attested from and to, and its periods. Null for MRDS. |
+| `approximate` | Pleiades: true unless its location is precise. Null for MRDS, which doesn't say. |
+| `matched_on` | The rule that matched, e.g. `ore: Hematite`, `tag: copper` or `text: copper`. |
+| `provenance` | `{"layer": "upstream", "dataset": "mrds" or "pleiades", "record": ..., "url": ..., "retrieved_at": ...}`. |
 
-Tests: `id` is unique and not null; `source_id` is not null and names a node in `graph_nodes`; `geometry`, `state` and `provenance` are not null; `state` is `worked` or `present`. Also the valid-points test above.
+Tests: `id` is unique and not null; `source_id` is not null and names a node in `graph_nodes`; `dataset` is `mrds` or `pleiades`; `geometry`, `state` and `provenance` are not null; `state` is `worked` or `present`. Also the valid-points test above.
 
-From the snapshot of 2026-11-22 there are 14,488 occurrences of 8 source kinds: 4,960 for malachite, 4,216 for limestone, 2,655 for hematite, 1,162 for granite, 1,083 for native copper, 238 for diamond gravel, 171 for tin gravel and 3 for flint. Of these, 1,968 have a working year; the earliest is 1505.
+From the snapshot of 2026-11-22 there are 14,488 occurrences of 8 source kinds: 4,960 for malachite, 4,216 for limestone, 2,655 for hematite, 1,162 for granite, 1,083 for native copper, 238 for diamond gravel, 171 for tin gravel and 3 for flint. Of these, 1,968 have a working year; the earliest is 1505. With Pleiades' snapshot of 2026-11-24, 290 ancient mines and quarries add 421 more: 118 each for copper ore and copper sulphide ore, 94 limestone, 68 iron ore, 14 granite, 8 tin ore and 1 flint. 35,732 in all, with the ore minerals' deposits.
 
 The marts' `external` materialization (a dbt-duckdb feature) writes each result to `build/graph/<model>.parquet` instead of keeping it as a table in the warehouse. Two quirks matter to readers of a mart that comes out empty (for example `source_occurrences.parquet` from a dataset with no matching records):
 
@@ -249,13 +275,13 @@ The marts' `external` materialization (a dbt-duckdb feature) writes each result 
 | Column | Meaning |
 |---|---|
 | `id` | `<kind>/<subject>`. |
-| `kind` | `ore_candidate`, `extracted_without_route`, `source_without_places`, `route_unverified`, `upstream_disagreement` or `stale_override`. |
+| `kind` | `ore_candidate`, `extracted_without_route`, `source_without_places`, `route_unverified`, `upstream_disagreement`, `stale_override` or `unmatched_place`. |
 | `subject`, `label` | What the item is about: an MRDS ore name (lower case) or a node or fact id, and how to show it. |
 | `detail` | What is missing, and what to do. |
-| `priority` | For ore candidates, the number of MRDS deposits of copper, iron or tin listing the mineral as an ore; otherwise null. |
+| `priority` | For ore candidates, the number of MRDS deposits of copper, iron or tin listing the mineral as an ore; for unmatched places, the number of places; otherwise null. |
 | `evidence` | JSON: the deposits and metals for a candidate, the values behind a disagreement, and so on. |
 
-An ore candidate is a mineral listed on at least 20 such deposits and not yet reviewed: in neither the ore crosswalk nor `mrds_sources`. Tests: `id` unique and not null; `kind` one of the six; `detail` not null. With the 2026-11-24 snapshots there are 186 items: 135 ore candidates (galena first, on 6,326 deposits), 49 routes with only unverified references, and 2 sources with no places. `uv run capabilities queue` prints them.
+An ore candidate is a mineral listed on at least 20 such deposits and not yet reviewed: in neither the ore crosswalk nor `mrds_sources`. An unmatched place group is the located Pleiades mines and quarries that no rule matches and none suppressed, by a material they name (gold, marble…), or naming none. They come last, after every other kind: where a material was found matters least to the app's questions ([ADR 0046](../adr/0046-place-ancient-mines-and-quarries-from-pleiades.md)). Tests: `id` unique and not null; `kind` one of the seven; `detail` not null. With the 2026-11-24 snapshots there are 221 items: 135 ore candidates (galena first, on 6,326 deposits), 49 routes with only unverified references, 2 sources with no places, and 35 groups of unmatched places (236 naming no material, then gold, 100). `uv run capabilities queue` prints them.
 
 ### 4. Publish
 
@@ -267,7 +293,7 @@ The build counts the rows in each Parquet file and writes **`build/graph/manifes
 | `fingerprint` | SHA-256 over the path and bytes of every input file and of the pipeline's code (below). |
 | `built_at` | UTC time of the build. |
 | `git_commit` | The commit checked out, if git is available. |
-| `tables` | Row count per file, e.g. `{"graph_nodes.parquet": 197, "graph_facts.parquet": 30, "source_occurrences.parquet": 35311, "curation_queue.parquet": 186}`. |
+| `tables` | Row count per file, e.g. `{"graph_nodes.parquet": 197, "graph_facts.parquet": 30, "source_occurrences.parquet": 35732, "curation_queue.parquet": 221}`. |
 | `upstream` | The snapshot loaded for every dataset: `url`, `retrieved_at`, `sha256`, `rows`, `license`, and `copy` (`download` or `backup`). |
 
 The manifest is written **last**. If anything fails earlier, no manifest matches the current inputs, so the failed build is never read as current.
@@ -278,9 +304,9 @@ The same steps are Dagster assets ([Dagster](technologies/dagster.md)). `assets.
 
 | Asset | Group | Step | Checks |
 |---|---|---|---|
-| `upstream/mrds_deposits`, `upstream/wikidata_quantities`, `upstream/wikidata_items` | upstream | Download (`fetch_or_fall_back` in `upstream.py`), or the cold backup when the network fails. Their URLs come from the `downloads` resource, which tests point at a local zip, a local stand-in for the SPARQL endpoint, or a port that refuses connections. | None |
-| `raw/curated_documents`, `raw/mrds_sources`, `raw/wikidata_things`, `raw/ore_minerals`, `raw/suppressed_records`, `raw/mrds_deposits`, `raw/wikidata_quantities`, `raw/wikidata_items`, `raw/upstream_snapshots` | raw | Load (`load_inputs`): one multi-asset, since the fingerprint is taken once before anything is read. The keys are the dbt sources' keys, so lineage runs into dbt. | The source tests above |
-| `stg_curated__documents`, `stg_curated__quantities`, `stg_curated__overrides`, `stg_curated__quantity_properties`, `stg_crosswalk__wikidata_items`, `stg_wikidata__items`, `stg_ore_minerals__nodes`, `stg_mrds__deposits`, `stg_wikidata__quantities` | staging | dbt views | Their tests above |
+| `upstream/mrds_deposits`, `upstream/wikidata_quantities`, `upstream/wikidata_items`, `upstream/pleiades_places` | upstream | Download (`fetch_or_fall_back` in `upstream.py`), or the cold backup when the network fails. Their URLs come from the `downloads` resource, which tests point at a local zip or gzip, a local stand-in for the SPARQL endpoint, or a port that refuses connections. | None |
+| `raw/curated_documents`, `raw/mrds_sources`, `raw/wikidata_things`, `raw/ore_minerals`, `raw/suppressed_records`, `raw/pleiades_sources`, `raw/mrds_deposits`, `raw/wikidata_quantities`, `raw/wikidata_items`, `raw/pleiades_places`, `raw/upstream_snapshots` | raw | Load (`load_inputs`): one multi-asset, since the fingerprint is taken once before anything is read. The keys are the dbt sources' keys, so lineage runs into dbt. | The source tests above |
+| `stg_curated__documents`, `stg_curated__quantities`, `stg_curated__overrides`, `stg_curated__quantity_properties`, `stg_crosswalk__wikidata_items`, `stg_wikidata__items`, `stg_ore_minerals__nodes`, `stg_mrds__deposits`, `stg_wikidata__quantities`, `stg_pleiades__workings` | staging | dbt views | Their tests above |
 | `graph_facts`, `graph_nodes`, `source_occurrences`, `curation_queue` | marts | dbt marts, written as Parquet | Their tests above |
 | `graph_manifest` | marts | Publish (`write_manifest`) | None |
 
@@ -309,6 +335,7 @@ A build is current when `manifest.json` exists, its `fingerprint` equals the fin
 | Reasoner and view tests | The built graph (the `graph` fixture: built once per test run from the cold backups), the curated YAML (`curated_graph`), or small graphs built in the test | The answers the app gives. |
 | Pipeline and server tests, `test_cli` | A build made once per test run in a temporary directory, from the cold backups | They test the real path, with no network. |
 | Upstream tests (`pipeline/tests/test_upstream.py`) | A snapshot of 14 real MRDS records (`pipeline/tests/fixtures/mrds-sample.csv`), "downloaded" from a local file | Every crosswalk rule and year rule, with no network. |
+| Pleiades tests (`pipeline/tests/test_pleiades.py`) | 13 real Pleiades places (`pipeline/tests/fixtures/pleiades-sample.csv`), gzipped and "downloaded" from a local file; and every place, from the cold backup | Matching by tag and by text, "Iron Age", class-level copper mines, dates, approximate locations, unmatched places in the queue, suppressions, and class-level places on a mineral's map. |
 | Ore mineral tests (`pipeline/tests/test_ore_minerals.py`) | The built graph from the cold backups | The upstream nodes, roasting, and the queue. |
 | Wikidata tests (`pipeline/tests/test_wikidata.py`) | 4 real Wikidata statements (`pipeline/tests/fixtures/wikidata-sample.csv`) and every crosswalked item's label, description and formula (the committed backup, `snapshots/wikidata_items/`), served by a local stand-in for the SPARQL endpoint (`wikidata_endpoint` in `conftest.py`) | The query, the snapshot, precedence, overrides (and stale ones) and suppressions, with no network. |
 
@@ -373,7 +400,7 @@ duckdb.sql("select id, layer, value, curated_value, disagrees from 'build/graph/
 
 | Milestone | Change to the pipeline |
 |---|---|
-| M1 | Done: Dagster runs the build; MRDS, the MRDS crosswalk and `source_occurrences`, served by `GET /api/occurrences/{id}` to the map; Wikidata's quantities through a crosswalk, overrides, suppressions and `graph_facts`; every dataset required, with cold backups; upstream ore minerals as nodes, roasting, and `curation_queue`. Still to come: Pleiades' ancient mines and quarries as occurrences (slice 4c). |
+| M1 | Done: Dagster runs the build; MRDS, the MRDS crosswalk and `source_occurrences`, served by `GET /api/occurrences/{id}` to the map; Wikidata's quantities through a crosswalk, overrides, suppressions and `graph_facts`; every dataset required, with cold backups; upstream ore minerals as nodes, roasting, and `curation_queue`. Pleiades' ancient mines and quarries as occurrences of sources and ore classes, and `unmatched_place` in the queue (slice 4c, [ADR 0046](../adr/0046-place-ancient-mines-and-quarries-from-pleiades.md)). |
 | M2 | Citation checks against OpenAlex and Crossref; a `reference_checks` mart. |
 | M3 | The agent curation stage and its append-only audit log. |
 | M5 | Raw and staging tables move to Apache Iceberg with an Apache Polaris catalog; the build still exports this artifact for the app. |

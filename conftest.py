@@ -1,4 +1,5 @@
 import csv
+import gzip
 import io
 import shutil
 import threading
@@ -78,6 +79,22 @@ def mrds_zip():
     return _mrds_zip
 
 
+# Thirteen real Pleiades places (CC BY 3.0), picked to cover each case of ADR 0046: a copper mine by tag (Agrokipia), by
+# its description only (Chale Ghar 1), and one dated "to the Iron Age" that is no iron mine (Almyras); limestone and
+# granite quarries; a mine of four metals (Dognecea); a gold mine no rule matches (Dolaucothi); an untitled quarry with a
+# rough location; a tin mine named in its description; Grimes Graves (flint); a settlement (Athens); an unlocated mine;
+# and a copper mine with a rough location (Temesa).
+PLEIADES_SAMPLE = REPO_ROOT / "pipeline" / "tests" / "fixtures" / "pleiades-sample.csv"
+
+
+@pytest.fixture(scope="session")
+def pleiades_gz(tmp_path_factory) -> str:
+    """The Pleiades sample, gzipped like the daily dump, as a file:// URL."""
+    archive = tmp_path_factory.mktemp("pleiades-download") / "pleiades-places-latest.csv.gz"
+    archive.write_bytes(gzip.compress(PLEIADES_SAMPLE.read_bytes()))
+    return archive.as_uri()
+
+
 @pytest.fixture(scope="session")
 def sample_rows():
     """Returns the sample's rows, as dictionaries, to change before zipping."""
@@ -133,16 +150,17 @@ def wikidata_endpoint():
 
 
 @pytest.fixture(scope="session")
-def upstream_built_dir(tmp_path_factory, mrds_zip, wikidata_endpoint) -> Path:
+def upstream_built_dir(tmp_path_factory, mrds_zip, wikidata_endpoint, pleiades_gz) -> Path:
     """The repository's graph built once with snapshots of the MRDS and Wikidata samples, so it has source occurrences
     and upstream quantity values."""
     from capabilities.built import run_build
-    from capabilities_pipeline.upstream import MRDS, WIKIDATA, WIKIDATA_ITEMS, fetch
+    from capabilities_pipeline.upstream import MRDS, PLEIADES, WIKIDATA, WIKIDATA_ITEMS, fetch
 
     build_dir = tmp_path_factory.mktemp("upstream-build")
     fetch(MRDS, build_dir, mrds_zip(tmp_path_factory.mktemp("mrds-download")))
     fetch(WIKIDATA, build_dir, wikidata_endpoint.url, root=REPO_ROOT)
     fetch(WIKIDATA_ITEMS, build_dir, wikidata_endpoint.url, root=REPO_ROOT)
+    fetch(PLEIADES, build_dir, pleiades_gz)
     run_build(REPO_ROOT, build_dir)
     return build_dir
 

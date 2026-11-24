@@ -6,6 +6,8 @@
 --   route_unverified          a route whose references are all unchecked
 --   upstream_disagreement     a curated value that differs from upstream's
 --   stale_override            an override of an upstream value that has since changed
+--   unmatched_place           Pleiades mines and quarries that name a material no rule matches, by material. Last:
+--                             where a material was found matters least to the app's questions (ADR 0046)
 with nodes as (
     select * from {{ ref('graph_nodes') }}
 ),
@@ -100,6 +102,39 @@ stale_overrides as (
     from facts where (override ->> 'stale')::boolean
 ),
 
+-- Mines and quarries with coordinates that no rule placed, counted by each material they name.
+pleiades_placed as (
+    select distinct record_id from {{ ref('source_occurrences') }} where dataset = 'pleiades'
+),
+
+unplaced_workings as (
+    select
+        record_id,
+        case when len(materials) = 0 then [null] else materials end as materials
+    from {{ ref('stg_pleiades__workings') }}
+    where latitude is not null and longitude is not null
+        and record_id not in (select record_id from pleiades_placed)
+        -- A suppressed place was looked at and left out: it isn't a gap.
+        and record_id not in (
+            select record_id from {{ source('raw', 'suppressed_records') }} where dataset = 'pleiades'
+        )
+),
+
+unmatched_places as (
+    select
+        'unmatched_place' as kind,
+        'pleiades:' || coalesce(material, '(none)') as subject,
+        coalesce(upper(left(material, 1)) || substr(material, 2), 'No material named') as label,
+        count(*) || ' Pleiades mines and quarries '
+            || coalesce('name ' || material || ' and match no rule', 'name no material')
+            || '. If one of our sources is found there, add a rule to data/crosswalks/pleiades_sources.csv;'
+            || ' otherwise leave them.' as detail,
+        count(*) as priority,
+        json_object('places', count(*)) as evidence
+    from (select record_id, unnest(materials) as material from unplaced_workings)
+    group by material
+),
+
 queue as (
     select * from ore_candidates
     union all select * from extracted_without_route
@@ -107,6 +142,7 @@ queue as (
     union all select * from routes_unverified
     union all select * from disagreements
     union all select * from stale_overrides
+    union all select * from unmatched_places
 )
 
 select
@@ -118,4 +154,5 @@ select
     priority,
     evidence
 from queue
-order by kind, priority desc nulls last, subject
+-- Unmatched places last: the app's questions don't depend on where a material was found (ADR 0046).
+order by kind = 'unmatched_place', kind, priority desc nulls last, subject
