@@ -290,6 +290,25 @@ class TestExplain:
         heat = [r["level"] for r in explain(graph, levels, context_for(graph, egypt(graph)), "heat")["leads_to"]]
         assert heat == sorted(heat, reverse=True)
 
+    def test_a_member_leads_to_what_routes_asking_for_its_class_make(self, graph, levels):
+        # given: smelting asks for copper ore, not for azurite by name; roasting asks for copper sulphide ore
+        def rows(node):
+            return [(r["id"], r["via"]) for r in explain(graph, levels, context_for(graph, egypt(graph)), node)["leads_to"]]
+
+        # then: the members lead where the reasoner takes them, saying which class they stand in for
+        assert rows("azurite") == [("copper", ["Smelting copper ore (as copper ore)"])]
+        assert rows("chalcopyrite") == [("roasted-copper-ore", ["Roasting copper sulphide ore (as copper sulphide ore)"])]
+        assert rows("roasted-copper-ore") == [("copper", ["Smelting copper ore (as copper ore)"])]
+        # and: the class itself still names the route plainly
+        assert rows("copper-ore") == [("copper", ["Smelting copper ore"])]
+
+    def test_a_member_its_known_values_rule_out_is_not_listed(self, graph, levels):
+        # given: chiseling asks for a chisel at least as hard as the stone; copper is softer than granite
+        rows = explain(graph, levels, context_for(graph, egypt(graph)), "copper-chisel")["leads_to"]
+        ids = {r["id"] for r in rows}
+        # then: it cuts limestone, but granite isn't among what it leads to
+        assert "cut:limestone" in ids and "cut:granite" not in ids
+
     def test_tools_lead_to_the_actions_they_perform(self, graph, levels):
         rows = explain(graph, levels, context_for(graph, egypt(graph)), "saw")["leads_to"]
         assert "cut:granite" in {r["id"] for r in rows}

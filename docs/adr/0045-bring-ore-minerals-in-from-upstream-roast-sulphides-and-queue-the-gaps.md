@@ -50,6 +50,7 @@ Each node's provenance names the Wikidata item, the crosswalk and the template. 
 - The graph has 197 nodes, 27 of them from upstream. Occurrences rise from 14,488 to 35,311, most of them chalcopyrite (11,316) and magnetite (3,313).
 - The graph view draws the new nodes as it draws curated ones. At this size there was no need to hide or group them; if the crosswalk grows to hundreds of minerals, grouping by class is the next step.
 - Copper is now reachable from a sulphide deposit and stone tools: mined, roasted, smelted.
+- A node's "Leads to" now follows class membership as the reasoner does: a route that asks for a class counts for each member, labelled "(as copper ore)", unless the member's known values fail the requirement's conditions (a copper chisel doesn't lead to cutting granite). Before, every member of a class (malachite and hematite too) showed nothing there.
 - In the worked example, Egypt is one step from iron through any of five iron ores (magnetite, goethite and siderite deposits besides hematite and bog iron), and can cut, drill and finish the new minerals. The answers to the example's jobs are unchanged.
 - The first queue holds 135 ore candidates (galena and sphalerite, on 6,326 and 5,051 deposits, at the top), 46 routes with only unverified references, and 2 sources with no places (bog iron, dolerite). Many candidates aren't ores of these metals at all; rejecting them is curation work too, and the evidence for each is one query away.
 - The crosswalk's references are credited in CREDITS.md like the curated layer's.
