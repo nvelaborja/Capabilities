@@ -10,6 +10,9 @@ const count = (n: number, one: string, many: string) => `${n.toLocaleString("en"
 /** One line per source: how many places are mapped and how many are known to have been worked, or why there are none. */
 export function sourceLine(source: SourceSummary, haveData: boolean): string {
   if (source.availability === "ubiquitous") return `${source.label}: found almost everywhere, so not mapped.`;
+  if (source.class_level) {
+    return `${source.label}, which ore isn't recorded: ${count(source.places, "ancient mine", "ancient mines")}.`;
+  }
   if (source.places > 0) {
     return `${source.label}: ${count(source.places, "place", "places")}, ${source.worked.toLocaleString("en")} known to have been worked.`;
   }
@@ -33,10 +36,42 @@ export function emptyReason(places: OccurrencesResponse): string | null {
 }
 
 /** What the popup says about a place's state: never "not worked", only "no known working date" (ADR 0041). */
-export function stateText(place: Pick<PlaceProperties, "state" | "worked_by_year">): string {
-  return place.state === "worked" && place.worked_by_year !== null
-    ? `Known to have been worked by ${place.worked_by_year}`
-    : "Present, with no known working date";
+export function stateText(
+  place: Pick<PlaceProperties, "state" | "worked_by_year"> & Partial<Pick<PlaceProperties, "attested_from" | "attested_to">>,
+): string {
+  if (place.state === "worked" && place.worked_by_year !== null) return `Known to have been worked by ${place.worked_by_year}`;
+  if (place.state === "worked" && place.attested_from != null && place.attested_to != null) {
+    return `Worked in antiquity: attested ${yearText(place.attested_from)} – ${yearText(place.attested_to)}`;
+  }
+  if (place.state === "worked") return "Worked in antiquity";
+  return "Present, with no known working date";
+}
+
+/** A year as historians write it: 330 BC, AD 640. Negative years are BC; there is no year zero. */
+export function yearText(year: number): string {
+  return year < 0 ? `${-year} BC` : `AD ${year}`;
+}
+
+/** Pleiades' periods in words, "Hellenistic republican, Roman, Late antique"; null when there are none. */
+export function periodsText(periods: PlaceProperties["periods"]): string | null {
+  const keys = typeof periods === "string" ? parsePeriods(periods) : (periods ?? []);
+  if (keys.length === 0) return null;
+  const words = keys.map((key) => key.replaceAll("-", " ")).map((text) => text.charAt(0).toUpperCase() + text.slice(1));
+  return `Periods: ${words.join(", ")}`;
+}
+
+function parsePeriods(text: string): string[] {
+  try {
+    const parsed: unknown = JSON.parse(text);
+    return Array.isArray(parsed) ? parsed.map(String) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** The popup's note on a place of an ore class: "Copper ore mined here; which ore isn't recorded". */
+export function classLevelText(sourceLabel: string): string {
+  return `${sourceLabel} mined here; which ore isn't recorded`;
 }
 
 /** Where a place is, as "Colorado, United States". */

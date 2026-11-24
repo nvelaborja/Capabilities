@@ -144,7 +144,8 @@ def load_facts(build_dir: Path) -> dict[str, dict]:
 # and reading them needs no spatial extension.
 OCCURRENCE_COLUMNS = (
     "id", "source_id", "dataset", "record_id", "name", "longitude", "latitude", "country", "admin_area",
-    "development_status", "deposit_type", "worked_by_year", "state", "matched_on", "url",
+    "development_status", "deposit_type", "worked_by_year", "state", "attested_from", "attested_to", "periods",
+    "approximate", "matched_on", "url",
 )
 
 
@@ -184,7 +185,7 @@ def load_queue(build_dir: Path) -> list[dict]:
         return []
     rows = duckdb.sql(
         f"select {', '.join(QUEUE_COLUMNS)} from read_parquet(?) where id is not null "
-        "order by kind, priority desc nulls last, subject",
+        "order by kind = 'unmatched_place', kind, priority desc nulls last, subject",
         params=[str(path)],
     ).fetchall()
     return [dict(zip(QUEUE_COLUMNS, row)) for row in rows]

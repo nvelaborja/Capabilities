@@ -69,6 +69,17 @@ class ZipDataset(Dataset):
 
 
 @dataclass(frozen=True)
+class GzipCsvDataset(Dataset):
+    """A CSV published compressed with gzip."""
+
+    def download(self, url: str, scratch: Path, root: Path) -> tuple[Path, Path, dict]:
+        download = scratch / "download.csv.gz"
+        headers = save(urllib.request.Request(url, headers={"User-Agent": USER_AGENT}), download)
+        # DuckDB reads the gzip directly, so the file hashed is the file converted.
+        return download, download, {"last_modified": headers.get("Last-Modified")}
+
+
+@dataclass(frozen=True)
 class WikidataDataset(Dataset):
     """The result of a SPARQL query to Wikidata, as CSV. What is asked for comes from the curated layer: the items in
     the Wikidata crosswalks, and for quantities the properties our quantities name (ADR 0043, ADR 0045)."""
@@ -136,7 +147,19 @@ WIKIDATA_ITEMS = WikidataItems(
     columns=("item", "label", "description", "formula"),
 )
 
-DATASETS = (MRDS, WIKIDATA, WIKIDATA_ITEMS)
+PLEIADES = GzipCsvDataset(
+    name="pleiades_places",
+    url="https://atlantides.org/downloads/pleiades/dumps/pleiades-places-latest.csv.gz",
+    license="CC BY 3.0 (Pleiades: a gazetteer of past places, https://pleiades.stoa.org)",
+    columns=(
+        "authors", "bbox", "connectsWith", "created", "creators", "currentVersion", "description", "extent",
+        "featureTypes", "geoContext", "hasConnectionsWith", "id", "locationPrecision", "maxDate", "minDate", "modified",
+        "path", "reprLat", "reprLatLong", "reprLong", "tags", "timePeriods", "timePeriodsKeys", "timePeriodsRange",
+        "title", "uid",
+    ),
+)
+
+DATASETS = (MRDS, WIKIDATA, WIKIDATA_ITEMS, PLEIADES)
 
 
 def fetch(dataset: Dataset, build_dir: Path, url: str | None = None, root: Path | None = None) -> dict:

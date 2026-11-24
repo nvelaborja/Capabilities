@@ -12,7 +12,9 @@ import { retrievedOn } from "../lib/dates";
 import type { Theme } from "../state/theme";
 import {
   bounds,
+  classLevelText,
   emptyReason,
+  periodsText,
   placesUnder,
   recordLinkText,
   safeLink,
@@ -94,7 +96,7 @@ function Summary({ places }: { places: OccurrencesResponse }) {
           <summary>Key and data source</summary>
           <ul className="map-legend" aria-label="Legend">
             <li>
-              <span className="map-key map-key-worked" aria-hidden="true" /> Known to have been worked by a given year
+              <span className="map-key map-key-worked" aria-hidden="true" /> Known to have been worked: by a given year, or in antiquity
             </li>
             <li>
               <span className="map-key map-key-present" aria-hidden="true" /> Present, with no known working date
@@ -123,8 +125,7 @@ function Datasets({ places }: { places: OccurrencesResponse }) {
           ) : (
             dataset.label
           )}
-          , retrieved {retrievedOn(dataset.retrieved_at)}. Modern records, most of them in the United States; a working
-          year is the year production first began.
+          , retrieved {retrievedOn(dataset.retrieved_at)}. {dataset.note}
         </p>
       ))}
     </>
@@ -307,10 +308,15 @@ function placeContent(place: PlaceProperties, places: OccurrencesResponse): HTML
     return element;
   };
   add("strong", place.name || "Unnamed place");
-  add("span", whereText(place), "map-popup-where");
-  add("span", stateText({ state: place.state, worked_by_year: place.worked_by_year ?? null }), `map-popup-state map-popup-${place.state}`);
+  // Pleiades names no country or region; its places are located by the point alone.
+  if (place.dataset !== "pleiades" || place.country || place.admin_area) add("span", whereText(place), "map-popup-where");
+  add("span", stateText({ ...place, worked_by_year: place.worked_by_year ?? null }), `map-popup-state map-popup-${place.state}`);
+  const periods = periodsText(place.periods);
+  if (periods) add("span", periods, "map-popup-detail");
+  if (place.approximate) add("span", "Approximate location: Pleiades gives only a rough area", "map-popup-detail");
   const source = places.sources.find((summary) => summary.id === place.source_id);
-  if (source && places.sources.length > 1) add("span", source.label);
+  if (source && place.class_level) add("span", classLevelText(source.label), "map-popup-detail");
+  else if (source && places.sources.length > 1) add("span", source.label);
   const details = [place.development_status && `Status: ${place.development_status}`, place.deposit_type && `Type: ${place.deposit_type}`];
   for (const detail of details.filter(Boolean)) add("span", detail as string, "map-popup-detail");
   const href = safeLink(place.url);

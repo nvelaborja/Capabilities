@@ -8,7 +8,8 @@ def occurrence(source_id: str, record_id: str, state: str = "present", worked_by
         "id": f"{source_id}/mrds/{record_id}", "source_id": source_id, "dataset": "mrds", "record_id": record_id,
         "name": f"Deposit {record_id}", "longitude": -106.26, "latitude": 39.24, "country": "United States",
         "admin_area": "Colorado", "development_status": "Past Producer", "deposit_type": None,
-        "worked_by_year": worked_by_year, "state": state, "matched_on": "ore: Hematite",
+        "worked_by_year": worked_by_year, "state": state, "attested_from": None, "attested_to": None, "periods": None,
+        "approximate": False, "matched_on": "ore: Hematite",
         "url": f"https://mrdata.usgs.gov/mrds/show-mrds.php?dep_id={record_id}",
     }
 
@@ -75,6 +76,7 @@ class TestWhereAThingIsFound:
             "label": "USGS Mineral Resources Data System (MRDS)",
             "short": "MRDS",
             "home": "https://mrdata.usgs.gov/mrds/",
+            "note": "Modern records, most of them in the United States; a working year is the year production first began.",
             "retrieved_at": "2026-11-22T21:58:22Z",
             "license": "US public domain (a work of the U.S. Geological Survey)",
         }]

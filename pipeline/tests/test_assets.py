@@ -25,6 +25,10 @@ SUPPRESSIONS = AssetKey(["raw", "suppressed_records"])
 ORE_RAW = AssetKey(["raw", "ore_minerals"])
 ORE_NODES = AssetKey("stg_ore_minerals__nodes")
 ITEMS_SNAPSHOT = AssetKey(["upstream", "wikidata_items"])
+PLEIADES_SNAPSHOT = AssetKey(["upstream", "pleiades_places"])
+PLEIADES_RAW = AssetKey(["raw", "pleiades_places"])
+PLEIADES_RULES = AssetKey(["raw", "pleiades_sources"])
+PLEIADES_STAGING = AssetKey("stg_pleiades__workings")
 ITEMS_RAW = AssetKey(["raw", "wikidata_items"])
 CROSSWALKED_ITEMS = AssetKey("stg_crosswalk__wikidata_items")
 QUEUE = AssetKey("curation_queue")
@@ -58,7 +62,15 @@ class TestDefinitions:
         assert graph.get(MRDS_RAW).parent_keys == {MRDS_SNAPSHOT}
         assert graph.get(MRDS_STAGING).parent_keys == {MRDS_RAW}
         assert graph.get(CROSSWALK).parent_keys == set()
-        assert graph.get(OCCURRENCES).parent_keys == {MRDS_STAGING, CROSSWALK, ORE_RAW, SNAPSHOTS_RAW, SUPPRESSIONS}
+        assert graph.get(OCCURRENCES).parent_keys == {
+            MRDS_STAGING, CROSSWALK, ORE_RAW, SNAPSHOTS_RAW, SUPPRESSIONS, PLEIADES_STAGING, PLEIADES_RULES,
+        }
+
+    def test_the_lineage_runs_from_the_pleiades_download_and_its_rules_to_the_occurrences(self, dagster_build):
+        graph = asset_graph(dagster_build[0])
+        assert graph.get(PLEIADES_RAW).parent_keys == {PLEIADES_SNAPSHOT}
+        assert graph.get(PLEIADES_STAGING).parent_keys == {PLEIADES_RAW}
+        assert PLEIADES_STAGING in graph.get(QUEUE).parent_keys
 
     def test_the_lineage_runs_from_the_wikidata_download_and_its_crosswalk_to_the_facts(self, dagster_build):
         graph = asset_graph(dagster_build[0])
@@ -100,13 +112,15 @@ class TestDefinitions:
 
 
 class TestMaterializing:
-    def test_materializing_everything_downloads_both_datasets_and_builds_a_current_graph(
-        self, dagster_build, repo_root, tmp_path, mrds_zip, wikidata_endpoint
+    def test_materializing_everything_downloads_every_dataset_and_builds_a_current_graph(
+        self, dagster_build, repo_root, tmp_path, mrds_zip, wikidata_endpoint, pleiades_gz
     ):
         from capabilities_pipeline.assets import UpstreamDownloads
 
         defs, build_dir = dagster_build
-        downloads = UpstreamDownloads(mrds_url=mrds_zip(tmp_path / "download"), wikidata_url=wikidata_endpoint.url)
+        downloads = UpstreamDownloads(
+            mrds_url=mrds_zip(tmp_path / "download"), wikidata_url=wikidata_endpoint.url, pleiades_url=pleiades_gz,
+        )
         result = materialize(list(defs.assets), resources={**defs.resources, "downloads": downloads})
         assert result.success
         assert all(evaluation.passed for evaluation in result.get_asset_check_evaluations())
@@ -117,15 +131,18 @@ class TestMaterializing:
         assert built.things["granite"]["quantities"]["hardness_mohs"] == [5, 7]
         assert list(built.routes.items())[: len(curated.routes)] == list(curated.routes.items())
         manifest = json.loads((graph_dir(build_dir) / MANIFEST_FILE).read_text())
-        # All fourteen sample records are placed: eleven occurrences of curated source kinds, and seven of upstream ore
-        # minerals' deposits (ADR 0045).
-        assert manifest["tables"][OCCURRENCES_FILE] == 18
+        # All fourteen MRDS sample records are placed: eleven occurrences of curated source kinds, and seven of upstream
+        # ore minerals' deposits (ADR 0045). Nine of the thirteen Pleiades places match a rule, fifteen times: a copper
+        # mine is a place of both copper ore classes (ADR 0046).
+        assert manifest["tables"][OCCURRENCES_FILE] == 18 + 15
+        assert manifest["upstream"]["pleiades_places"]["rows"] == 13
         assert manifest["upstream"]["mrds_deposits"]["rows"] == 14
         assert manifest["upstream"]["wikidata_quantities"]["rows"] == 4
         materialized = {event.asset_key for event in result.get_asset_materialization_events()}
         assert {RAW, CROSSWALK, MRDS_RAW, SNAPSHOTS_RAW, MRDS_SNAPSHOT, OCCURRENCES, MANIFEST} <= materialized
         assert {WIKIDATA_SNAPSHOT, WIKIDATA_RAW, WIKIDATA_CROSSWALK, SUPPRESSIONS, FACTS} <= materialized
         assert {ITEMS_SNAPSHOT, ITEMS_RAW, ORE_RAW, ORE_NODES, QUEUE} <= materialized
+        assert {PLEIADES_SNAPSHOT, PLEIADES_RAW, PLEIADES_RULES, PLEIADES_STAGING} <= materialized
 
     def test_offline_a_download_falls_back_to_the_cold_backup_and_says_so(self, dagster_build, wikidata_endpoint):
         from capabilities_pipeline.assets import UpstreamDownloads

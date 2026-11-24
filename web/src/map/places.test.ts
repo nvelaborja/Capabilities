@@ -4,16 +4,19 @@ import type { OccurrencesResponse, SourceSummary } from "../api/types";
 import {
   bounds,
   canMap,
+  classLevelText,
   emptyReason,
+  periodsText,
   placesUnder,
   recordLinkText,
   safeLink,
   sourceLine,
   stateText,
   whereText,
+  yearText,
 } from "./places";
 
-const hematite: SourceSummary = { id: "hematite-deposit", label: "Hematite deposit", availability: "regional", regions: ["Widespread"], places: 2655, worked: 659 };
+const hematite: SourceSummary = { id: "hematite-deposit", label: "Hematite deposit", availability: "regional", regions: ["Widespread"], places: 2655, worked: 659, class_level: false };
 
 function response(overrides: Partial<OccurrencesResponse> = {}): OccurrencesResponse {
   return {
@@ -22,7 +25,7 @@ function response(overrides: Partial<OccurrencesResponse> = {}): OccurrencesResp
     kind: "material",
     origin: "extracted",
     sources: [hematite],
-    datasets: [{ id: "mrds", label: "USGS MRDS", short: "MRDS", home: null, retrieved_at: "2026-11-22T21:58:22Z", license: null }],
+    datasets: [{ id: "mrds", label: "USGS MRDS", short: "MRDS", home: null, note: "Modern records.", retrieved_at: "2026-11-22T21:58:22Z", license: null }],
     features: {
       type: "FeatureCollection",
       features: [
@@ -134,5 +137,26 @@ describe("placesUnder", () => {
   it("lists every place under a click once, by name", () => {
     const under = placesUnder([place("b", "Tilt Cove"), place("a", "Betts Cove"), place("b", "Tilt Cove"), place("c", null)]);
     expect(under.map((feature) => feature.properties.id)).toEqual(["c", "a", "b"]);
+  });
+});
+
+describe("Pleiades places (ADR 0046)", () => {
+  it("says an ancient working was worked, with the years it is attested, BC and AD", () => {
+    const place = { state: "worked" as const, worked_by_year: null, attested_from: -330, attested_to: 640 };
+    expect(stateText(place)).toBe("Worked in antiquity: attested 330 BC – AD 640");
+    expect([yearText(-750), yearText(300)]).toEqual(["750 BC", "AD 300"]);
+  });
+
+  it("names the periods in words, whether the API's list or MapLibre's JSON string", () => {
+    const expected = "Periods: Hellenistic republican, Roman";
+    expect(periodsText(["hellenistic-republican", "roman"])).toBe(expected);
+    expect(periodsText('["hellenistic-republican","roman"]')).toBe(expected);
+    expect([periodsText(null), periodsText([]), periodsText("not json")]).toEqual([null, null, null]);
+  });
+
+  it("says which ore a class-level place had isn't recorded, in the popup and the summary", () => {
+    expect(classLevelText("Copper ore")).toBe("Copper ore mined here; which ore isn't recorded");
+    const copper: SourceSummary = { id: "copper-ore", label: "Copper ore", regions: [], places: 118, worked: 118, class_level: true };
+    expect(sourceLine(copper, true)).toBe("Copper ore, which ore isn't recorded: 118 ancient mines.");
   });
 });

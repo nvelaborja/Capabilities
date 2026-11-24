@@ -14,10 +14,11 @@ from capabilities_pipeline.upstream import MRDS, fetch
 UNPLACED = "10003682"
 
 
-def occurrences(build_dir: Path) -> list[dict]:
+def occurrences(build_dir: Path, dataset: str = "mrds") -> list[dict]:
+    """The occurrences from one dataset: MRDS's, unless another is named (Pleiades' are tested in test_pleiades.py)."""
     relation = duckdb.sql(
-        "select * exclude (geometry) from read_parquet(?) where id is not null order by id",
-        params=[str(graph_dir(build_dir) / OCCURRENCES_FILE)],
+        "select * exclude (geometry) from read_parquet(?) where id is not null and dataset = ? order by id",
+        params=[str(graph_dir(build_dir) / OCCURRENCES_FILE), dataset],
     )
     return [dict(zip(relation.columns, row)) for row in relation.fetchall()]
 
@@ -163,7 +164,8 @@ class TestOccurrences:
     def test_the_manifest_records_the_snapshot_and_the_number_of_occurrences(self, mrds_build):
         build_dir, snapshot = mrds_build
         manifest = json.loads((graph_dir(build_dir) / MANIFEST_FILE).read_text())
-        assert manifest["tables"][OCCURRENCES_FILE] == 16  # 10 of curated source kinds, 6 of upstream ore minerals
+        # 10 of curated source kinds and 6 of upstream ore minerals from the MRDS sample, and Pleiades' from its backup.
+        assert manifest["tables"][OCCURRENCES_FILE] == 16 + len(occurrences(build_dir, "pleiades"))
         # The sample was just downloaded, so it is newer than the cold backup and is used; Wikidata comes from its backup.
         assert manifest["upstream"]["mrds_deposits"] == {
             **{key: snapshot[key] for key in ("url", "retrieved_at", "sha256", "rows", "license")}, "copy": "download"
@@ -179,7 +181,8 @@ class TestEveryDatasetIsRequired:
         # built_dir (conftest) never downloads anything, like CI and a fresh clone.
         manifest = json.loads((graph_dir(built_dir) / MANIFEST_FILE).read_text())
         assert {name: snapshot["copy"] for name, snapshot in manifest["upstream"].items()} == {
-            "mrds_deposits": "backup", "wikidata_items": "backup", "wikidata_quantities": "backup",
+            "mrds_deposits": "backup", "pleiades_places": "backup", "wikidata_items": "backup",
+            "wikidata_quantities": "backup",
         }
         assert manifest["tables"][OCCURRENCES_FILE] > 0
 

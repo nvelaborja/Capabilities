@@ -126,15 +126,21 @@ class TestOccurrences:
 
     def test_a_materials_places_are_the_occurrences_of_its_sources_as_geojson(self, mapped, graph):
         body = mapped.get("/api/occurrences/hematite").json()
-        assert body["sources"] == [{
-            "id": "hematite-deposit", "label": "Hematite deposit", "availability": "regional",
-            "regions": graph.things["hematite-deposit"]["regions"], "places": 3, "worked": 1,
-        }]
+        assert body["sources"] == [
+            {
+                "id": "hematite-deposit", "label": "Hematite deposit", "availability": "regional",
+                "regions": graph.things["hematite-deposit"]["regions"], "places": 3, "worked": 1, "class_level": False,
+            },
+            # And the ancient iron mines of Pleiades, which don't say which ore (ADR 0046): Dognecea, in the sample.
+            {"id": "iron-ore", "label": "Iron ore", "availability": None, "regions": [], "places": 1, "worked": 1,
+             "class_level": True},
+        ]
         records = {f["properties"]["record_id"]: f for f in body["features"]["features"]}
-        assert set(records) == {"10001442", "10003682", "10008106"}
+        assert set(records) == {"10001442", "10003682", "10008106", "207083"}
         assert records["10008106"]["geometry"] == {"type": "Point", "coordinates": [-106.26, 39.24]}
         assert records["10008106"]["properties"]["worked_by_year"] == 1860
-        assert body["datasets"][0]["id"] == "mrds"
+        assert records["207083"]["properties"]["class_level"] is True
+        assert [dataset["id"] for dataset in body["datasets"]] == ["mrds", "pleiades"]
 
     def test_large_answers_are_compressed(self, mapped):
         response = mapped.get("/api/occurrences/hematite", headers={"Accept-Encoding": "gzip"})
@@ -142,8 +148,8 @@ class TestOccurrences:
 
     def test_with_nothing_downloaded_the_places_come_from_the_cold_backup(self, client):
         body = client.get("/api/occurrences/hematite").json()
-        assert body["sources"][0]["places"] == len(body["features"]["features"]) > 0
-        assert [dataset["id"] for dataset in body["datasets"]] == ["mrds"]
+        assert sum(source["places"] for source in body["sources"]) == len(body["features"]["features"]) > 0
+        assert [dataset["id"] for dataset in body["datasets"]] == ["mrds", "pleiades"]
 
     def test_only_materials_and_sources_have_places(self, client):
         assert client.get("/api/occurrences/copper-saw").status_code == 404

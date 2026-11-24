@@ -49,7 +49,7 @@ models:
           - not_null
           - accepted_values:
               arguments:
-                values: [ore_candidate, extracted_without_route, source_without_places, route_unverified, upstream_disagreement, stale_override]
+                values: [ore_candidate, extracted_without_route, source_without_places, route_unverified, upstream_disagreement, stale_override, unmatched_place]
       - name: detail
         data_tests: [not_null]
   - name: source_occurrences
@@ -68,8 +68,16 @@ models:
                 field: id
       - name: geometry
         data_tests: [not_null]
+      - name: dataset
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [mrds, pleiades]
       - name: state
-        description: worked (known to be worked by worked_by_year) or present (no known working date).
+        description: >
+          worked (MRDS: known to be worked by worked_by_year; Pleiades: an ancient mine or quarry, attested from
+          attested_from to attested_to) or present (no known working date).
         data_tests:
           - not_null
           - accepted_values:
