@@ -4,6 +4,7 @@ import duckdb
 import pytest
 
 from capabilities.built import (
+    FACTS_FILE,
     MANIFEST_FILE,
     NODES_FILE,
     current_graph,
@@ -13,26 +14,35 @@ from capabilities.built import (
     load_built,
 )
 from capabilities.graph import Graph
-from capabilities.reasoner import Selection, explore
 from capabilities_pipeline.build import BuildError, build, load_inputs, run_dbt, write_manifest
 
 BUCKETS = ("quantities", "things", "verbs", "routes", "profiles", "jobs")
 
 
 class TestBuiltGraph:
-    def test_the_built_graph_is_the_curated_graph_in_the_same_order(self, repo_root, built_dir):
+    def test_the_built_graph_has_the_curated_documents_in_the_same_order(self, repo_root, built_dir):
         curated, built = Graph.from_curated(repo_root), load_built(repo_root, built_dir)
         for bucket in BUCKETS:
-            # Same documents and the same order: some answers list things in load order.
-            assert list(getattr(built, bucket).items()) == list(getattr(curated, bucket).items()), bucket
+            # The same documents in the same order (some answers list things in load order), except that a thing's
+            # quantities are the values graph_facts chose.
+            without_quantities = lambda graph: [  # noqa: E731
+                (node_id, {key: value for key, value in document.items() if key != "quantities"})
+                for node_id, document in getattr(graph, bucket).items()
+            ]
+            assert without_quantities(built) == without_quantities(curated), bucket
 
-    def test_answers_from_the_built_graph_match_the_curated_graph(self, repo_root, built_dir):
-        # The worked example in examples/README.md: Middle Kingdom Egypt, plus hematite as a what-if.
-        def egypt(graph):
-            selected = Selection.from_profile(graph.profiles["middle-kingdom-egypt"])
-            return explore(graph, selected, Selection.parse(["hematite"])).to_dict(graph)
-
-        assert egypt(load_built(repo_root, built_dir)) == egypt(Graph.from_curated(repo_root))
+    def test_a_things_quantities_are_the_values_its_facts_chose(self, repo_root, built_dir):
+        rows = duckdb.sql(
+            "select node_id, split_part(field, '.', 2), value::varchar from read_parquet(?) where id is not null",
+            params=[str(graph_dir(built_dir) / FACTS_FILE)],
+        ).fetchall()
+        chosen: dict[str, dict] = {}
+        for node_id, quantity, value in rows:
+            chosen.setdefault(node_id, {})[quantity] = json.loads(value)
+        built = load_built(repo_root, built_dir)
+        assert {thing: doc["quantities"] for thing, doc in built.things.items() if doc.get("quantities")} == chosen
+        # Hematite's hardness comes only from Wikidata, through the cold backup.
+        assert built.things["hematite"]["quantities"]["hardness_mohs"] == [5.5, 6.5]
 
     def test_every_node_says_it_came_from_the_curated_layer_and_which_file(self, built_dir):
         rows = duckdb.sql(

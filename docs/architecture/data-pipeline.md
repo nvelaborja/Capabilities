@@ -1,29 +1,33 @@
 # Data pipeline
 
-Reference for how the graph is built: inputs, stages, tables, outputs, checks and commands. The diagram is the `pipeline` view at `/architecture/`. For background on the tools, see [DuckDB](technologies/duckdb.md), [dbt](technologies/dbt.md), [Parquet](technologies/parquet.md) and [Dagster](technologies/dagster.md). Decisions: [ADR 0034](../adr/0034-build-the-graph-from-upstream-datasets-and-a-curated-layer.md) (a built graph from a curated layer and, later, upstream datasets) [ADR 0038](../adr/0038-serve-the-app-from-a-built-graph-artifact.md) (the artifact the app reads), [ADR 0040](../adr/0040-orchestrate-the-build-with-dagster.md) (Dagster, and the quick build without it) and [ADR 0041](../adr/0041-place-sources-with-mrds-deposits-through-a-crosswalk.md) (MRDS deposits as source occurrences). Spatial work uses [DuckDB spatial and GeoParquet](technologies/duckdb-spatial-and-geoparquet.md).
+Reference for how the graph is built: inputs, stages, tables, outputs, checks and commands. The diagram is the `pipeline` view at `/architecture/`. For background on the tools, see [DuckDB](technologies/duckdb.md), [dbt](technologies/dbt.md), [Parquet](technologies/parquet.md) and [Dagster](technologies/dagster.md). Decisions: [ADR 0034](../adr/0034-build-the-graph-from-upstream-datasets-and-a-curated-layer.md) (a built graph from a curated layer and, later, upstream datasets) [ADR 0038](../adr/0038-serve-the-app-from-a-built-graph-artifact.md) (the artifact the app reads), [ADR 0040](../adr/0040-orchestrate-the-build-with-dagster.md) (Dagster, and the quick build without it), [ADR 0041](../adr/0041-place-sources-with-mrds-deposits-through-a-crosswalk.md) (MRDS deposits as source occurrences) [ADR 0043](../adr/0043-take-quantities-from-wikidata-with-upstream-first-and-overrides.md) (quantities from Wikidata, upstream first, with overrides) and [ADR 0044](../adr/0044-require-every-upstream-dataset-with-cold-backups-in-git.md) (every dataset required, with cold backups in git). Spatial work uses [DuckDB spatial and GeoParquet](technologies/duckdb-spatial-and-geoparquet.md); Wikidata is queried with [SPARQL](technologies/wikidata-and-sparql.md).
 
 ## Summary
 
 | | |
 |---|---|
-| **Inputs** | The curated layer: `data/**/*.yaml` (quantities, things, verbs, routes, profiles), `data/crosswalks/*.csv`, `examples/**/*.yaml` (jobs) and `schema/*.json`. Upstream snapshots already downloaded into `build/upstream/` (today: USGS MRDS). |
-| **Output** | `build/graph/graph_nodes.parquet` (one row per node), `build/graph/source_occurrences.parquet` (where sources are found, GeoParquet) and `build/graph/manifest.json`. |
+| **Inputs** | The curated layer: `data/**/*.yaml` (quantities, things, verbs, routes, profiles, overrides), `data/crosswalks/*.csv`, `data/suppressions/*.csv`, `examples/**/*.yaml` (jobs) and `schema/*.json`. A copy of every upstream dataset, USGS MRDS and Wikidata's quantity statements: the latest download in `build/upstream/` or the cold backup in `snapshots/`, whichever is newer. Every dataset is required ([ADR 0044](../adr/0044-require-every-upstream-dataset-with-cold-backups-in-git.md)). |
+| **Output** | `build/graph/graph_nodes.parquet` (one row per node), `build/graph/graph_facts.parquet` (where each quantity value comes from), `build/graph/source_occurrences.parquet` (where sources are found, GeoParquet) and `build/graph/manifest.json`. |
 | **Run by** | `uv run capabilities build`, or automatically by `need`, `explore`, `check` and `serve` when the output is missing or stale. Or Dagster: the same steps as assets, plus downloading upstream snapshots, with lineage, checks and run history (see [Orchestration](#orchestration-dagster)). Only Dagster downloads. |
 | **Code** | `pipeline/src/capabilities_pipeline/build.py` (extract, load, run dbt, manifest), `upstream.py` (downloading and loading snapshots), `assets.py` and `definitions.py` (the same steps as Dagster assets), and `pipeline/dbt/` (the dbt project). Reading: `packages/core/src/capabilities/built.py`. |
 | **Engine** | DuckDB with its spatial extension, through dbt Core and the dbt-duckdb adapter. |
-| **Time** | With the MRDS snapshot, about 8 seconds with `capabilities build` (about 5 without one); about 45 seconds as a Dagster run that downloads MRDS again. |
+| **Time** | About 7 seconds with `capabilities build`; about 45 seconds as a Dagster run that downloads MRDS again. The Wikidata query takes under a second. |
 
 ## Stages
 
 ```
-                      0. download      1. extract   2. load                    3. transform (dbt)                         4. publish
-                      (Dagster only)   (Python)     (DuckDB tables)            (views and marts)
-data/**/*.yaml ─┐
-examples/**/*.yaml ─┼──────────────────▶ documents ─▶ raw.curated_documents ──▶ stg_curated__documents ──▶ graph_nodes ──▶ graph_nodes.parquet
-schema/*.json ──┘
-data/crosswalks/*.csv ────────────────────────────▶ raw.mrds_sources ───────────────────────────┐
-USGS MRDS ──▶ build/upstream/mrds_deposits/ ─────▶ raw.mrds_deposits ──▶ stg_mrds__deposits ──┴─▶ source_occurrences ──▶ source_occurrences.parquet
-              (Parquet + snapshot.json)          raw.upstream_snapshots ──────────────────────┘                          manifest.json (last)
+                     0. download      1. extract   2. load                       3. transform (dbt)                              4. publish
+                     (Dagster only)   (Python)     (DuckDB tables)               (views and marts)
+data/**/*.yaml ─────┐
+examples/**/*.yaml ─┼────────────────▶ documents ─▶ raw.curated_documents ──▶ stg_curated__documents ─────────────────▶ graph_nodes ──▶ graph_nodes.parquet
+schema/*.json ──────┘                                                         stg_curated__quantities,                        ▲
+                                                                              __overrides, __quantity_properties ──┐          │
+data/crosswalks/wikidata_things.csv ─────────────▶ raw.wikidata_things ────────────────────────────────────────────┤          │
+Wikidata ──▶ build/upstream/wikidata_quantities/ ▶ raw.wikidata_quantities ─▶ stg_wikidata__quantities ────────────┼─▶ graph_facts ──▶ graph_facts.parquet
+data/suppressions/*.csv ─────────────────────────▶ raw.suppressed_records ─────────────────────────────────────────┘  (and source_occurrences)
+data/crosswalks/mrds_sources.csv ────────────────▶ raw.mrds_sources ─────────────────────────────┐
+USGS MRDS ──▶ build/upstream/mrds_deposits/ ─────▶ raw.mrds_deposits ──▶ stg_mrds__deposits ─────┼─▶ source_occurrences ──────▶ source_occurrences.parquet
+             (Parquet + snapshot.json)            raw.upstream_snapshots ────────────────────────┘                             manifest.json (last)
 ```
 
 ### 0. Download (Dagster only)
@@ -45,7 +49,13 @@ The `upstream/mrds_deposits` asset downloads `https://mrdata.usgs.gov/mrds/mrds-
 | `rows` | How many rows it holds. |
 | `license` | The dataset's license. |
 
-USGS refuses Python's default user agent, so downloads send a generic one (`dataset-snapshot/1.0`). Nothing in a build downloads: without a snapshot, the load step creates an empty table and the build produces no occurrences.
+The `upstream/wikidata_quantities` asset sends one SPARQL query to `https://query.wikidata.org/sparql` ([Wikidata and SPARQL](technologies/wikidata-and-sparql.md)). The query is built from the curated layer: the items in `data/crosswalks/wikidata_things.csv`, and the property each quantity names in its `wikidata` field (today only `P1088`, Mohs hardness, expected in unit `Q199`). It asks for each item's best-ranked statements of those properties, with their amount, lower and upper bounds and unit, and keeps the CSV result unchanged as `wikidata_quantities.parquet`. Its `snapshot.json` adds the `query` itself, the number of `items` asked about and the `properties`. On 2026-11-24 it returned 11 statements for the 15 crosswalked items.
+
+USGS refuses Python's default user agent, so downloads send a generic one (`dataset-snapshot/1.0`), and so does the Wikidata query.
+
+**When a download fails.** If the network fails (offline, a refused connection, a timeout) and the dataset has a cold backup, the asset uses the backup instead: it logs a warning and records `copy: backup` and the `download_error` in its metadata, and the run goes on (`fetch_or_fall_back`). Any other failure, such as changed columns, fails the asset.
+
+**Cold backups.** `snapshots/<dataset>/` in the repository holds a copy of each dataset, in git: the Parquet, every value unchanged but compressed with zstd (MRDS: 15 MB, down from 32 MB), and the same `snapshot.json` as the download. `uv run capabilities backup` replaces a backup with a newer download (`back_up`); commit the result. Nothing in a build downloads: a build reads the downloads and the backups ([ADR 0044](../adr/0044-require-every-upstream-dataset-with-cold-backups-in-git.md)).
 
 ### 1. Extract
 
@@ -55,33 +65,40 @@ USGS refuses Python's default user agent, so downloads send a generic one (`data
 
 `load_inputs` fills the DuckDB warehouse `build/warehouse.duckdb`. It takes the fingerprint of the inputs first (see [Freshness](#freshness)), then loads each kind of input, and records the fingerprint last:
 
-- every curated document, whole, as JSON;
-- each crosswalk, as text;
-- each upstream snapshot, as text.
+- every curated document, whole, as JSON (overrides included);
+- each crosswalk and the suppressions, as text;
+- each upstream dataset's newest copy, as text: the latest download or the cold backup, whichever was retrieved later (`best_copy` in `upstream.py`). If a dataset has neither, the build stops here with `MissingSnapshot`, naming it and how to get one ([ADR 0044](../adr/0044-require-every-upstream-dataset-with-cold-backups-in-git.md)).
 
-Every table is replaced on every build. The crosswalks are loaded here rather than as dbt seeds, because dbt reads seeds only from inside its project ([ADR 0041](../adr/0041-place-sources-with-mrds-deposits-through-a-crosswalk.md)).
+Every table is replaced on every build. The crosswalks and suppressions are loaded here rather than as dbt seeds, because dbt reads seeds only from inside its project ([ADR 0041](../adr/0041-place-sources-with-mrds-deposits-through-a-crosswalk.md)).
 
 **`raw.curated_documents`**
 
 | Column | Type | Meaning |
 |---|---|---|
 | `ordinal` | integer | Position in read order (sorted by path). Kept to the end so the app loads nodes in the same order as the YAML. |
-| `node_type` | varchar | `quantity`, `thing`, `verb`, `route`, `profile` or `job`. |
+| `node_type` | varchar | `quantity`, `thing`, `verb`, `route`, `profile`, `job` or `override`. |
 | `id` | varchar | The document's `id`. |
 | `document` | json | The whole document. |
 | `path` | varchar | The file, relative to the repository root. |
 
 **`raw.mrds_sources`**: the crosswalk `data/crosswalks/mrds_sources.csv`, every column text: `source_id`, `field` (`ore` or `commodity`), `value`, `deposit_type` (optional), `notes`. See [the data format](../data-format.md#crosswalk-datacrosswalkscsv).
 
-**`raw.mrds_deposits`**: the MRDS snapshot as downloaded, all 46 columns as text (`dep_id`, `site_name`, `latitude`, `longitude`, `country`, `state`, `commod1`–`commod3`, `dep_type`, `dev_stat`, `ore`, `yfp_ba`, `yr_fst_prd`, `score`, `url` and the rest). Empty when nothing has been downloaded.
+**`raw.wikidata_things`**: the crosswalk `data/crosswalks/wikidata_things.csv`: `id`, `wikidata` (a Q id) and `notes`.
+
+**`raw.suppressed_records`**: `data/suppressions/suppressed_records.csv`: `dataset` (`mrds` or `wikidata`), `record_id` and `reason`.
+
+**`raw.wikidata_quantities`**: the Wikidata snapshot as the query returned it, every column text: `item` (Q id), `property` (P id), `amount`, `lower`, `upper` (empty when the statement has no bounds) and `unit` (Q id; `Q199`, "1", for Mohs).
+
+**`raw.mrds_deposits`**: the MRDS snapshot as downloaded, all 46 columns as text (`dep_id`, `site_name`, `latitude`, `longitude`, `country`, `state`, `commod1`–`commod3`, `dep_type`, `dev_stat`, `ore`, `yfp_ba`, `yr_fst_prd`, `score`, `url` and the rest).
 
 **`raw.upstream_snapshots`**
 
 | Column | Type | Meaning |
 |---|---|---|
-| `dataset` | varchar | `mrds_deposits`. |
+| `dataset` | varchar | `mrds_deposits` or `wikidata_quantities`. |
 | `url`, `retrieved_at`, `sha256`, `license` | | From `snapshot.json`. |
 | `row_count` | bigint | Rows in the snapshot. |
+| `copy` | varchar | `download` or `backup`: which copy was loaded. |
 
 **`raw.loads`**
 
@@ -96,7 +113,10 @@ The build runs `dbt build` on `pipeline/dbt`: `capabilities build` through dbt's
 
 **Source tests:**
 
-- `raw.curated_documents`: `ordinal` and `path` are unique and not null; `node_type` is not null and one of the six known types; `id` is not null.
+- `raw.curated_documents`: `ordinal` and `path` are unique and not null; `node_type` is not null and one of the seven known types; `id` is not null.
+- `raw.wikidata_things`: `id` is unique, not null and names a curated node; `wikidata` is unique and not null; `notes` is not null.
+- `raw.wikidata_quantities`: `item`, `property` and `amount` are not null.
+- `raw.suppressed_records`: `dataset` is `mrds` or `wikidata`; `record_id` and `reason` are not null.
 - `raw.mrds_sources`: `source_id` is not null and names a curated node; `field` is `ore` or `commodity`; `value` and `notes` are not null.
 - `raw.mrds_deposits`: `dep_id` is unique and not null.
 - `raw.upstream_snapshots`: `dataset` is unique and not null; `retrieved_at` is not null.
@@ -107,6 +127,11 @@ The build runs `dbt build` on `pipeline/dbt`: `capabilities build` through dbt's
 - `crosswalk_rows_are_distinct`: no rule is listed twice.
 - `stg_mrds_coordinates_are_numbers`: no published coordinate fails to read as a number.
 - `occurrences_are_valid_points`: every occurrence is a valid point within latitude ±90 and longitude ±180.
+- `wikidata_crosswalk_ids_are_items`: every `wikidata` value is a Q id.
+- `wikidata_units_match`: every Wikidata value is in the unit its quantity expects (`wikidata.unit`); one in another unit would otherwise be read unconverted.
+- `overrides_target_upstream_values`: every override's thing is in the Wikidata crosswalk, and its quantity is read from Wikidata. A value only the curated layer gives is corrected in its own file.
+
+Macros (`pipeline/dbt/macros/quantity_json.sql`) turn a low and high into a quantity value as the curated layer writes it (one number, or `[low, high]`; whole numbers as integers), and read the low and high ends back out of one.
 
 **`stg_curated__documents`** (view, `models/staging/`). One row per document, with the fields every node has as columns.
 
@@ -116,7 +141,15 @@ The build runs `dbt build` on `pipeline/dbt`: `capabilities build` through dbt's
 | `kind` | `document ->> 'kind'` |
 | `label` | `document ->> 'label'` |
 
-Tests: `kind` and `label` not null.
+Tests: `kind` not null; `label` not null for every node (overrides have none).
+
+**`stg_curated__quantities`** (view). One row per thing and quantity it gives: `thing_id`, `quantity`, `value` (JSON, as written), `low`, `high`.
+
+**`stg_curated__overrides`** (view). One row per override: `id`, `thing_id`, `quantity`, `value`, `replaces_dataset`, `replaces_value`, `replaces_low`, `replaces_high`, `reason`, `references`, `path`.
+
+**`stg_curated__quantity_properties`** (view). Each quantity that names a Wikidata property: `quantity`, `property`, and the `unit` its values must be in.
+
+**`stg_wikidata__quantities`** (view). One row per Wikidata statement, typed: `record_id` (the item), `property`, `amount`, `low` and `high` (the bounds, or the amount when there are none), `unit`.
 
 **`stg_mrds__deposits`** (view). One row per MRDS deposit, typed.
 
@@ -134,18 +167,35 @@ Tests: `kind` and `label` not null.
 
 Tests: `record_id` is unique and not null; `first_production_qualifier` is `before`, `after` or null.
 
+**`graph_facts`** (mart, written as Parquet). Where each quantity value comes from ([ADR 0043](../adr/0043-take-quantities-from-wikidata-with-upstream-first-and-overrides.md)): one row per thing and quantity that has a value from any layer.
+
+| Column | Meaning |
+|---|---|
+| `id` | `<thing>/quantities.<quantity>`, e.g. `granite/quantities.hardness_mohs`. |
+| `node_id`, `field` | The thing, and `quantities.<quantity>`. |
+| `layer` | Where `value` comes from: `override`, else `upstream`, else `curated`. |
+| `value` | The value the graph uses (JSON: a number or `[low, high]`). |
+| `curated_value`, `upstream_value` | Each layer's value, or null. Several best-ranked Wikidata statements become one range. |
+| `disagrees` | Both layers have a value and they differ. |
+| `upstream` | `{"dataset": "wikidata", "record": "Q41177", "url": ..., "retrieved_at": ...}`, or null. |
+| `override` | `{"id", "path", "reason", "references", "replaces", "stale"}`, or null. `stale` is true when upstream no longer has the value the override says it replaces. |
+
+Suppressed Wikidata items are left out before the choice is made. Tests: `id` unique and not null; `node_id` not null and in `graph_nodes`; `layer` one of the three; `value` not null.
+
+With the 2026-11-24 snapshot there are 23 facts: 11 from Wikidata and 12 curated. The curated layer has no value where Wikidata gives one ([ADR 0044](../adr/0044-require-every-upstream-dataset-with-cold-backups-in-git.md)), so none disagree.
+
 **`graph_nodes`** (mart, `models/marts/`, written as Parquet). The built graph.
 
 | Column | Meaning |
 |---|---|
 | `ordinal` | Read order. |
-| `node_type`, `id`, `kind`, `label` | As above. |
-| `document` | The full document as JSON: what the app parses. |
-| `provenance` | Where the node came from. Today always `{"layer": "curated", "path": "<file>"}`. Upstream records add `{"layer": "upstream", ...}` from M1 (ADR 0034). |
+| `node_type`, `id`, `kind`, `label` | As above. Overrides aren't nodes and are left out. |
+| `document` | The full document as JSON: what the app parses. Its `quantities` are the values `graph_facts` chose, so the reasoner uses upstream values and overrides without knowing where they came from. |
+| `provenance` | Where the node came from: `{"layer": "curated", "path": "<file>"}`. Where each of its quantity values came from is in `graph_facts`. |
 
 Tests: `ordinal` unique and not null; `id` unique and not null, across every type of node; `provenance` not null.
 
-**`source_occurrences`** (mart, written as GeoParquet). Where each source kind is found ([ADR 0036](../adr/0036-place-sources-and-profiles-in-space-and-time.md)). It has one row per source kind and MRDS deposit, for every deposit with coordinates that matches a crosswalk rule. A deposit that matches two source kinds appears twice.
+**`source_occurrences`** (mart, written as GeoParquet). Where each source kind is found ([ADR 0036](../adr/0036-place-sources-and-profiles-in-space-and-time.md)). It has one row per source kind and MRDS deposit, for every deposit with coordinates that matches a crosswalk rule and isn't suppressed. A deposit that matches two source kinds appears twice.
 
 | Column | Meaning |
 |---|---|
@@ -165,7 +215,7 @@ Tests: `id` is unique and not null; `source_id` is not null and names a node in 
 
 From the snapshot of 2026-11-22 there are 14,488 occurrences of 8 source kinds: 4,960 for malachite, 4,216 for limestone, 2,655 for hematite, 1,162 for granite, 1,083 for native copper, 238 for diamond gravel, 171 for tin gravel and 3 for flint. Of these, 1,968 have a working year; the earliest is 1505.
 
-The marts' `external` materialization (a dbt-duckdb feature) writes each result to `build/graph/<model>.parquet` instead of keeping it as a table in the warehouse. Two quirks matter to readers of `source_occurrences.parquet` when it is empty (no snapshot):
+The marts' `external` materialization (a dbt-duckdb feature) writes each result to `build/graph/<model>.parquet` instead of keeping it as a table in the warehouse. Two quirks matter to readers of a mart that comes out empty (for example `source_occurrences.parquet` from a dataset with no matching records):
 
 - dbt-duckdb writes an empty table as **one row of nulls**, so its columns keep their types. Skip rows whose `id` is null; the manifest's counts already do.
 - DuckDB writes no GeoParquet metadata for a file with no rows, so `geometry` reads back as WKB bytes. Cast it (`geometry::geometry`) before using spatial functions.
@@ -176,12 +226,12 @@ The build counts the rows in each Parquet file and writes **`build/graph/manifes
 
 | Field | Meaning |
 |---|---|
-| `format_version` | The artifact's shape (`FORMAT_VERSION` in `built.py`, now 2: `source_occurrences.parquet` was added). Bumping it makes every older build stale. |
+| `format_version` | The artifact's shape (`FORMAT_VERSION` in `built.py`, now 3: `graph_facts.parquet` was added). Bumping it makes every older build stale. |
 | `fingerprint` | SHA-256 over the path and bytes of every input file and of the pipeline's code (below). |
 | `built_at` | UTC time of the build. |
 | `git_commit` | The commit checked out, if git is available. |
-| `tables` | Row count per file, e.g. `{"graph_nodes.parquet": 167, "source_occurrences.parquet": 14488}`. |
-| `upstream` | The snapshots loaded, by dataset: `url`, `retrieved_at`, `sha256`, `rows`, `license`. Empty when none were downloaded. |
+| `tables` | Row count per file, e.g. `{"graph_nodes.parquet": 167, "graph_facts.parquet": 23, "source_occurrences.parquet": 14488}`. |
+| `upstream` | The snapshot loaded for every dataset: `url`, `retrieved_at`, `sha256`, `rows`, `license`, and `copy` (`download` or `backup`). |
 
 The manifest is written **last**. If anything fails earlier, no manifest matches the current inputs, so the failed build is never read as current.
 
@@ -191,20 +241,20 @@ The same steps are Dagster assets ([Dagster](technologies/dagster.md)). `assets.
 
 | Asset | Group | Step | Checks |
 |---|---|---|---|
-| `upstream/mrds_deposits` | upstream | Download (`fetch` in `upstream.py`). Its URL comes from the `downloads` resource, which tests point at a local file. | None |
-| `raw/curated_documents`, `raw/mrds_sources`, `raw/mrds_deposits`, `raw/upstream_snapshots` | raw | Load (`load_inputs`): one multi-asset, since the fingerprint is taken once before anything is read. The keys are the dbt sources' keys, so lineage runs into dbt. | The source tests above |
-| `stg_curated__documents`, `stg_mrds__deposits` | staging | dbt views | Their tests above |
-| `graph_nodes`, `source_occurrences` | marts | dbt marts, written as Parquet | Their tests above |
+| `upstream/mrds_deposits`, `upstream/wikidata_quantities` | upstream | Download (`fetch_or_fall_back` in `upstream.py`), or the cold backup when the network fails. Their URLs come from the `downloads` resource, which tests point at a local zip, a local stand-in for the SPARQL endpoint, or a port that refuses connections. | None |
+| `raw/curated_documents`, `raw/mrds_sources`, `raw/wikidata_things`, `raw/suppressed_records`, `raw/mrds_deposits`, `raw/wikidata_quantities`, `raw/upstream_snapshots` | raw | Load (`load_inputs`): one multi-asset, since the fingerprint is taken once before anything is read. The keys are the dbt sources' keys, so lineage runs into dbt. | The source tests above |
+| `stg_curated__documents`, `stg_curated__quantities`, `stg_curated__overrides`, `stg_curated__quantity_properties`, `stg_mrds__deposits`, `stg_wikidata__quantities` | staging | dbt views | Their tests above |
+| `graph_facts`, `graph_nodes`, `source_occurrences` | marts | dbt marts, written as Parquet | Their tests above |
 | `graph_manifest` | marts | Publish (`write_manifest`) | None |
 
-Every dbt test that belongs to one model or source is an asset check (37 today). Tests that compare two tables, such as `crosswalk_maps_to_sources`, still run in `dbt build` but aren't attached to an asset. "Materialize all" downloads MRDS again; to rebuild from the snapshot you have, select everything except `upstream/mrds_deposits`. Loading the definitions runs `dbt parse` first, so the asset list always matches the dbt project. dbt's files for each Dagster run go in `build/dbt/target/<run>/`.
+Every dbt test that belongs to one model or source is an asset check (58 today). Tests that compare two tables, such as `crosswalk_maps_to_sources`, still run in `dbt build` but aren't attached to an asset. "Materialize all" downloads both datasets again; to rebuild from the snapshots you have, select everything except the `upstream` group. Loading the definitions runs `dbt parse` first, so the asset list always matches the dbt project. dbt's files for each Dagster run go in `build/dbt/target/<run>/`.
 
 ## Freshness
 
 A build is current when `manifest.json` exists, its `fingerprint` equals the fingerprint of the inputs now, and `graph_nodes.parquet` exists. The fingerprint covers:
 
-- `data/**/*.yaml`, `data/**/*.csv`, `examples/**/*.yaml` and `schema/*.json` under the repository root;
-- each upstream snapshot's `snapshot.json` in the build directory, so downloading again makes the graph stale;
+- `data/**/*.yaml`, `data/**/*.csv` (crosswalks and suppressions), `examples/**/*.yaml` and `schema/*.json` under the repository root;
+- each upstream snapshot's `snapshot.json`, downloaded in the build directory and backed up in `snapshots/`, so downloading again or refreshing a backup makes the graph stale;
 - the pipeline's code, wherever the pipeline package is installed: `src/capabilities_pipeline/*.py`, `dbt/**/*.sql`, `dbt/**/*.yml`;
 - the artifact's `format_version`.
 
@@ -214,21 +264,23 @@ A build is current when `manifest.json` exists, its `fingerprint` equals the fin
 
 | Reader | Reads | Why |
 |---|---|---|
-| `need`, `explore`, `check`, `serve` | The built graph (`load_built` via `current_graph`) | They answer questions from what the pipeline built. From M1 this includes upstream data. |
+| `need`, `explore`, `check`, `serve` | The built graph (`load_built` via `current_graph`), and `graph_facts.parquet` (`load_facts`) as `Graph.facts` | They answer questions from what the pipeline built, upstream values included. The detail pane shows where each quantity value came from (`quantity_source` in `views.py`). |
 | `serve`, for the map | `source_occurrences.parquet` (`load_occurrences`) and the manifest's `upstream` | Where each source is found, for `GET /api/occurrences/{id}` ([ADR 0042](../adr/0042-show-where-things-are-found-on-a-maplibre-map.md)). It reads the longitude and latitude columns, so the server needs no spatial extension. |
 | `validate` | The curated YAML (`Graph.from_curated`) | It checks what people wrote, file by file. |
 | `credits` | The curated YAML | The works cited are in the curated layer. |
-| Reasoner and view tests | The curated YAML, or small graphs built in the test | Fast, and no build needed. |
-| Pipeline and server tests, `test_cli` | A build made once per test run in a temporary directory | They test the real path. |
+| Reasoner and view tests | The built graph (the `graph` fixture: built once per test run from the cold backups), the curated YAML (`curated_graph`), or small graphs built in the test | The answers the app gives. |
+| Pipeline and server tests, `test_cli` | A build made once per test run in a temporary directory, from the cold backups | They test the real path, with no network. |
 | Upstream tests (`pipeline/tests/test_upstream.py`) | A snapshot of 14 real MRDS records (`pipeline/tests/fixtures/mrds-sample.csv`), "downloaded" from a local file | Every crosswalk rule and year rule, with no network. |
+| Wikidata tests (`pipeline/tests/test_wikidata.py`) | 4 real Wikidata statements (`pipeline/tests/fixtures/wikidata-sample.csv`), served by a local stand-in for the SPARQL endpoint (`wikidata_endpoint` in `conftest.py`) | The query, the snapshot, precedence, overrides (and stale ones) and suppressions, with no network. |
 
-While the curated layer is the only source of nodes, the built graph must equal the curated graph: same documents, same order. `pipeline/tests/test_build.py` checks this, and checks that a worked example gives the same answers from both.
+The built graph has the curated graph's documents in the same order, except that each thing's quantities are the values `graph_facts` chose. `pipeline/tests/test_build.py` checks both. Copies of the data made for tests (`data_copy`) link to the real cold backups; a test that needs a dataset missing replaces the link with a copy that leaves it out.
 
 ## Files and configuration
 
 | Path | What |
 |---|---|
-| `build/upstream/<dataset>/` | Upstream snapshots: the data as Parquet, and `snapshot.json`. Deleting it means downloading again. |
+| `build/upstream/<dataset>/` | Downloaded snapshots: the data as Parquet, and `snapshot.json`. Without them, the build uses the cold backups. |
+| `snapshots/<dataset>/` | The cold backups, in git, with a README of their licenses. Refreshed by `capabilities backup`. |
 | `build/warehouse.duckdb` | The warehouse: the raw tables and the staging views. |
 | `build/graph/` | The artifact the app reads. |
 | `build/dbt/target/`, `build/dbt/logs/dbt.log` | dbt's compiled SQL, run results, and log. Dagster runs each get a folder under `target/`. |
@@ -243,8 +295,11 @@ The build directory is, in order: `--build-dir`, then `$CAPABILITIES_BUILD_DIR`,
 `BuildError` names the failing models or tests and points to `build/dbt/logs/dbt.log`. Common causes:
 
 - **A data test failed**, for example two nodes share an id. The YAML files can each be valid on their own and still clash. Fix the data and rebuild.
+- **No copy of a dataset** (`MissingSnapshot`): nothing downloaded and no cold backup. Download it with Dagster, or restore `snapshots/<dataset>/` from git.
 - **A YAML syntax error.** The message names the file.
 - **A crosswalk row names something that isn't a source**, or isn't in the graph (`crosswalk_maps_to_sources`, `relationships_...`).
+- **An override names a thing that isn't in the Wikidata crosswalk, or a quantity not read from Wikidata** (`overrides_target_upstream_values`): correct the curated value in the thing's file instead.
+- **A Wikidata value is in another unit than its quantity expects** (`wikidata_units_match`): add a conversion, or suppress the item.
 - **The download's columns changed** (Dagster only): USGS changed the file. The last snapshot stays in place; update `MRDS.columns` and the staging model.
 - **The pipeline package isn't installed** (only the core package was). Run `uv sync` in the repository.
 
@@ -258,6 +313,8 @@ duckdb build/warehouse.duckdb                  # explore the warehouse (needs th
 cd pipeline && uv run dg dev                   # Dagster UI at http://localhost:3000
 cd pipeline && uv run dg launch --assets '*'   # a full build as a Dagster run, downloading MRDS again
 cd pipeline && uv run dg launch --assets 'upstream/mrds_deposits'   # just download a new MRDS snapshot
+cd pipeline && uv run dg launch --assets 'upstream/wikidata_quantities'   # just query Wikidata again
+uv run capabilities backup                     # make newer downloads the cold backups in snapshots/ (then commit)
 ```
 
 To look at the output from Python:
@@ -269,13 +326,14 @@ duckdb.sql("""
     select source_id, state, count(*) from 'build/graph/source_occurrences.parquet'
     where id is not null group by all order by all
 """).show()
+duckdb.sql("select id, layer, value, curated_value, disagrees from 'build/graph/graph_facts.parquet' order by all").show()
 ```
 
 ## Planned changes
 
 | Milestone | Change to the pipeline |
 |---|---|
-| M1 | Done: Dagster runs the build; MRDS, the MRDS crosswalk and `source_occurrences`, served by `GET /api/occurrences/{id}` to the map. Still to come: Pleiades and Wikidata, with a Wikidata crosswalk; overrides and suppressions; upstream nodes in `graph_nodes`; a `curation_queue` mart. |
+| M1 | Done: Dagster runs the build; MRDS, the MRDS crosswalk and `source_occurrences`, served by `GET /api/occurrences/{id}` to the map; Wikidata's quantities through a crosswalk, overrides, suppressions and `graph_facts`. Still to come: upstream nodes in `graph_nodes` and a `curation_queue` mart (slice 4b); Pleiades' ancient mines and quarries as occurrences (slice 4c). |
 | M2 | Citation checks against OpenAlex and Crossref; a `reference_checks` mart. |
 | M3 | The agent curation stage and its append-only audit log. |
 | M5 | Raw and staging tables move to Apache Iceberg with an Apache Polaris catalog; the build still exports this artifact for the app. |

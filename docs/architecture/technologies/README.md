@@ -19,6 +19,7 @@ One page per technology the project uses. Each page teaches the technology, enou
 | Apache Parquet | The file format of the built graph | [parquet.md](parquet.md) |
 | DuckDB spatial and GeoParquet | Points for where sources are found, written as GeoParquet | [duckdb-spatial-and-geoparquet.md](duckdb-spatial-and-geoparquet.md) |
 | dbt | Transforms and tests the data inside DuckDB | [dbt.md](dbt.md) |
+| Wikidata and SPARQL | Quantity values for our things, from one query to Wikidata | [wikidata-and-sparql.md](wikidata-and-sparql.md) |
 | Dagster | Orchestration: the build as assets, with lineage, checks and run history | [dagster.md](dagster.md) |
 | FastAPI | The API server | [fastapi.md](fastapi.md) |
 | React, Vite and Cytoscape.js | The web app and the graph drawing | [react-vite-and-cytoscape.md](react-vite-and-cytoscape.md) |

@@ -21,12 +21,16 @@ model {
     description 'The Mineral Resources Data System: 304,632 mineral deposits worldwide, with coordinates, ore minerals and commodities. US public domain. Downloaded as mrds-csv.zip.'
   }
 
+  wikidata = external 'Wikidata' {
+    description 'The free knowledge base of Wikimedia, CC0. Its SPARQL endpoint (query.wikidata.org) answers one query for the quantity statements (Mohs hardness) of the items our things are matched to (ADR 0043).'
+  }
+
   capabilities = system 'Capabilities' {
     description 'A free, non-commercial knowledge graph of what it physically takes to make and do things, with a reasoner that answers three questions.'
 
     curated = store 'Curated layer' {
-      technology 'YAML files in git, checked by JSON Schema; CSV crosswalks'
-      description 'data/ (things, routes, verbs, quantities, profiles, crosswalks), examples/jobs/ and schema/. Written by people, reviewed in pull requests.'
+      technology 'YAML files in git, checked by JSON Schema; CSV crosswalks and suppressions'
+      description 'data/ (things, routes, verbs, quantities, profiles, overrides, crosswalks, suppressions), examples/jobs/ and schema/. Written by people, reviewed in pull requests.'
     }
 
     snapshots = store 'Upstream snapshots' {
@@ -35,21 +39,26 @@ model {
       description 'Each upstream dataset as downloaded, every column as text, with its URL, retrieval time, hash and license. Downloaded only by Dagster; not in git.'
     }
 
+    backups = store 'Cold backups' {
+      technology 'Parquet (zstd) and snapshot.json, in git (snapshots/)'
+      description 'A copy of every upstream dataset, so the graph builds offline, in CI and when a download fails. Every dataset is required: a build uses the newest copy, download or backup, and stops if one has neither (ADR 0044).'
+    }
+
     pipeline = container 'Pipeline' {
       technology 'Python, dbt Core, dbt-duckdb, Dagster'
       description 'pipeline/: builds the graph from its inputs, with `capabilities build` or as Dagster assets.'
 
       loader = component 'Loader' {
         technology 'Python (capabilities_pipeline.build)'
-        description 'Loads every curated document, crosswalk and downloaded snapshot into raw DuckDB tables, with the inputs fingerprint. Writes the manifest last.'
+        description 'Loads every curated document, crosswalk, suppression and downloaded snapshot into raw DuckDB tables, with the inputs fingerprint. Writes the manifest last.'
       }
       downloader = component 'Downloader' {
         technology 'Python (capabilities_pipeline.upstream)'
-        description 'Downloads an upstream dataset, checks its columns, converts it to Parquet unchanged and records the snapshot.'
+        description 'Downloads an upstream dataset (a zip, or the result of a SPARQL query built from the curated layer), checks its columns, converts it to Parquet unchanged and records the snapshot.'
       }
       dagster = component 'Dagster assets' {
         technology 'Dagster, dagster-dbt (assets.py, definitions.py)'
-        description 'The same steps as assets, plus the MRDS download: grouped upstream, raw, staging and marts. dbt tests are asset checks. `dg dev` shows lineage and run history.'
+        description 'The same steps as assets, plus the MRDS and Wikidata downloads: grouped upstream, raw, staging and marts. dbt tests are asset checks. `dg dev` shows lineage and run history.'
       }
       dbt = component 'dbt project' {
         technology 'dbt Core with the DuckDB adapter'
@@ -68,8 +77,17 @@ model {
       rawCrosswalk = table 'raw.mrds_sources' {
         description 'The crosswalk from MRDS deposits to our source kinds (data/crosswalks/mrds_sources.csv): field, value, optional deposit type, notes.'
       }
+      rawWikidataCrosswalk = table 'raw.wikidata_things' {
+        description 'The crosswalk from our things to Wikidata items (data/crosswalks/wikidata_things.csv): id, wikidata, notes.'
+      }
+      rawSuppressions = table 'raw.suppressed_records' {
+        description 'Upstream records left out of the build, with why (data/suppressions/suppressed_records.csv).'
+      }
+      rawWikidata = table 'raw.wikidata_quantities' {
+        description 'The Wikidata snapshot: item, property, amount, bounds and unit of each best-ranked statement, as text.'
+      }
       rawMrds = table 'raw.mrds_deposits' {
-        description 'The MRDS snapshot, all 46 columns as text. Empty when nothing has been downloaded.'
+        description 'The MRDS snapshot, all 46 columns as text.'
       }
       rawSnapshots = table 'raw.upstream_snapshots' {
         description 'Each snapshot loaded: dataset, URL, retrieval time, hash, rows, license.'
@@ -80,6 +98,14 @@ model {
       stgDocuments = table 'stg_curated__documents' {
         technology 'dbt view'
         description 'Common fields (kind, label) pulled out of each document.'
+      }
+      stgCuratedQuantities = table 'stg_curated__quantities, __overrides, __quantity_properties' {
+        technology 'dbt views'
+        description 'The curated quantity values, the overrides, and the Wikidata property each quantity is read from.'
+      }
+      stgWikidata = table 'stg_wikidata__quantities' {
+        technology 'dbt view'
+        description 'Wikidata statements typed: amount, low and high (the bounds, or the amount).'
       }
       stgMrds = table 'stg_mrds__deposits' {
         technology 'dbt view'
@@ -96,6 +122,10 @@ model {
         technology 'dbt mart, external materialization'
         description 'Every node: type, id, kind, label, full document, provenance, and read order.'
       }
+      graphFacts = file 'graph_facts.parquet' {
+        technology 'dbt mart, external materialization'
+        description 'Where each quantity value comes from: one row per thing and quantity, with the value used (override, else upstream, else curated), the value from each layer, whether they disagree, the upstream record and the override (ADR 0043).'
+      }
       occurrences = file 'source_occurrences.parquet' {
         technology 'dbt mart, external materialization, GeoParquet'
         description 'Where each source kind is found: one row per source kind and MRDS deposit, with a point geometry, worked_by_year, state (worked or present) and upstream provenance (ADR 0041).'
@@ -111,7 +141,7 @@ model {
 
       built = component 'Built-graph reader' {
         technology 'capabilities.built'
-        description 'Checks the fingerprint, rebuilds when stale, and loads the built graph into memory.'
+        description 'Checks the fingerprint, rebuilds when stale, and loads the built graph into memory, with where each quantity value came from.'
       }
       reasoner = component 'Reasoner' {
         technology 'capabilities.reasoner, levels, views'
@@ -127,7 +157,7 @@ model {
       }
       cli = component 'CLI' {
         technology 'argparse (`capabilities`)'
-        description 'validate, build, need, explore, check, credits, serve.'
+        description 'validate, build, backup, need, explore, check, credits, serve.'
       }
     }
 
@@ -174,16 +204,26 @@ model {
   capabilities.core.built -> capabilities.pipeline.loader 'rebuilds when the inputs changed'
   capabilities.core.built -> capabilities.artifact.manifest 'compares fingerprints'
   capabilities.core.built -> capabilities.artifact.graphNodes 'reads every node'
+  capabilities.core.built -> capabilities.artifact.graphFacts 'reads where each value came from'
   capabilities.core.built -> capabilities.snapshots 'includes each snapshot.json in the fingerprint'
   capabilities.pipeline.loader -> capabilities.curated 'reads every document'
   capabilities.pipeline.loader -> capabilities.warehouse.rawDocuments 'loads documents, whole'
   capabilities.pipeline.loader -> capabilities.warehouse.rawLoads 'records the inputs fingerprint'
   capabilities.pipeline.loader -> capabilities.warehouse.rawCrosswalk 'loads each crosswalk, as text'
   capabilities.pipeline.loader -> capabilities.snapshots 'reads the snapshots already downloaded'
-  capabilities.pipeline.loader -> capabilities.warehouse.rawMrds 'loads the MRDS snapshot (or an empty table)'
+  capabilities.pipeline.loader -> capabilities.backups 'reads a backup when it is newer than the download, or there is none'
+  capabilities.pipeline.downloader -> capabilities.backups 'falls back to it when the network fails'
+  capabilities.core.cli -> capabilities.backups 'backup: makes newer downloads the backups'
+  capabilities.core.built -> capabilities.backups 'includes each snapshot.json in the fingerprint'
+  capabilities.pipeline.loader -> capabilities.warehouse.rawMrds 'loads the newest copy of MRDS'
   capabilities.pipeline.loader -> capabilities.warehouse.rawSnapshots 'records each snapshot loaded'
-  capabilities.pipeline.dagster -> capabilities.pipeline.downloader 'downloads MRDS as an asset'
+  capabilities.pipeline.loader -> capabilities.warehouse.rawWikidataCrosswalk 'loads the crosswalk, as text'
+  capabilities.pipeline.loader -> capabilities.warehouse.rawSuppressions 'loads the suppressions, as text'
+  capabilities.pipeline.loader -> capabilities.warehouse.rawWikidata 'loads the newest copy of the Wikidata snapshot'
+  capabilities.pipeline.dagster -> capabilities.pipeline.downloader 'downloads MRDS and Wikidata as assets'
   capabilities.pipeline.downloader -> mrds 'downloads mrds-csv.zip (HTTPS)'
+  capabilities.pipeline.downloader -> wikidata 'one SPARQL query for the crosswalked items (HTTPS)'
+  capabilities.pipeline.downloader -> capabilities.curated 'reads the crosswalk and quantities to build the query'
   capabilities.pipeline.downloader -> capabilities.snapshots 'writes Parquet, then snapshot.json'
   capabilities.pipeline.dagster -> capabilities.pipeline.loader 'runs the load and manifest as assets'
   capabilities.pipeline.dagster -> capabilities.pipeline.dbt 'runs every model as an asset, tests as checks'
@@ -194,8 +234,17 @@ model {
   capabilities.pipeline.dbt -> capabilities.artifact.graphNodes 'writes the mart as Parquet, with data tests'
   capabilities.pipeline.dbt -> capabilities.warehouse.stgMrds 'builds the staging view'
   capabilities.pipeline.dbt -> capabilities.artifact.occurrences 'writes the mart as GeoParquet, with data tests'
+  capabilities.pipeline.dbt -> capabilities.artifact.graphFacts 'writes the mart as Parquet, with data tests'
   capabilities.warehouse.rawDocuments -> capabilities.warehouse.stgDocuments 'parsed into columns'
   capabilities.warehouse.stgDocuments -> capabilities.artifact.graphNodes 'adds provenance'
+  capabilities.warehouse.stgDocuments -> capabilities.warehouse.stgCuratedQuantities 'quantities, overrides, properties'
+  capabilities.warehouse.rawWikidata -> capabilities.warehouse.stgWikidata 'typed'
+  capabilities.warehouse.stgWikidata -> capabilities.artifact.graphFacts 'upstream values'
+  capabilities.warehouse.stgCuratedQuantities -> capabilities.artifact.graphFacts 'curated values and overrides'
+  capabilities.warehouse.rawWikidataCrosswalk -> capabilities.artifact.graphFacts 'which item each thing is'
+  capabilities.warehouse.rawSuppressions -> capabilities.artifact.graphFacts 'items left out'
+  capabilities.warehouse.rawSuppressions -> capabilities.artifact.occurrences 'deposits left out'
+  capabilities.artifact.graphFacts -> capabilities.artifact.graphNodes 'the chosen values, into each document'
   capabilities.warehouse.rawMrds -> capabilities.warehouse.stgMrds 'typed, lists split'
   capabilities.warehouse.stgMrds -> capabilities.artifact.occurrences 'deposits with coordinates, as points'
   capabilities.warehouse.rawCrosswalk -> capabilities.artifact.occurrences 'match rules'

@@ -168,6 +168,23 @@ export interface DependencyRow {
   conditions?: string[];
 }
 
+/** A thing's value of a quantity, and where it came from (ADR 0043). */
+export interface Quantity {
+  id: string;
+  label: string;
+  value: string;
+  source: QuantitySource;
+}
+
+export interface QuantitySource {
+  layer: "curated" | "upstream" | "override";
+  /** The upstream record, for a value from upstream or one an override replaces. */
+  upstream?: { dataset: string; record: string; url: string; retrieved_at: string | null; value: string };
+  /** The curated layer's value, when it differs from the upstream one. */
+  curated_value?: string;
+  override?: { reason: string; replaces: string; references: Reference[]; stale: boolean };
+}
+
 export interface About {
   description?: string | null;
   notes?: string;
@@ -175,7 +192,7 @@ export interface About {
   availability?: "ubiquitous" | "regional";
   regions?: string[];
   era?: string;
-  quantities?: { id: string; label: string; value: string }[];
+  quantities?: Quantity[];
   member_of?: Named[];
   /** Actions: what is being acted on. */
   target?: Named;

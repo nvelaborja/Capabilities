@@ -443,7 +443,8 @@ def about(graph: Graph, key: str) -> dict:
     thing = graph.things[key]
     view = {
         "description": thing.get("description"),
-        "quantities": [{"id": q, "label": quantity_name(graph, q), "value": quantity_value(graph, q, v)}
+        "quantities": [{"id": q, "label": quantity_name(graph, q), "value": quantity_value(graph, q, v),
+                        "source": quantity_source(graph, key, q)}
                        for q, v in thing.get("quantities", {}).items()],
         "member_of": [{"id": c, "label": graph.label(c)} for c in thing.get("is_a", []) if c in graph.things],
         "references": references(thing),
@@ -452,6 +453,37 @@ def about(graph: Graph, key: str) -> dict:
         if thing.get(field):
             view[field] = thing[field].strip() if isinstance(thing[field], str) else thing[field]
     return view
+
+
+# How upstream datasets are named in the app.
+DATASET_LABELS = {"wikidata": "Wikidata"}
+
+
+def quantity_source(graph: Graph, thing_id: str, quantity: str) -> dict:
+    """Where a thing's quantity value comes from (ADR 0043): the curated layer, an upstream record, or an override. An
+    upstream value says what the curated layer had, when that differs; an override says what it replaces and why."""
+    fact = graph.facts.get(f"{thing_id}/quantities.{quantity}")
+    if not fact or fact["layer"] == "curated":
+        return {"layer": "curated"}
+    source: dict = {"layer": fact["layer"]}
+    if upstream := fact["upstream"]:
+        source["upstream"] = {
+            "dataset": DATASET_LABELS.get(upstream["dataset"], upstream["dataset"]),
+            "record": upstream["record"],
+            "url": upstream["url"],
+            "retrieved_at": upstream["retrieved_at"],
+            "value": quantity_value(graph, quantity, fact["upstream_value"]),
+        }
+    if fact["disagrees"]:
+        source["curated_value"] = quantity_value(graph, quantity, fact["curated_value"])
+    if override := fact["override"]:
+        source["override"] = {
+            "reason": override["reason"],
+            "replaces": quantity_value(graph, quantity, override["replaces"]),
+            "references": references(override),
+            "stale": override["stale"],
+        }
+    return source
 
 
 def references(item: dict) -> list[dict]:

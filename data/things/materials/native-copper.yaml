@@ -4,10 +4,3 @@ label: Native copper
 origin: extracted
 is_a: [metal]
 description: Copper found as metal in nature. It can be hammered into shape without smelting, which made it the first metal people worked.
-quantities:
-  hardness_mohs: [2.5, 3]
-references:
-  - citation: "Mohs scale of mineral hardness: table of common materials. Wikipedia."
-    url: https://en.wikipedia.org/wiki/Mohs_scale
-    supports: Mohs hardness value.
-    status: secondary

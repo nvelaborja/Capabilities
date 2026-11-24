@@ -32,12 +32,6 @@ export function emptyReason(places: OccurrencesResponse): string | null {
   return null;
 }
 
-/** "22 Nov 2026" from an ISO time, in UTC so it matches the manifest. */
-export function retrievedOn(iso: string | null): string {
-  if (!iso) return "an unknown date";
-  return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
-}
-
 /** What the popup says about a place's state: never "not worked", only "no known working date" (ADR 0041). */
 export function stateText(place: Pick<PlaceProperties, "state" | "worked_by_year">): string {
   return place.state === "worked" && place.worked_by_year !== null

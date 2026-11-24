@@ -7,7 +7,11 @@ models:
       - name: kind
         data_tests: [not_null]
       - name: label
-        data_tests: [not_null]
+        description: Every node has a label; overrides aren't nodes, and have none.
+        data_tests:
+          - not_null:
+              config:
+                where: "node_type <> 'override'"
   - name: stg_mrds__deposits
     description: MRDS deposits with typed columns, and their ore minerals and commodities as lists.
     columns:

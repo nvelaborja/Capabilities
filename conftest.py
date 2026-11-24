@@ -1,7 +1,11 @@
 import csv
 import shutil
+import threading
 import zipfile
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from types import SimpleNamespace
+from urllib.parse import parse_qs
 
 import pytest
 
@@ -16,13 +20,23 @@ def repo_root() -> Path:
 
 
 @pytest.fixture(scope="session")
-def graph() -> Graph:
+def graph(built_dir) -> Graph:
+    """The graph the app reads: the curated layer built with the upstream datasets' cold backups (ADR 0044)."""
+    from capabilities.built import load_built
+
+    return load_built(REPO_ROOT, built_dir)
+
+
+@pytest.fixture(scope="session")
+def curated_graph() -> Graph:
+    """The curated YAML alone, as people wrote it."""
     return Graph.from_curated(REPO_ROOT)
 
 
 @pytest.fixture(scope="session")
 def built_dir(tmp_path_factory) -> Path:
-    """The repository's graph, built once per test run into a temporary directory (never the repo's build/)."""
+    """The repository's graph, built once per test run into a temporary directory (never the repo's build/). Nothing is
+    downloaded, so it uses the cold backups in snapshots/, as CI and a fresh clone do."""
     from capabilities.built import run_build
 
     build_dir = tmp_path_factory.mktemp("build")
@@ -69,14 +83,47 @@ def sample_rows():
     return _sample_rows
 
 
-@pytest.fixture(scope="session")
-def mrds_built_dir(tmp_path_factory, mrds_zip) -> Path:
-    """The repository's graph built once with a snapshot of the 14-record MRDS sample, so it has source occurrences."""
-    from capabilities.built import run_build
-    from capabilities_pipeline.upstream import MRDS, fetch
+# Four real Wikidata hardness statements (CC0), retrieved 2026-11-24, for hematite, limonite, granite and copper. Our
+# curated values match them since ADR 0043 was accepted; tests that need a disagreement change a curated value.
+WIKIDATA_SAMPLE = REPO_ROOT / "pipeline" / "tests" / "fixtures" / "wikidata-sample.csv"
 
-    build_dir = tmp_path_factory.mktemp("mrds-build")
+
+class _SparqlEndpoint(BaseHTTPRequestHandler):
+    def do_POST(self):
+        body = self.rfile.read(int(self.headers["Content-Length"])).decode()
+        self.server.queries.append(parse_qs(body)["query"][0])
+        result = WIKIDATA_SAMPLE.read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/csv")
+        self.send_header("Content-Length", str(len(result)))
+        self.end_headers()
+        self.wfile.write(result)
+
+    def log_message(self, *args):
+        pass
+
+
+@pytest.fixture(scope="session")
+def wikidata_endpoint():
+    """A local stand-in for Wikidata's SPARQL endpoint, so tests never use the network: it answers every query with the
+    sample and keeps the queries it was sent."""
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _SparqlEndpoint)
+    server.queries = []
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    yield SimpleNamespace(url=f"http://127.0.0.1:{server.server_port}/sparql", queries=server.queries)
+    server.shutdown()
+
+
+@pytest.fixture(scope="session")
+def upstream_built_dir(tmp_path_factory, mrds_zip, wikidata_endpoint) -> Path:
+    """The repository's graph built once with snapshots of the MRDS and Wikidata samples, so it has source occurrences
+    and upstream quantity values."""
+    from capabilities.built import run_build
+    from capabilities_pipeline.upstream import MRDS, WIKIDATA, fetch
+
+    build_dir = tmp_path_factory.mktemp("upstream-build")
     fetch(MRDS, build_dir, mrds_zip(tmp_path_factory.mktemp("mrds-download")))
+    fetch(WIKIDATA, build_dir, wikidata_endpoint.url, root=REPO_ROOT)
     run_build(REPO_ROOT, build_dir)
     return build_dir
 
@@ -86,7 +133,37 @@ def data_copy(tmp_path: Path) -> Path:
     """A throwaway copy of the schemas and data, for tests that break files on purpose."""
     for directory in ("schema", "data", "examples"):
         shutil.copytree(REPO_ROOT / directory, tmp_path / directory)
+    # The cold backups of the upstream datasets, which every build needs (ADR 0044). Linked, not copied: no test changes
+    # them, and MRDS's is 15 MB.
+    (tmp_path / "snapshots").symlink_to(REPO_ROOT / "snapshots", target_is_directory=True)
     return tmp_path
+
+
+GRANITE_OVERRIDE = """id: {id}
+kind: override
+thing: {thing}
+quantity: hardness_mohs
+value: [6, 7]
+replaces: {{ dataset: wikidata, value: {replaces} }}
+reason: Granite's common minerals, quartz and feldspar, are 6 to 7; 5 is softer than either.
+references:
+  - citation: "Klein, C. & Dutrow, B. (2007). Manual of Mineral Science, 23rd ed. Wiley."
+    supports: Mohs hardness of quartz and feldspar.
+    status: unverified
+"""
+
+
+@pytest.fixture
+def write_override():
+    """Writes an override of a thing's hardness into a copy of the data: by default granite's, replacing Wikidata's 5–7
+    with 6–7."""
+    def write(root: Path, id: str = "granite-hardness", thing: str = "granite", replaces: str = "[5, 7]") -> Path:
+        path = root / "data" / "overrides" / f"{id}.yaml"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(GRANITE_OVERRIDE.format(id=id, thing=thing, replaces=replaces), encoding="utf-8")
+        return path
+
+    return write
 
 
 def _route(route_id: str, achieves: dict, requires: list[dict], **extra) -> dict:

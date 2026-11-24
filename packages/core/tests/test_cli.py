@@ -33,9 +33,9 @@ class TestCli:
     def test_build_reports_nodes_and_occurrences_separately(self, repo_root, tmp_path, capsys):
         assert main(["--root", str(repo_root), "--build-dir", str(tmp_path / "build"), "build"]) == 0
         output = capsys.readouterr().out
-        # No snapshot has been downloaded into a new build directory, so there are no occurrences.
-        assert " nodes and 0 source occurrences" in output
-        assert "upstream datasets: none downloaded" in output
+        # Nothing has been downloaded into a new build directory, so the cold backups are used.
+        assert " source occurrences, from inputs " in output
+        assert "mrds_deposits (backup of 2026-11-22)" in output
 
     @pytest.mark.parametrize(
         "args",

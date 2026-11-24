@@ -1,4 +1,5 @@
 import json
+import shutil
 from pathlib import Path
 
 import duckdb
@@ -141,18 +142,62 @@ class TestOccurrences:
         build_dir, snapshot = mrds_build
         manifest = json.loads((graph_dir(build_dir) / MANIFEST_FILE).read_text())
         assert manifest["tables"][OCCURRENCES_FILE] == 10
-        assert manifest["upstream"] == {
-            "mrds_deposits": {key: snapshot[key] for key in ("url", "retrieved_at", "sha256", "rows", "license")}
+        # The sample was just downloaded, so it is newer than the cold backup and is used; Wikidata comes from its backup.
+        assert manifest["upstream"]["mrds_deposits"] == {
+            **{key: snapshot[key] for key in ("url", "retrieved_at", "sha256", "rows", "license")}, "copy": "download"
         }
+        assert manifest["upstream"]["wikidata_quantities"]["copy"] == "backup"
 
 
-class TestWithoutASnapshot:
-    def test_the_graph_builds_with_no_occurrences_and_no_upstream_datasets(self, built_dir):
+REPO_SNAPSHOTS = Path(__file__).resolve().parents[2] / "snapshots"
+
+
+class TestEveryDatasetIsRequired:
+    def test_with_nothing_downloaded_the_cold_backups_are_used(self, built_dir):
         # built_dir (conftest) never downloads anything, like CI and a fresh clone.
-        assert occurrences(built_dir) == []
         manifest = json.loads((graph_dir(built_dir) / MANIFEST_FILE).read_text())
-        assert manifest["tables"][OCCURRENCES_FILE] == 0
-        assert manifest["upstream"] == {}
+        assert {name: snapshot["copy"] for name, snapshot in manifest["upstream"].items()} == {
+            "mrds_deposits": "backup", "wikidata_quantities": "backup",
+        }
+        assert manifest["tables"][OCCURRENCES_FILE] > 0
+
+    def test_a_build_with_no_copy_of_a_dataset_stops_and_says_how_to_get_one(self, data_copy, tmp_path):
+        from capabilities_pipeline.upstream import MissingSnapshot
+
+        # given: no cold backup of MRDS, and nothing downloaded
+        (data_copy / "snapshots").unlink()
+        shutil.copytree(REPO_SNAPSHOTS, data_copy / "snapshots", ignore=shutil.ignore_patterns("mrds_deposits"))
+        # when, then: the build stops before anything is built
+        with pytest.raises(MissingSnapshot, match="No copy of mrds_deposits.*upstream/mrds_deposits"):
+            build(data_copy, tmp_path / "build")
+        assert not (graph_dir(tmp_path / "build") / MANIFEST_FILE).exists()
+
+    def test_backing_up_makes_a_newer_download_the_cold_backup(self, data_copy, tmp_path, mrds_zip):
+        from capabilities_pipeline.upstream import back_up, backup_directory
+
+        # given: a fresh download, newer than the backup
+        root = data_copy
+        (root / "snapshots").unlink()
+        shutil.copytree(REPO_SNAPSHOTS, root / "snapshots", ignore=shutil.ignore_patterns("*.parquet"))
+        build_dir = tmp_path / "build"
+        snapshot = fetch(MRDS, build_dir, mrds_zip(tmp_path / "download"))
+        # when: backing up, twice
+        first, second = back_up(MRDS, root, build_dir), back_up(MRDS, root, build_dir)
+        # then: the backup is the download, value for value; the second time there was nothing newer
+        assert first == snapshot and second is None
+        backup = backup_directory(MRDS, root) / "mrds_deposits.parquet"
+        difference = duckdb.sql(
+            "select count(*) from (select * from read_parquet(?) except all select * from read_parquet(?))",
+            params=[str(MRDS.parquet(build_dir)), str(backup)],
+        ).fetchall()[0][0]
+        assert difference == 0
+
+    def test_offline_the_download_falls_back_to_the_cold_backup(self, repo_root, tmp_path):
+        from capabilities_pipeline.upstream import fetch_or_fall_back
+
+        # Port 9 refuses connections, as a server that is down or a network that is off would.
+        snapshot, error = fetch_or_fall_back(MRDS, repo_root, tmp_path / "build", "http://127.0.0.1:9/mrds-csv.zip")
+        assert snapshot["copy"] == "backup" and error
 
 
 class TestCrosswalk:
@@ -167,3 +212,18 @@ class TestCrosswalk:
         crosswalk.write_text(crosswalk.read_text() + "galena-deposit,ore,Galena,,Not in the graph.\n")
         with pytest.raises(BuildError, match="relationships"):
             build(data_copy, tmp_path / "build")
+
+
+class TestSuppressions:
+    def test_a_suppressed_deposit_is_not_an_occurrence(self, data_copy, tmp_path, mrds_zip):
+        # given: the Leadville District deposit (10008106) is suppressed as not belonging
+        suppressions = data_copy / "data" / "suppressions" / "suppressed_records.csv"
+        suppressions.write_text(suppressions.read_text() + 'mrds,10008106,"Test: a duplicate record."\n', encoding="utf-8")
+        build_dir = tmp_path / "build"
+        fetch(MRDS, build_dir, mrds_zip(tmp_path / "download"))
+        # when: building
+        build(data_copy, build_dir)
+        # then: it is on no map, and the other deposits still are
+        records = {row["record_id"] for row in occurrences(build_dir)}
+        assert "10008106" not in records
+        assert "10001442" in records

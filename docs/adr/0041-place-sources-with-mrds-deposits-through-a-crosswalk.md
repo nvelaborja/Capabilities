@@ -1,6 +1,6 @@
 # 0041. Place sources with MRDS deposits, matched through a hand-kept crosswalk
 
-- **Status:** Accepted
+- **Status:** Accepted; building without a snapshot superseded by [0044](0044-require-every-upstream-dataset-with-cold-backups-in-git.md)
 - **Date:** 2026-11-22
 
 ## Context

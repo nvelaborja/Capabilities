@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:capabilities:schema:override",
+  "title": "Override",
+  "description": "Replaces an upstream value we believe is wrong, with the reason and references (ADR 0034, ADR 0043). Upstream sources are never edited; an override is applied in the build and shown in the app beside the value it replaces.",
+  "type": "object",
+  "required": ["id", "kind", "thing", "quantity", "value", "replaces", "reason", "references"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "$ref": "urn:capabilities:schema:defs#/$defs/id" },
+    "kind": { "const": "override" },
+    "thing": { "$ref": "urn:capabilities:schema:defs#/$defs/id" },
+    "quantity": { "$ref": "urn:capabilities:schema:defs#/$defs/quantityId" },
+    "value": { "$ref": "urn:capabilities:schema:defs#/$defs/quantityValue" },
+    "replaces": {
+      "description": "The upstream value this replaces, as it was when the override was written. If upstream changes, the build flags the override for review.",
+      "type": "object",
+      "required": ["dataset", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "dataset": { "enum": ["wikidata"] },
+        "value": { "$ref": "urn:capabilities:schema:defs#/$defs/quantityValue" }
+      }
+    },
+    "reason": { "type": "string", "minLength": 1 },
+    "references": { "$ref": "urn:capabilities:schema:defs#/$defs/references", "minItems": 1 },
+    "notes": { "type": "string" }
+  }
+}

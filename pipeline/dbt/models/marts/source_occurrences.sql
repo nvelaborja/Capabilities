@@ -4,6 +4,10 @@ with deposits as (
     select * from {{ ref('stg_mrds__deposits') }}
     -- A deposit without coordinates can't be placed, so it isn't an occurrence.
     where latitude is not null and longitude is not null
+        -- Records the curated layer suppresses as not belonging (ADR 0034).
+        and record_id not in (
+            select record_id from {{ source('raw', 'suppressed_records') }} where dataset = 'mrds'
+        )
 ),
 
 crosswalk as (

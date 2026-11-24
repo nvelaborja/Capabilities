@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import type { About, ExplainResponse, ExploreResponse, SelectionRequest } from "../api/types";
+import type { About, ExplainResponse, ExploreResponse, QuantitySource, SelectionRequest } from "../api/types";
 import type { Catalog } from "../catalog";
 import { CHIP_ICONS, NodeChip } from "../chips/NodeChip";
 import { STATUS_LABELS } from "../legend/Legend";
@@ -10,6 +10,7 @@ import { DetailShell } from "./DetailShell";
 import { ExpandAllDialog } from "./ExpandAllDialog";
 import { ItemChips, type QuickAdd } from "./ItemChips";
 import { chipStatus, kindName, statusTri, waysHeading } from "./marks";
+import { sourceLines } from "./provenance";
 import { References } from "./References";
 import { Routes, type StatusOf } from "./Routes";
 
@@ -228,11 +229,15 @@ function Needs({ data, statusOf, onDrill, quickAdd, onExpandAll }: NeedsProps) {
 }
 
 function AboutSection({ about, statusOf, onDrill }: { about: About; statusOf: StatusOf; onDrill: (id: string) => void }) {
-  const facts: [string, string][] = (about.quantities ?? []).map((q) => [q.label, q.value]);
+  const facts: { term: string; value: string; source?: QuantitySource }[] = (about.quantities ?? []).map((q) => ({
+    term: q.label,
+    value: q.value,
+    source: q.source,
+  }));
   // Hand-gathered materials and sources say where they are found; extracted materials are found through their source.
   const natural = about.origin === "natural" || about.availability !== undefined;
   const everywhere = about.availability === "ubiquitous";
-  if (natural) facts.push(["Found", everywhere ? "Almost everywhere" : (about.regions ?? []).join("; ") || "Some regions"]);
+  if (natural) facts.push({ term: "Found", value: everywhere ? "Almost everywhere" : (about.regions ?? []).join("; ") || "Some regions" });
   return (
     <div className="about">
       {about.description && <p className="description">{about.description}</p>}
@@ -244,10 +249,13 @@ function AboutSection({ about, statusOf, onDrill }: { about: About; statusOf: St
       )}
       {facts.length > 0 && (
         <dl className="facts">
-          {facts.map(([term, value]) => (
+          {facts.map(({ term, value, source }) => (
             <div key={term}>
               <dt>{term}</dt>
-              <dd>{value}</dd>
+              <dd>
+                {value}
+                {source && <FactSource source={source} hasSources={about.references.length > 0} />}
+              </dd>
             </div>
           ))}
         </dl>
@@ -269,5 +277,26 @@ function AboutSection({ about, statusOf, onDrill }: { about: About; statusOf: St
       )}
       {about.notes && <p className="muted">{about.notes}</p>}
     </div>
+  );
+}
+
+/** Where a value came from, under it (ADR 0043): every fact has provenance, and an override shows what it replaces. */
+function FactSource({ source, hasSources }: { source: QuantitySource; hasSources: boolean }) {
+  return (
+    <span className={`fact-source fact-source-${source.layer}`}>
+      {sourceLines(source, hasSources).map((line, index) => (
+        <span key={index}>
+          {line.text}
+          {line.link && (
+            <>
+              {" "}
+              <a href={line.link.href} target="_blank" rel="noreferrer">
+                {line.link.label} ↗
+              </a>
+            </>
+          )}
+        </span>
+      ))}
+    </span>
   );
 }

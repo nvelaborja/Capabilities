@@ -10,7 +10,7 @@ from pathlib import Path
 import yaml
 
 from .credits import cited_works, credits_path, refreshed, works_cited_markdown
-from .built import NODES_FILE, OCCURRENCES_FILE, build_dir_for, current_graph, run_build
+from .built import FACTS_FILE, NODES_FILE, OCCURRENCES_FILE, build_dir_for, current_graph, run_backup, run_build
 from .graph import Graph, LoadError, find_root
 from .reasoner import Backward, Selection, assess_job, closure, explore, need_tree
 from .validate import validate
@@ -66,6 +66,11 @@ def build_parser() -> argparse.ArgumentParser:
     cmd = commands.add_parser("build", help="Build the graph the app reads, from the curated layer, with dbt.")
     cmd.set_defaults(handler=cmd_build)
 
+    cmd = commands.add_parser(
+        "backup", help="Make the latest download of each upstream dataset its cold backup in snapshots/ (commit it)."
+    )
+    cmd.set_defaults(handler=cmd_backup)
+
     cmd = commands.add_parser("credits", help="Regenerate the list of works cited in CREDITS.md.")
     cmd.add_argument("--check", action="store_true", help="Only report whether CREDITS.md is up to date.")
     cmd.set_defaults(handler=cmd_credits)
@@ -100,11 +105,22 @@ def build_selection(graph: Graph, profile: str | None, select: list[str], desele
 def cmd_build(args, root: Path) -> int:
     manifest = run_build(root, build_dir_for(root, args.build_dir))
     tables = manifest["tables"]
-    upstream = ", ".join(sorted(manifest.get("upstream", {}))) or "none downloaded"
+    upstream = ", ".join(f"{name} ({snapshot['copy']} of {snapshot['retrieved_at'][:10]})"
+                         for name, snapshot in sorted(manifest["upstream"].items()))
     print(
-        f"Built the graph: {tables[NODES_FILE]} nodes and {tables[OCCURRENCES_FILE]} source occurrences, "
-        f"from inputs {manifest['fingerprint'][:12]} (upstream datasets: {upstream})."
+        f"Built the graph: {tables[NODES_FILE]} nodes, {tables[FACTS_FILE]} quantity values and "
+        f"{tables[OCCURRENCES_FILE]} source occurrences, from inputs {manifest['fingerprint'][:12]} "
+        f"(upstream datasets: {upstream})."
     )
+    return 0
+
+
+def cmd_backup(args, root: Path) -> int:
+    for name, snapshot in run_backup(root, build_dir_for(root, args.build_dir)).items():
+        if snapshot:
+            print(f"Backed up {name}, retrieved {snapshot['retrieved_at']}, to snapshots/{name}/.")
+        else:
+            print(f"{name}: the cold backup is already the newest copy.")
     return 0
 
 

@@ -1,6 +1,6 @@
 # 0042. Show where things are found on a MapLibre map, over OpenFreeMap tiles
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-22
 
 ## Context

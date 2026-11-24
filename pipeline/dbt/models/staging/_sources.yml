@@ -14,7 +14,7 @@ sources:
               - not_null
               - accepted_values:
                   arguments:
-                    values: [quantity, thing, verb, route, profile, job]
+                    values: [quantity, thing, verb, route, profile, job, override]
           - name: id
             data_tests: [not_null]
           - name: path
@@ -49,6 +49,49 @@ sources:
         columns:
           - name: dep_id
             data_tests: [unique, not_null]
+      - name: wikidata_things
+        description: >
+          The crosswalk from our things to Wikidata items (data/crosswalks/wikidata_things.csv, ADR 0043). It says which
+          item's statements a thing's quantities are read from.
+        columns:
+          - name: id
+            data_tests:
+              - unique
+              - not_null
+              - relationships:
+                  arguments:
+                    to: ref('stg_curated__documents')
+                    field: id
+          - name: wikidata
+            data_tests: [unique, not_null]
+          - name: notes
+            data_tests: [not_null]
+      - name: wikidata_quantities
+        description: >
+          Wikidata's best-ranked quantity statements for the crosswalked items, as the SPARQL query returned them, every
+          column as text (ADR 0043). Empty when no snapshot has been downloaded.
+        columns:
+          - name: item
+            data_tests: [not_null]
+          - name: property
+            data_tests: [not_null]
+          - name: amount
+            data_tests: [not_null]
+      - name: suppressed_records
+        description: >
+          Upstream records left out of the build because they don't belong: a duplicate, bad coordinates, the wrong
+          mineral (data/suppressions/suppressed_records.csv, ADR 0034). Not for unwelcome history.
+        columns:
+          - name: dataset
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: [mrds, wikidata]
+          - name: record_id
+            data_tests: [not_null]
+          - name: reason
+            data_tests: [not_null]
       - name: upstream_snapshots
         description: One row per upstream dataset loaded, with where and when it was retrieved, for provenance.
         columns:

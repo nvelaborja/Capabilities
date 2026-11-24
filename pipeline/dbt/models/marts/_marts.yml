@@ -11,6 +11,31 @@ models:
         data_tests: [unique, not_null]
       - name: provenance
         data_tests: [not_null]
+  - name: graph_facts
+    description: >
+      Where each quantity value in the graph comes from (build/graph/graph_facts.parquet, ADR 0043): one row per thing
+      and quantity, with the value used (an override, else the upstream value, else the curated one) and the others.
+    columns:
+      - name: id
+        description: The thing and the field, as hematite/quantities.hardness_mohs. One value per field.
+        data_tests: [unique, not_null]
+      - name: node_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('graph_nodes')
+                field: id
+      - name: field
+        data_tests: [not_null]
+      - name: layer
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [curated, upstream, override]
+      - name: value
+        data_tests: [not_null]
   - name: source_occurrences
     description: >
       Where each source kind is found: one row per source kind and located upstream record, with a point geometry

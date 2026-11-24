@@ -120,9 +120,9 @@ class TestWebUi:
 
 class TestOccurrences:
     @pytest.fixture(scope="class")
-    def mapped(self, repo_root, mrds_built_dir, tmp_path_factory) -> TestClient:
+    def mapped(self, repo_root, upstream_built_dir, tmp_path_factory) -> TestClient:
         """A server on a build with the 14-record MRDS sample."""
-        return TestClient(create_app(repo_root, web_dist=tmp_path_factory.mktemp("no-web-build"), build_dir=mrds_built_dir))
+        return TestClient(create_app(repo_root, web_dist=tmp_path_factory.mktemp("no-web-build"), build_dir=upstream_built_dir))
 
     def test_a_materials_places_are_the_occurrences_of_its_sources_as_geojson(self, mapped, graph):
         body = mapped.get("/api/occurrences/hematite").json()
@@ -140,11 +140,37 @@ class TestOccurrences:
         response = mapped.get("/api/occurrences/hematite", headers={"Accept-Encoding": "gzip"})
         assert response.headers["content-encoding"] == "gzip"
 
-    def test_without_a_snapshot_a_material_has_sources_but_no_places(self, client):
+    def test_with_nothing_downloaded_the_places_come_from_the_cold_backup(self, client):
         body = client.get("/api/occurrences/hematite").json()
-        assert body["sources"][0]["places"] == 0
-        assert body["features"]["features"] == []
-        assert body["datasets"] == []
+        assert body["sources"][0]["places"] == len(body["features"]["features"]) > 0
+        assert [dataset["id"] for dataset in body["datasets"]] == ["mrds"]
 
     def test_only_materials_and_sources_have_places(self, client):
         assert client.get("/api/occurrences/copper-saw").status_code == 404
+
+
+class TestProvenance:
+    @pytest.fixture(scope="class")
+    def upstream(self, repo_root, upstream_built_dir, tmp_path_factory) -> TestClient:
+        """A server on a build with the Wikidata sample, in which granite's hardness comes from Wikidata."""
+        return TestClient(create_app(repo_root, web_dist=tmp_path_factory.mktemp("no-web-build"), build_dir=upstream_built_dir))
+
+    def hardness(self, client: TestClient, node: str) -> dict:
+        about = client.post("/api/explain", json={"profile": "middle-kingdom-egypt", "node": node}).json()["about"]
+        return next(quantity for quantity in about["quantities"] if quantity["id"] == "hardness_mohs")
+
+    def test_an_upstream_value_names_its_dataset_and_record(self, upstream):
+        granite = self.hardness(upstream, "granite")
+        assert granite["value"] == "5–7 Mohs"
+        assert granite["source"]["layer"] == "upstream"
+        assert granite["source"]["upstream"]["dataset"] == "Wikidata"
+        assert granite["source"]["upstream"]["url"] == "https://www.wikidata.org/wiki/Q41177"
+
+    def test_an_upstream_value_that_agrees_shows_no_curated_value(self, upstream):
+        # The curated layer matches Wikidata (ADR 0043), so there is nothing to show beside it; the views' tests cover a
+        # value that disagrees.
+        assert "curated_value" not in self.hardness(upstream, "granite")["source"]
+
+    def test_a_curated_value_says_so(self, client):
+        # Flint has no Wikidata hardness, so its value is curated.
+        assert self.hardness(client, "flint")["source"] == {"layer": "curated"}

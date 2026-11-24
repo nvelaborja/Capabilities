@@ -2,7 +2,16 @@ import pytest
 
 from capabilities.levels import compute_levels
 from capabilities.reasoner import Selection, explore
-from capabilities.views import StatusContext, UnknownNode, explain, explain_edge, explore_view, graph_view, implied_by
+from capabilities.views import (
+    StatusContext,
+    UnknownNode,
+    explain,
+    explain_edge,
+    explore_view,
+    graph_view,
+    implied_by,
+    quantity_source,
+)
 
 
 def egypt(graph) -> Selection:
@@ -203,7 +212,7 @@ class TestExplain:
     @pytest.mark.parametrize(("node", "route_id", "row_id", "status", "reason"), [
         ("steel", "steel-by-carburizing", "carbon-source", "yes", "Met by charcoal."),
         ("bloom-iron", "bloomery-smelting", "iron-ore", "no", "No member is reachable (hematite, limonite (bog iron ore))."),
-        ("cut:granite", "cut-by-chiseling", "chisel", "no", "Copper chisel: hardness 2.5–3 Mohs; needs ≥ 6–7 Mohs (granite)."),
+        ("cut:granite", "cut-by-chiseling", "chisel", "no", "Copper chisel: hardness 2.5–3 Mohs; needs ≥ 5–7 Mohs (granite)."),
         ("shape:limestone", "shape-by-pounding", "pounder", "maybe",
          "Dolerite pounder: fracture toughness unknown; needs ≥ 0.62–0.68 MPa·√m (limestone)."),
         ("steel", "steel-by-crucible", "heat", "maybe",
@@ -234,7 +243,8 @@ class TestExplain:
     def test_about_says_what_a_thing_is_and_where_it_is_found(self, graph, levels):
         about = explain(graph, levels, context_for(graph, egypt(graph)), "granite")["about"]
         assert about["description"].startswith("A hard, coarse-grained igneous rock")
-        assert {"id": "hardness_mohs", "label": "Hardness", "value": "6–7 Mohs"} in about["quantities"]
+        hardness = next(quantity for quantity in about["quantities"] if quantity["id"] == "hardness_mohs")
+        assert (hardness["label"], hardness["value"], hardness["source"]["layer"]) == ("Hardness", "5–7 Mohs", "upstream")
         assert about["origin"] == "extracted" and "availability" not in about
         assert about["member_of"] == [{"id": "stone", "label": "Stone"}]
         assert about["references"][0]["doi"] == "10.1007/3-7643-7712-7_2"
@@ -334,3 +344,37 @@ class TestExplainEdge:
     def test_rejects_pairs_no_line_joins(self, graph, levels, source, target):
         with pytest.raises(UnknownNode):
             explain_edge(graph, levels, context_for(graph, egypt(graph)), source, target)
+
+
+class TestQuantitySource:
+    """Where a quantity value in the detail pane comes from (ADR 0043)."""
+
+    def granite_with(self, workshop, **fact) -> dict:
+        workshop.facts = {"granite/quantities.hardness_mohs": {
+            "layer": "upstream", "curated_value": [6, 7], "upstream_value": [5, 7], "disagrees": True,
+            "upstream": {"dataset": "wikidata", "record": "Q41177", "url": "https://www.wikidata.org/wiki/Q41177",
+                         "retrieved_at": "2026-11-24T00:14:22Z"},
+            "override": None, **fact,
+        }}
+        return quantity_source(workshop, "granite", "hardness_mohs")
+
+    def test_an_override_says_what_it_replaces_and_why(self, workshop):
+        source = self.granite_with(workshop, layer="override", override={
+            "reason": "Quartz and feldspar are 6 to 7.", "replaces": [5, 7], "stale": False,
+            "references": [{"citation": "Klein & Dutrow (2007).", "status": "unverified"}],
+        })
+        assert source["layer"] == "override"
+        assert source["override"] == {
+            "reason": "Quartz and feldspar are 6 to 7.", "replaces": "5–7 Mohs", "stale": False,
+            "references": [{"citation": "Klein & Dutrow (2007).", "status": "unverified"}],
+        }
+        # The upstream record is still named, so the reader can check it.
+        assert source["upstream"]["value"] == "5–7 Mohs"
+
+    def test_an_upstream_value_names_the_dataset_as_people_know_it(self, workshop):
+        source = self.granite_with(workshop)
+        assert source["upstream"]["dataset"] == "Wikidata"
+        assert source["curated_value"] == "6–7 Mohs"
+
+    def test_a_value_with_no_fact_is_curated(self, workshop):
+        assert quantity_source(workshop, "knife", "hardness_mohs") == {"layer": "curated"}

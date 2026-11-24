@@ -7,7 +7,6 @@ import {
   emptyReason,
   placesUnder,
   recordLinkText,
-  retrievedOn,
   safeLink,
   sourceLine,
   stateText,
@@ -89,11 +88,6 @@ describe("place text", () => {
     expect(whereText({ admin_area: "Colorado", country: "United States" })).toBe("Colorado, United States");
     expect(whereText({ admin_area: null, country: "Burma" })).toBe("Burma");
     expect(whereText({ admin_area: null, country: null })).toBe("Location name unknown");
-  });
-
-  it("dates the snapshot in UTC", () => {
-    expect(retrievedOn("2026-11-22T23:58:22Z")).toBe("22 Nov 2026");
-    expect(retrievedOn(null)).toBe("an unknown date");
   });
 });
 

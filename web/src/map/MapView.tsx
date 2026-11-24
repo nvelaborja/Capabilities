@@ -8,13 +8,13 @@ import { useEffect, useRef, useState } from "react";
 
 import { api } from "../api/client";
 import type { OccurrencesResponse, PlaceProperties } from "../api/types";
+import { retrievedOn } from "../lib/dates";
 import type { Theme } from "../state/theme";
 import {
   bounds,
   emptyReason,
   placesUnder,
   recordLinkText,
-  retrievedOn,
   safeLink,
   sourceLine,
   stateText,
