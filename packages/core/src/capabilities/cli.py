@@ -10,7 +10,17 @@ from pathlib import Path
 import yaml
 
 from .credits import cited_works, credits_path, refreshed, works_cited_markdown
-from .built import FACTS_FILE, NODES_FILE, OCCURRENCES_FILE, build_dir_for, current_graph, run_backup, run_build
+from .built import (
+    FACTS_FILE,
+    NODES_FILE,
+    OCCURRENCES_FILE,
+    QUEUE_FILE,
+    build_dir_for,
+    current_graph,
+    load_queue,
+    run_backup,
+    run_build,
+)
 from .graph import Graph, LoadError, find_root
 from .reasoner import Backward, Selection, assess_job, closure, explore, need_tree
 from .validate import validate
@@ -66,6 +76,11 @@ def build_parser() -> argparse.ArgumentParser:
     cmd = commands.add_parser("build", help="Build the graph the app reads, from the curated layer, with dbt.")
     cmd.set_defaults(handler=cmd_build)
 
+    cmd = commands.add_parser("queue", help="The curation queue: the gaps the last build found, most valuable first.")
+    cmd.add_argument("--kind", help="Only this kind, such as ore_candidate or route_unverified.")
+    cmd.add_argument("--limit", type=int, default=10, help="Items to show of each kind (default 10; 0 for all).")
+    cmd.set_defaults(handler=cmd_queue)
+
     cmd = commands.add_parser(
         "backup", help="Make the latest download of each upstream dataset its cold backup in snapshots/ (commit it)."
     )
@@ -108,10 +123,30 @@ def cmd_build(args, root: Path) -> int:
     upstream = ", ".join(f"{name} ({snapshot['copy']} of {snapshot['retrieved_at'][:10]})"
                          for name, snapshot in sorted(manifest["upstream"].items()))
     print(
-        f"Built the graph: {tables[NODES_FILE]} nodes, {tables[FACTS_FILE]} quantity values and "
-        f"{tables[OCCURRENCES_FILE]} source occurrences, from inputs {manifest['fingerprint'][:12]} "
+        f"Built the graph: {tables[NODES_FILE]} nodes, {tables[FACTS_FILE]} quantity values, "
+        f"{tables[OCCURRENCES_FILE]} source occurrences and {tables[QUEUE_FILE]} items to curate, "
+        f"from inputs {manifest['fingerprint'][:12]} "
         f"(upstream datasets: {upstream})."
     )
+    return 0
+
+
+def cmd_queue(args, root: Path) -> int:
+    build_dir = build_dir_for(root, args.build_dir)
+    current_graph(root, build_dir)  # builds first if the inputs changed
+    by_kind: dict[str, list[dict]] = {}
+    for item in load_queue(build_dir):
+        if not args.kind or item["kind"] == args.kind:
+            by_kind.setdefault(item["kind"], []).append(item)
+    if not by_kind:
+        print("Nothing to curate." if not args.kind else f"No {args.kind} items.")
+        return 0
+    for kind, items in by_kind.items():
+        print(f"{kind} ({len(items)})")
+        for item in items[: args.limit or None]:
+            print(f"  {item['label']}: {item['detail']}")
+        if args.limit and len(items) > args.limit:
+            print(f"  … and {len(items) - args.limit} more (--kind {kind} --limit 0 for all)")
     return 0
 
 

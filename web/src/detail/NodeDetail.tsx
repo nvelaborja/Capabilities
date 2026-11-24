@@ -241,6 +241,15 @@ function AboutSection({ about, statusOf, onDrill }: { about: About; statusOf: St
   return (
     <div className="about">
       {about.description && <p className="description">{about.description}</p>}
+      {about.upstream && (
+        <p className="detail-note node-source">
+          From {about.upstream.dataset} (
+          <a href={about.upstream.url} target="_blank" rel="noreferrer">
+            {about.upstream.record} ↗
+          </a>
+          ), brought in by <code>{about.upstream.crosswalk}</code>.
+        </p>
+      )}
       {about.target && (
         <p>
           Acting on{" "}

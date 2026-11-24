@@ -96,7 +96,8 @@ class TestCertainNeeds:
         assert "crucible" not in needs
 
     def test_a_category_needs_its_members(self, graph, levels):
-        assert graph_view(graph, levels)["needs"]["iron-ore"] == ["hematite", "limonite"]
+        # The curated members and the upstream ore minerals in the class (ADR 0045), by id.
+        assert graph_view(graph, levels)["needs"]["iron-ore"] == ["goethite", "hematite", "limonite", "magnetite", "siderite"]
 
     def test_only_drawn_nodes_are_listed(self, graph, levels):
         view = graph_view(graph, levels)
@@ -147,7 +148,9 @@ class TestExploreViewExtras:
 
     def test_near_misses_are_grouped_by_thing_and_name_what_is_missing(self, graph):
         near = {item["id"]: item for item in explore_view(graph, explore(graph, egypt(graph)))["near"]}
-        assert {r["missing"]["label"] for r in near["bloom-iron"]["routes"]} == {"Hematite deposit", "Bog iron deposit"}
+        assert {r["missing"]["label"] for r in near["bloom-iron"]["routes"]} == {
+            "Bog iron deposit", "Goethite deposit", "Hematite deposit", "Magnetite deposit", "Siderite deposit",
+        }
         assert near["bloom-iron"]["routes"][0]["missing"] == {"id": "bog-iron-deposit", "label": "Bog iron deposit", "kind": "source"}
         assert {r["id"] for r in near["steel"]["routes"]} == {"steel-by-carburizing", "steel-by-crucible"}
 
@@ -211,7 +214,7 @@ class TestExplain:
 
     @pytest.mark.parametrize(("node", "route_id", "row_id", "status", "reason"), [
         ("steel", "steel-by-carburizing", "carbon-source", "yes", "Met by charcoal."),
-        ("bloom-iron", "bloomery-smelting", "iron-ore", "no", "No member is reachable (hematite, limonite (bog iron ore))."),
+        ("bloom-iron", "bloomery-smelting", "iron-ore", "no", "No member is reachable (goethite, hematite, limonite (bog iron ore), magnetite, …)."),
         ("cut:granite", "cut-by-chiseling", "chisel", "no", "Copper chisel: hardness 2.5–3 Mohs; needs ≥ 5–7 Mohs (granite)."),
         ("shape:limestone", "shape-by-pounding", "pounder", "maybe",
          "Dolerite pounder: fracture toughness unknown; needs ≥ 0.62–0.68 MPa·√m (limestone)."),
@@ -231,7 +234,10 @@ class TestExplain:
 
     def test_drill_down_works_on_categories(self, graph, levels):
         view = explain(graph, levels, context_for(graph, egypt(graph)), "iron-ore")
-        assert [(m["id"], m["status"]) for m in view["members"]] == [("hematite", "near"), ("limonite", "near")]
+        assert [(m["id"], m["status"]) for m in view["members"]] == [
+            # Ranked by level, then name: bog iron is dug, a step after the mined ores.
+            ("goethite", "near"), ("hematite", "near"), ("magnetite", "near"), ("siderite", "near"), ("limonite", "near"),
+        ]
 
     def test_expand_all_lists_every_certain_need_by_level(self, graph, levels):
         view = explain(graph, levels, context_for(graph, egypt(graph)), "steel", everything=True)

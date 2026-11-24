@@ -452,7 +452,23 @@ def about(graph: Graph, key: str) -> dict:
     for field in ("notes", "origin", "availability", "regions", "era"):
         if thing.get(field):
             view[field] = thing[field].strip() if isinstance(thing[field], str) else thing[field]
+    if upstream := node_source(graph, key):
+        view["upstream"] = upstream
     return view
+
+
+def node_source(graph: Graph, node_id: str) -> dict | None:
+    """Where a node that came from upstream came from (ADR 0045): its dataset and record, and the crosswalk that
+    brought it in. None for a curated node."""
+    provenance = graph.upstream_nodes.get(node_id)
+    if not provenance:
+        return None
+    return {
+        "dataset": DATASET_LABELS.get(provenance["dataset"], provenance["dataset"]),
+        "record": provenance["record"],
+        "url": provenance["url"],
+        "crosswalk": provenance["crosswalk"],
+    }
 
 
 # How upstream datasets are named in the app.

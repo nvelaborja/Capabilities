@@ -34,7 +34,7 @@ class TestCli:
         assert main(["--root", str(repo_root), "--build-dir", str(tmp_path / "build"), "build"]) == 0
         output = capsys.readouterr().out
         # Nothing has been downloaded into a new build directory, so the cold backups are used.
-        assert " source occurrences, from inputs " in output
+        assert " source occurrences and " in output and " items to curate, from inputs " in output
         assert "mrds_deposits (backup of 2026-11-22)" in output
 
     @pytest.mark.parametrize(

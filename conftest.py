@@ -86,13 +86,17 @@ def sample_rows():
 # Four real Wikidata hardness statements (CC0), retrieved 2026-11-24, for hematite, limonite, granite and copper. Our
 # curated values match them since ADR 0043 was accepted; tests that need a disagreement change a curated value.
 WIKIDATA_SAMPLE = REPO_ROOT / "pipeline" / "tests" / "fixtures" / "wikidata-sample.csv"
+# The same items' labels, descriptions and formulas, with azurite and chalcopyrite from the ore crosswalk (CC0, 2026-11-24).
+WIKIDATA_ITEMS_SAMPLE = REPO_ROOT / "pipeline" / "tests" / "fixtures" / "wikidata-items-sample.csv"
 
 
 class _SparqlEndpoint(BaseHTTPRequestHandler):
     def do_POST(self):
         body = self.rfile.read(int(self.headers["Content-Length"])).decode()
-        self.server.queries.append(parse_qs(body)["query"][0])
-        result = WIKIDATA_SAMPLE.read_bytes()
+        query = parse_qs(body)["query"][0]
+        self.server.queries.append(query)
+        # Each of our two queries gets its own sample: the labels query asks for rdfs:label.
+        result = (WIKIDATA_ITEMS_SAMPLE if "rdfs:label" in query else WIKIDATA_SAMPLE).read_bytes()
         self.send_response(200)
         self.send_header("Content-Type", "text/csv")
         self.send_header("Content-Length", str(len(result)))
@@ -105,8 +109,8 @@ class _SparqlEndpoint(BaseHTTPRequestHandler):
 
 @pytest.fixture(scope="session")
 def wikidata_endpoint():
-    """A local stand-in for Wikidata's SPARQL endpoint, so tests never use the network: it answers every query with the
-    sample and keeps the queries it was sent."""
+    """A local stand-in for Wikidata's SPARQL endpoint, so tests never use the network: it answers each query with the
+    matching sample and keeps the queries it was sent."""
     server = ThreadingHTTPServer(("127.0.0.1", 0), _SparqlEndpoint)
     server.queries = []
     threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -119,11 +123,12 @@ def upstream_built_dir(tmp_path_factory, mrds_zip, wikidata_endpoint) -> Path:
     """The repository's graph built once with snapshots of the MRDS and Wikidata samples, so it has source occurrences
     and upstream quantity values."""
     from capabilities.built import run_build
-    from capabilities_pipeline.upstream import MRDS, WIKIDATA, fetch
+    from capabilities_pipeline.upstream import MRDS, WIKIDATA, WIKIDATA_ITEMS, fetch
 
     build_dir = tmp_path_factory.mktemp("upstream-build")
     fetch(MRDS, build_dir, mrds_zip(tmp_path_factory.mktemp("mrds-download")))
     fetch(WIKIDATA, build_dir, wikidata_endpoint.url, root=REPO_ROOT)
+    fetch(WIKIDATA_ITEMS, build_dir, wikidata_endpoint.url, root=REPO_ROOT)
     run_build(REPO_ROOT, build_dir)
     return build_dir
 

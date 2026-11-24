@@ -2,7 +2,7 @@
 
 A build directory holds `graph/graph_nodes.parquet` (one row per node, its full document as JSON, and its provenance),
 `graph/graph_facts.parquet` (where each quantity value comes from: upstream, curated or an override, ADR 0043),
-`graph/source_occurrences.parquet` (where sources are found, from upstream datasets, ADR 0036 and ADR 0041) and
+`graph/curation_queue.parquet` (the gaps the build found, ADR 0045), `graph/source_occurrences.parquet` (where sources are found, from upstream datasets, ADR 0036 and ADR 0041) and
 `graph/manifest.json`, which records the fingerprint of the inputs it was built from. A build is current when
 that fingerprint matches the inputs on disk now; otherwise the question commands and the server rebuild first.
 """
@@ -19,9 +19,10 @@ from pathlib import Path
 from .graph import Graph, LoadError
 
 # Bump when the artifact's shape changes, so older builds are rebuilt rather than misread.
-FORMAT_VERSION = 3
+FORMAT_VERSION = 4
 NODES_FILE = "graph_nodes.parquet"
 FACTS_FILE = "graph_facts.parquet"
+QUEUE_FILE = "curation_queue.parquet"
 OCCURRENCES_FILE = "source_occurrences.parquet"
 MANIFEST_FILE = "manifest.json"
 SNAPSHOT_FILE = "snapshot.json"
@@ -111,6 +112,10 @@ def load_built(root: Path, build_dir: Path) -> Graph:
     ).fetchall()
     graph = Graph.from_documents(root, ((node_type, json.loads(document), provenance) for node_type, document, provenance in rows))
     graph.facts = load_facts(build_dir)
+    for _, document, provenance in rows:
+        source = json.loads(provenance)
+        if source.get("layer") == "upstream":
+            graph.upstream_nodes[json.loads(document)["id"]] = source
     return graph
 
 
@@ -165,6 +170,24 @@ def current_graph(root: Path, build_dir: Path | None = None) -> Graph:
         print("The built graph is missing or out of date; building it now…", file=sys.stderr)
         run_build(root, build_dir)
     return load_built(root, build_dir)
+
+
+QUEUE_COLUMNS = ("id", "kind", "subject", "label", "detail", "priority")
+
+
+def load_queue(build_dir: Path) -> list[dict]:
+    """The curation queue (ADR 0045): the gaps the build found, most valuable first within each kind."""
+    import duckdb
+
+    path = graph_dir(build_dir) / QUEUE_FILE
+    if not path.is_file():
+        return []
+    rows = duckdb.sql(
+        f"select {', '.join(QUEUE_COLUMNS)} from read_parquet(?) where id is not null "
+        "order by kind, priority desc nulls last, subject",
+        params=[str(path)],
+    ).fetchall()
+    return [dict(zip(QUEUE_COLUMNS, row)) for row in rows]
 
 
 def run_backup(root: Path, build_dir: Path) -> dict[str, dict | None]:

@@ -5,7 +5,7 @@
 -- upstream datasets are the master set for what they cover; a curated value that disagrees stays visible, and an
 -- override is how we say an upstream value is wrong.
 with crosswalk as (
-    select id as thing_id, wikidata as record_id from {{ source('raw', 'wikidata_things') }}
+    select * from {{ ref('stg_crosswalk__wikidata_items') }}
 ),
 
 suppressed as (

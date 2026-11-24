@@ -197,7 +197,8 @@ class TestExplore:
         # when: exploring
         near = {miss["thing"]: miss for miss in explore(graph, egypt(graph)).near_misses}
         # then: hardened steel is one step away, because one ore unlocks bloom iron, steel and hardened steel at once
-        assert near["hardened-steel"]["missing"] in {"hematite-deposit", "limonite"}
+        # (any iron ore will do: the curated hematite and bog iron, or an upstream ore mineral's deposit, ADR 0045)
+        assert near["hardened-steel"]["missing"] in {"goethite-deposit", "hematite-deposit", "limonite", "magnetite-deposit", "siderite-deposit"}
 
 
 class TestExtraction:

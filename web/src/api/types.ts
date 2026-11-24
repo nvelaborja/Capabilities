@@ -194,6 +194,8 @@ export interface About {
   era?: string;
   quantities?: Quantity[];
   member_of?: Named[];
+  /** A node that came from upstream: its dataset and record, and the crosswalk that brought it in (ADR 0045). */
+  upstream?: { dataset: string; record: string; url: string; crosswalk: string };
   /** Actions: what is being acted on. */
   target?: Named;
   references: Reference[];

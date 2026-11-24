@@ -108,6 +108,8 @@ class Graph:
     # Where each quantity value of a built graph came from, by fact id ("granite/quantities.hardness_mohs", ADR 0043).
     # Empty for the curated graph, where every value is curated.
     facts: dict[str, dict] = field(default_factory=dict)
+    # Where each node of a built graph that came from upstream came from (ADR 0045), by id. Empty for the curated graph.
+    upstream_nodes: dict[str, dict] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         self.routes_achieving: dict[str, list[str]] = {}

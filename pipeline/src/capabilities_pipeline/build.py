@@ -19,6 +19,7 @@ from capabilities.built import (
     MANIFEST_FILE,
     NODES_FILE,
     OCCURRENCES_FILE,
+    QUEUE_FILE,
     fingerprint,
     graph_dir,
 )
@@ -55,7 +56,10 @@ def write_manifest(root: Path, build_dir: Path) -> dict:
         "fingerprint": loaded_fingerprint(build_dir),
         "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "git_commit": git_commit(root),
-        "tables": {name: row_count(graph_dir(build_dir) / name) for name in (NODES_FILE, FACTS_FILE, OCCURRENCES_FILE)},
+        "tables": {
+            name: row_count(graph_dir(build_dir) / name)
+            for name in (NODES_FILE, FACTS_FILE, OCCURRENCES_FILE, QUEUE_FILE)
+        },
         "upstream": loaded_snapshots(build_dir),
     }
     (graph_dir(build_dir) / MANIFEST_FILE).write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
