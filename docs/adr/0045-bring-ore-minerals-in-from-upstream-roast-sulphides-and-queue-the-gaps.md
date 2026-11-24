@@ -1,6 +1,6 @@
 # 0045. Bring ore minerals in from upstream, roast copper sulphides, and queue the gaps
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-24
 
 ## Context
