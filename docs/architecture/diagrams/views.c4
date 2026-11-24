@@ -49,7 +49,7 @@ views {
       include capabilities.curated
     }
     group '1b Download upstream (Dagster)' {
-      include mrds, wikidata
+      include mrds, wikidata, pleiades
       include capabilities.pipeline.dagster, capabilities.pipeline.downloader
       include capabilities.snapshots, capabilities.backups
     }
@@ -58,11 +58,12 @@ views {
       include capabilities.warehouse.rawDocuments, capabilities.warehouse.rawCrosswalk, capabilities.warehouse.rawWikidataCrosswalk
       include capabilities.warehouse.rawOreMinerals, capabilities.warehouse.rawWikidataItems, capabilities.warehouse.rawSuppressions
       include capabilities.warehouse.rawWikidata, capabilities.warehouse.rawMrds, capabilities.warehouse.rawSnapshots, capabilities.warehouse.rawLoads
+      include capabilities.warehouse.rawPleiades, capabilities.warehouse.rawPleiadesRules
     }
     group '3a/3b Transform and test (dbt)' {
       include capabilities.pipeline.dbt
       include capabilities.warehouse.stgDocuments, capabilities.warehouse.stgCuratedQuantities, capabilities.warehouse.stgWikidata
-      include capabilities.warehouse.stgOreNodes, capabilities.warehouse.stgMrds
+      include capabilities.warehouse.stgOreNodes, capabilities.warehouse.stgMrds, capabilities.warehouse.stgPleiades
       include capabilities.artifact.graphNodes, capabilities.artifact.graphFacts, capabilities.artifact.queue, capabilities.artifact.occurrences
     }
     group '4 Publish' {
@@ -82,6 +83,7 @@ views {
     exclude capabilities.pipeline.dagster -> capabilities.pipeline.dbt
     exclude capabilities.pipeline.downloader -> mrds
     exclude capabilities.pipeline.downloader -> wikidata
+    exclude capabilities.pipeline.downloader -> pleiades
     exclude capabilities.pipeline.downloader -> capabilities.curated
     autoLayout LeftRight
   }

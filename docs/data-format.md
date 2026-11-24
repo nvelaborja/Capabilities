@@ -23,7 +23,7 @@ data/
   verbs/                 parameterized actions: cut, drill, shape, finish (target), move (load)
   routes/                ways to obtain things, produce effects, or perform verbs
   profiles/              curated starting sets (e.g. Middle Kingdom Egypt)
-  crosswalks/            CSV tables matching upstream records to our ids (MRDS deposits to source kinds, things to Wikidata items, ore minerals that join the graph)
+  crosswalks/            CSV tables matching upstream records to our ids (MRDS deposits to source kinds, things to Wikidata items, ore minerals that join the graph, rules placing Pleiades mines and quarries)
   overrides/             replacements for upstream values we believe are wrong, with the reason and references
   suppressions/          upstream records left out of the build, with why
   LICENSE                CC BY-NC-SA 4.0 (the data); the code is PolyForm Noncommercial 1.0.0
@@ -193,6 +193,22 @@ siderite,Q192669,Siderite,iron-ore,mine-hematite,"Föll, H. ...",https://...,"Si
 
 Add a mineral only with a reference that it was smelted as its class says; leave it in the curation queue otherwise (`uv run capabilities queue`). Rejecting a mineral (`none`, with the reference that says why) takes it off the queue. After adding rows, query Wikidata again, as for `wikidata_things.csv`.
 
+`pleiades_sources.csv` places Pleiades' ancient mines and quarries at our sources and ore classes, with the years they are attested ([ADR 0046](adr/0046-place-ancient-mines-and-quarries-from-pleiades.md)). One row per rule:
+
+| Column | Meaning |
+|---|---|
+| `target` | A source (`granite-outcrop`), or an ore class (`copper-ore`) when the place doesn't say which ore was mined |
+| `places` | `mine` or `quarry`. Pleiades' deprecated "mine, quarry" type counts as both |
+| `word` | What the place must name: one of its tags, or a whole word in its title or description ("Iron Age" doesn't count as iron) |
+| `notes` | Why the rule is right |
+
+```csv
+target,places,word,notes
+copper-ore,mine,copper,"A copper mine: which ore isn't recorded, so the place belongs to the class."
+```
+
+Matching needn't be perfect: where a material was found matters least to the app's questions. Suppress a wrong match (dataset `pleiades`); unmatched mines and quarries are the last kind in the curation queue.
+
 ### Override (`data/overrides/*.yaml`)
 
 Replaces an upstream value we believe is wrong. Upstream sources are never edited; the build applies the override and the app shows it beside the value it replaces ([ADR 0043](adr/0043-take-quantities-from-wikidata-with-upstream-first-and-overrides.md)).
@@ -217,7 +233,7 @@ Upstream records left out of the build: a duplicate, bad coordinates, the wrong 
 
 | Column | Meaning |
 |---|---|
-| `dataset` | `mrds` (a deposit, by `dep_id`) or `wikidata` (an item, by Q id) |
+| `dataset` | `mrds` (a deposit, by `dep_id`), `wikidata` (an item, by Q id) or `pleiades` (a place, by its id) |
 | `record_id` | The record |
 | `reason` | Why it doesn't belong |
 
