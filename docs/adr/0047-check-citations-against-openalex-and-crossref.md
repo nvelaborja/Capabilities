@@ -1,6 +1,6 @@
 # 0047. Check citations against OpenAlex and Crossref
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-24
 
 ## Context
