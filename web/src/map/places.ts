@@ -40,16 +40,22 @@ export function stateText(
   place: Pick<PlaceProperties, "state" | "worked_by_year"> & Partial<Pick<PlaceProperties, "attested_from" | "attested_to">>,
 ): string {
   if (place.state === "worked" && place.worked_by_year !== null) return `Known to have been worked by ${place.worked_by_year}`;
+  // Pleiades: worked when it is attested, which may be modern only. Such a place still shows the material was there.
   if (place.state === "worked" && place.attested_from != null && place.attested_to != null) {
-    return `Worked in antiquity: attested ${yearText(place.attested_from)} – ${yearText(place.attested_to)}`;
+    return `Worked: attested ${yearText(place.attested_from)} – ${untilText(place.attested_to, new Date().getFullYear())}`;
   }
-  if (place.state === "worked") return "Worked in antiquity";
+  if (place.state === "worked") return "Worked, with no recorded dates";
   return "Present, with no known working date";
 }
 
 /** A year as historians write it: 330 BC, AD 640. Negative years are BC; there is no year zero. */
 export function yearText(year: number): string {
   return year < 0 ? `${-year} BC` : `AD ${year}`;
+}
+
+/** The end of an attested range: "the present" for Pleiades' modern periods, which end in years still to come (2100). */
+export function untilText(year: number, thisYear: number): string {
+  return year > thisYear ? "the present" : yearText(year);
 }
 
 /** Pleiades' periods in words, "Hellenistic republican, Roman, Late antique"; null when there are none. */

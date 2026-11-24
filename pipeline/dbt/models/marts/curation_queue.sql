@@ -114,6 +114,10 @@ unplaced_workings as (
     from {{ ref('stg_pleiades__workings') }}
     where latitude is not null and longitude is not null
         and record_id not in (select record_id from pleiades_placed)
+        -- A suppressed place was looked at and left out: it isn't a gap.
+        and record_id not in (
+            select record_id from {{ source('raw', 'suppressed_records') }} where dataset = 'pleiades'
+        )
 ),
 
 unmatched_places as (

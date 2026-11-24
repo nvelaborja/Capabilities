@@ -257,7 +257,7 @@ Tests: `ordinal` unique and not null; `id` unique and not null, across every typ
 | `worked_by_year` | The year by which it is known to have been worked: the first production year, unless production began only "after" it. |
 | `state` | MRDS: `worked` if `worked_by_year` is known, otherwise `present` ("present, not known to be worked by then"). Pleiades: always `worked`, with `worked_by_year` empty (it needs each period's end year; M4). |
 | `attested_from`, `attested_to`, `periods` | Pleiades: the years it is attested from and to, and its periods. Null for MRDS. |
-| `approximate` | Pleiades: true unless its location is precise. False for MRDS. |
+| `approximate` | Pleiades: true unless its location is precise. Null for MRDS, which doesn't say. |
 | `matched_on` | The rule that matched, e.g. `ore: Hematite`, `tag: copper` or `text: copper`. |
 | `provenance` | `{"layer": "upstream", "dataset": "mrds" or "pleiades", "record": ..., "url": ..., "retrieved_at": ...}`. |
 
@@ -281,7 +281,7 @@ The marts' `external` materialization (a dbt-duckdb feature) writes each result 
 | `priority` | For ore candidates, the number of MRDS deposits of copper, iron or tin listing the mineral as an ore; for unmatched places, the number of places; otherwise null. |
 | `evidence` | JSON: the deposits and metals for a candidate, the values behind a disagreement, and so on. |
 
-An ore candidate is a mineral listed on at least 20 such deposits and not yet reviewed: in neither the ore crosswalk nor `mrds_sources`. An unmatched place group is the located Pleiades mines and quarries that no rule matches, by a material they name (gold, marble…), or naming none. They come last, after every other kind: where a material was found matters least to the app's questions ([ADR 0046](../adr/0046-place-ancient-mines-and-quarries-from-pleiades.md)). Tests: `id` unique and not null; `kind` one of the seven; `detail` not null. With the 2026-11-24 snapshots there are 221 items: 135 ore candidates (galena first, on 6,326 deposits), 49 routes with only unverified references, 2 sources with no places, and 35 groups of unmatched places (236 naming no material, then gold, 100). `uv run capabilities queue` prints them.
+An ore candidate is a mineral listed on at least 20 such deposits and not yet reviewed: in neither the ore crosswalk nor `mrds_sources`. An unmatched place group is the located Pleiades mines and quarries that no rule matches and none suppressed, by a material they name (gold, marble…), or naming none. They come last, after every other kind: where a material was found matters least to the app's questions ([ADR 0046](../adr/0046-place-ancient-mines-and-quarries-from-pleiades.md)). Tests: `id` unique and not null; `kind` one of the seven; `detail` not null. With the 2026-11-24 snapshots there are 221 items: 135 ore candidates (galena first, on 6,326 deposits), 49 routes with only unverified references, 2 sources with no places, and 35 groups of unmatched places (236 naming no material, then gold, 100). `uv run capabilities queue` prints them.
 
 ### 4. Publish
 

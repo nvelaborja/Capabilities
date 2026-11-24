@@ -51,4 +51,4 @@ Each file records one significant design decision: the context, what we decided,
 | [0043](0043-take-quantities-from-wikidata-with-upstream-first-and-overrides.md) | Take quantities from Wikidata, upstream first, with overrides | Accepted; keeping curated values that match upstream superseded by 0044 |
 | [0044](0044-require-every-upstream-dataset-with-cold-backups-in-git.md) | Require every upstream dataset, with cold backups in git | Accepted |
 | [0045](0045-bring-ore-minerals-in-from-upstream-roast-sulphides-and-queue-the-gaps.md) | Bring ore minerals in from upstream, roast copper sulphides, and queue the gaps | Accepted |
-| [0046](0046-place-ancient-mines-and-quarries-from-pleiades.md) | Place ancient mines and quarries from Pleiades | Proposed |
+| [0046](0046-place-ancient-mines-and-quarries-from-pleiades.md) | Place ancient mines and quarries from Pleiades | Accepted |

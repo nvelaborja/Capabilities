@@ -61,9 +61,16 @@ class TestWhatAPlaceSays:
         assert list(agrokipia["periods"]) == ["archaic", "classical", "hellenistic-republican", "roman"]
         assert agrokipia["url"] == "https://pleiades.stoa.org/places/707452"
 
-    def test_a_rough_location_is_marked_approximate(self, upstream_built_dir):
+    def test_a_rough_location_is_marked_approximate_and_mrds_doesnt_say(self, upstream_built_dir):
         assert occurrences_of(upstream_built_dir, "Temesa Copper Mines")["copper-ore"]["approximate"] is True
         assert occurrences_of(upstream_built_dir, "Agrokipia")["copper-ore"]["approximate"] is False
+        assert {row["approximate"] for row in load_occurrences(upstream_built_dir) if row["dataset"] == "mrds"} == {None}
+
+    def test_a_place_attested_only_in_modern_times_stays_since_the_material_was_there(self, graph, built_dir):
+        # given: Bou Khenndak Copper Mines, attested AD 2000-2099 only
+        (place,) = [row for row in load_occurrences(built_dir) if row["name"] == "Bou Khenndak Copper Mines"
+                    and row["source_id"] == "copper-ore"]
+        assert (place["state"], place["attested_from"]) == ("worked", 2000)
 
 
 class TestCurationQueue:
@@ -76,11 +83,18 @@ class TestCurationQueue:
 
 
 class TestCuration:
-    def test_a_suppressed_place_is_left_out(self, data_copy, tmp_path):
+    def test_a_suppressed_place_is_left_out_and_isnt_queued_as_unmatched(self, data_copy, tmp_path):
+        # given: Agrokipia (copper) and Dolaucothi (gold, unmatched) suppressed
         suppressions = data_copy / "data" / "suppressions" / "suppressed_records.csv"
-        suppressions.write_text(suppressions.read_text() + "pleiades,707452,Testing a suppression.\n", encoding="utf-8")
+        suppressions.write_text(
+            suppressions.read_text() + "pleiades,707452,Testing a suppression.\npleiades,82301,Testing a suppression.\n",
+            encoding="utf-8",
+        )
         build(data_copy, tmp_path / "build")
-        assert not [row for row in load_occurrences(tmp_path / "build") if row["record_id"] == "707452"]
+        assert not [row for row in load_occurrences(tmp_path / "build") if row["record_id"] in ("707452", "82301")]
+        # then: it was looked at, so it isn't a gap either
+        gold = next(item for item in load_queue(tmp_path / "build") if item["subject"] == "pleiades:gold")
+        assert gold["priority"] == 99  # 100 gold mines and quarries on 2026-11-24, less Dolaucothi
 
     def test_a_rule_may_only_place_at_a_source_or_a_class(self, data_copy, tmp_path):
         rules = data_copy / "data" / "crosswalks" / "pleiades_sources.csv"

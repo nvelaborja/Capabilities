@@ -96,7 +96,7 @@ function Summary({ places }: { places: OccurrencesResponse }) {
           <summary>Key and data source</summary>
           <ul className="map-legend" aria-label="Legend">
             <li>
-              <span className="map-key map-key-worked" aria-hidden="true" /> Known to have been worked: by a given year, or in antiquity
+              <span className="map-key map-key-worked" aria-hidden="true" /> Known to have been worked: by a given year, or in the periods it is attested
             </li>
             <li>
               <span className="map-key map-key-present" aria-hidden="true" /> Present, with no known working date

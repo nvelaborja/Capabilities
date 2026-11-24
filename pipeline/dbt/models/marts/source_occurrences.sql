@@ -97,7 +97,8 @@ select
     null::integer as attested_from,
     null::integer as attested_to,
     null::varchar[] as periods,
-    false as approximate,
+    -- MRDS doesn't say how precise its coordinates are.
+    null::boolean as approximate,
     matched_on,
     record_quality,
     url,
@@ -130,7 +131,8 @@ select
     null::varchar[] as commodities,
     null::integer as first_production_year,
     null as first_production_qualifier,
-    -- Listed because it was worked in antiquity. The year it was worked by needs each period's end (M4).
+    -- Worked when it is attested, perhaps only in modern times, which still shows the material was there to be used.
+    -- The year it was certainly worked by needs each period's end year (M4).
     null::integer as worked_by_year,
     'worked' as state,
     attested_from,

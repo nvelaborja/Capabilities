@@ -12,6 +12,7 @@ import {
   safeLink,
   sourceLine,
   stateText,
+  untilText,
   whereText,
   yearText,
 } from "./places";
@@ -141,10 +142,18 @@ describe("placesUnder", () => {
 });
 
 describe("Pleiades places (ADR 0046)", () => {
-  it("says an ancient working was worked, with the years it is attested, BC and AD", () => {
+  it("says a working was worked, with the years it is attested, BC and AD", () => {
     const place = { state: "worked" as const, worked_by_year: null, attested_from: -330, attested_to: 640 };
-    expect(stateText(place)).toBe("Worked in antiquity: attested 330 BC – AD 640");
+    expect(stateText(place)).toBe("Worked: attested 330 BC – AD 640");
     expect([yearText(-750), yearText(300)]).toEqual(["750 BC", "AD 300"]);
+    expect(stateText({ state: "worked", worked_by_year: null, attested_from: null, attested_to: null })).toBe(
+      "Worked, with no recorded dates",
+    );
+  });
+
+  it("says a range that runs into Pleiades' modern periods runs to the present, never to a year to come", () => {
+    expect(untilText(2100, 2026)).toBe("the present");
+    expect([untilText(2026, 2026), untilText(1999, 2026)]).toEqual(["AD 2026", "AD 1999"]);
   });
 
   it("names the periods in words, whether the API's list or MapLibre's JSON string", () => {

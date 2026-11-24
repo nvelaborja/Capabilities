@@ -1,6 +1,6 @@
 # 0046. Place ancient mines and quarries from Pleiades
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-24
 
 ## Context
@@ -24,9 +24,9 @@ The user's view: where a material was found is among the least important things 
 
 **A class can have places.** An occurrence's `source_id` is a source or an ore class. A material extracted from the ground is shown at its own sources' places and at its classes' places, which the map marks "Copper ore mined here; which ore isn't recorded". The reasoner doesn't read places yet, so nothing else changes.
 
-**A Pleiades place is worked, with the years it is attested.** Occurrences gain `attested_from`, `attested_to` (years, negative BC), `periods` (Pleiades' keys) and `approximate` (true unless Pleiades calls the location precise). Rough and related locations are kept, marked "Approximate location". `worked_by_year` stays empty for Pleiades: the year a place was certainly worked by is the end of its earliest attested period, which needs Pleiades' period vocabulary, another dataset. M4, which compares places with a profile's date, brings it in if it needs it.
+**A Pleiades place is worked, with the years it is attested.** Occurrences gain `attested_from`, `attested_to` (years, negative BC), `periods` (Pleiades' keys) and `approximate` (true unless Pleiades calls the location precise; null for MRDS, which doesn't say). Not every place was worked in antiquity: two placed on 2026-11-24 are attested only in modern times (Bou Khenndak Copper Mines, AD 2000–2099; Isole della Marmorata, 1700–2100). They stay: a material worked today was there to be used in the past, which is what the map shows. So the map says "Worked: attested …", never "in antiquity", and a range running into Pleiades' modern periods, which end in 2099 or 2100, ends at "the present". Rough and related locations are kept, marked "Approximate location". `worked_by_year` stays empty for Pleiades: the year a place was certainly worked by is the end of its earliest attested period, which needs Pleiades' period vocabulary, another dataset. M4, which compares places with a profile's date, brings it in if it needs it.
 
-**Unmatched mines and quarries are queued last.** The curation queue gains `unmatched_place`: located mines and quarries no rule matches, one item per material they name (gold, marble…) and one for those naming none, ranked by count. It is ordered after every other kind: placing a material matters least to the app's questions.
+**Unmatched mines and quarries are queued last.** The curation queue gains `unmatched_place`: located mines and quarries no rule matches and none suppressed, one item per material they name (gold, marble…) and one for those naming none, ranked by count. It is ordered after every other kind: placing a material matters least to the app's questions.
 
 ## Consequences
 
