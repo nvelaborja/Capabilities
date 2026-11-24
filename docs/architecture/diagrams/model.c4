@@ -22,7 +22,7 @@ model {
   }
 
   wikidata = external 'Wikidata' {
-    description 'The free knowledge base of Wikimedia, CC0. Its SPARQL endpoint (query.wikidata.org) answers one query for the quantity statements (Mohs hardness) of the items our things are matched to (ADR 0043).'
+    description 'The free knowledge base of Wikimedia, CC0. Its SPARQL endpoint (query.wikidata.org) answers two queries about the items our things and ore minerals are matched to: their quantity statements (Mohs hardness, ADR 0043), and their labels, descriptions and formulas (ADR 0045).'
   }
 
   capabilities = system 'Capabilities' {
@@ -80,6 +80,12 @@ model {
       rawWikidataCrosswalk = table 'raw.wikidata_things' {
         description 'The crosswalk from our things to Wikidata items (data/crosswalks/wikidata_things.csv): id, wikidata, notes.'
       }
+      rawOreMinerals = table 'raw.ore_minerals' {
+        description 'The hand-kept crosswalk of ore minerals that join the graph (data/crosswalks/ore_minerals.csv): Wikidata item, MRDS name, ore class, the route it is mined like, and its reference.'
+      }
+      rawWikidataItems = table 'raw.wikidata_items' {
+        description 'The Wikidata items snapshot: the label, description and chemical formula of each crosswalked item, as text.'
+      }
       rawSuppressions = table 'raw.suppressed_records' {
         description 'Upstream records left out of the build, with why (data/suppressions/suppressed_records.csv).'
       }
@@ -107,6 +113,10 @@ model {
         technology 'dbt view'
         description 'Wikidata statements typed: amount, low and high (the bounds, or the amount).'
       }
+      stgOreNodes = table 'stg_ore_minerals__nodes, stg_wikidata__items, stg_crosswalk__wikidata_items' {
+        technology 'dbt views'
+        description 'The upstream nodes: for each ore mineral, a material named from Wikidata, its deposit, and a mining route cloned from a curated one (ADR 0045).'
+      }
       stgMrds = table 'stg_mrds__deposits' {
         technology 'dbt view'
         description 'MRDS deposits typed: coordinates as numbers, ore minerals and commodities as lists, first production year and qualifier.'
@@ -125,6 +135,10 @@ model {
       graphFacts = file 'graph_facts.parquet' {
         technology 'dbt mart, external materialization'
         description 'Where each quantity value comes from: one row per thing and quantity, with the value used (override, else upstream, else curated), the value from each layer, whether they disagree, the upstream record and the override (ADR 0043).'
+      }
+      queue = file 'curation_queue.parquet' {
+        technology 'dbt mart, external materialization'
+        description 'The gaps the build found, most valuable first: ore candidates from MRDS, extracted materials with no route, sources with no places, routes with only unverified references, disagreements and stale overrides (ADR 0045).'
       }
       occurrences = file 'source_occurrences.parquet' {
         technology 'dbt mart, external materialization, GeoParquet'
@@ -157,7 +171,7 @@ model {
       }
       cli = component 'CLI' {
         technology 'argparse (`capabilities`)'
-        description 'validate, build, backup, need, explore, check, credits, serve.'
+        description 'validate, build, backup, queue, need, explore, check, credits, serve.'
       }
     }
 
@@ -219,6 +233,8 @@ model {
   capabilities.pipeline.loader -> capabilities.warehouse.rawSnapshots 'records each snapshot loaded'
   capabilities.pipeline.loader -> capabilities.warehouse.rawWikidataCrosswalk 'loads the crosswalk, as text'
   capabilities.pipeline.loader -> capabilities.warehouse.rawSuppressions 'loads the suppressions, as text'
+  capabilities.pipeline.loader -> capabilities.warehouse.rawOreMinerals 'loads the ore crosswalk, as text'
+  capabilities.pipeline.loader -> capabilities.warehouse.rawWikidataItems 'loads the newest copy of the Wikidata items snapshot'
   capabilities.pipeline.loader -> capabilities.warehouse.rawWikidata 'loads the newest copy of the Wikidata snapshot'
   capabilities.pipeline.dagster -> capabilities.pipeline.downloader 'downloads MRDS and Wikidata as assets'
   capabilities.pipeline.downloader -> mrds 'downloads mrds-csv.zip (HTTPS)'
@@ -245,6 +261,14 @@ model {
   capabilities.warehouse.rawSuppressions -> capabilities.artifact.graphFacts 'items left out'
   capabilities.warehouse.rawSuppressions -> capabilities.artifact.occurrences 'deposits left out'
   capabilities.artifact.graphFacts -> capabilities.artifact.graphNodes 'the chosen values, into each document'
+  capabilities.warehouse.rawOreMinerals -> capabilities.warehouse.stgOreNodes 'one mineral, deposit and route per row'
+  capabilities.warehouse.rawWikidataItems -> capabilities.warehouse.stgOreNodes 'labels, descriptions, formulas'
+  capabilities.warehouse.stgOreNodes -> capabilities.artifact.graphNodes 'upstream nodes, after the curated ones'
+  capabilities.warehouse.rawOreMinerals -> capabilities.artifact.occurrences 'the deposits of each mineral'
+  capabilities.artifact.graphNodes -> capabilities.artifact.queue 'materials without routes, sources without places, unverified routes'
+  capabilities.warehouse.stgMrds -> capabilities.artifact.queue 'ore candidates'
+  capabilities.pipeline.dbt -> capabilities.artifact.queue 'writes the mart as Parquet, with data tests'
+  capabilities.core.cli -> capabilities.artifact.queue 'queue: prints it'
   capabilities.warehouse.rawMrds -> capabilities.warehouse.stgMrds 'typed, lists split'
   capabilities.warehouse.stgMrds -> capabilities.artifact.occurrences 'deposits with coordinates, as points'
   capabilities.warehouse.rawCrosswalk -> capabilities.artifact.occurrences 'match rules'
