@@ -1,0 +1,9 @@
+id: copper-sulphide-ore
+kind: category
+label: Copper sulphide ore
+description: Copper minerals that carry sulphur, such as chalcocite and chalcopyrite. Carbon can't reduce them, so they are roasted first, which turns them into oxides that smelt like oxide ore.
+references:
+  - citation: "Haubner, R. & Strobl, S. (2023). Considerations on Copper Smelting from Fahlores and the Metallurgy of Cu-As Bronzes. Berg- und Hüttenmännische Monatshefte 168 (9), 434–444."
+    doi: 10.1007/s00501-022-01230-6
+    supports: "Sulphidic ores cannot be reduced by coal or carbon monoxide, so the ore is first roasted to oxides."
+    status: unverified

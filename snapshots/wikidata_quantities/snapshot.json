@@ -1,12 +1,12 @@
 {
   "dataset": "wikidata_quantities",
   "url": "https://query.wikidata.org/sparql",
-  "retrieved_at": "2026-11-24T00:22:52Z",
-  "sha256": "21bf7dba08388dea7975565dd44276279829a2e2bf69975562fb67c68d1bc2c5",
-  "rows": 11,
+  "retrieved_at": "2026-11-24T01:56:37Z",
+  "sha256": "2acd35473f0f0f05e79bc2388cab6193e149125a0a91f2e04ae4b43fe0de6a70",
+  "rows": 18,
   "license": "CC0 1.0 (Wikidata's structured data)",
-  "query": "SELECT (STRAFTER(STR(?entity), \"/entity/\") AS ?item) ?property ?amount ?lower ?upper\n       (STRAFTER(STR(?unitEntity), \"/entity/\") AS ?unit)\nWHERE {\n  VALUES ?entity { wd:Q103223 wd:Q1096 wd:Q11427 wd:Q1235463 wd:Q164411 wd:Q191222 wd:Q193565 wd:Q23757 wd:Q34095 wd:Q41177 wd:Q5283 wd:Q583353 wd:Q753 wd:Q83087 wd:Q860451 }\n  { ?entity p:P1088 ?statement . ?statement psv:P1088 ?value . BIND(\"P1088\" AS ?property) }\n  ?statement a wikibase:BestRank .\n  ?value wikibase:quantityAmount ?amount ; wikibase:quantityUnit ?unitEntity .\n  OPTIONAL { ?value wikibase:quantityLowerBound ?lower }\n  OPTIONAL { ?value wikibase:quantityUpperBound ?upper }\n}\nORDER BY ?item ?property ?amount",
-  "items": 15,
+  "query": "SELECT (STRAFTER(STR(?entity), \"/entity/\") AS ?item) ?property ?amount ?lower ?upper\n       (STRAFTER(STR(?unitEntity), \"/entity/\") AS ?unit)\nWHERE {\n  VALUES ?entity { wd:Q103223 wd:Q108212 wd:Q108694 wd:Q1096 wd:Q111044 wd:Q11427 wd:Q1235463 wd:Q163577 wd:Q164411 wd:Q181395 wd:Q189703 wd:Q191222 wd:Q192669 wd:Q193565 wd:Q23757 wd:Q278106 wd:Q34095 wd:Q407335 wd:Q41177 wd:Q5283 wd:Q583353 wd:Q753 wd:Q83087 wd:Q860451 }\n  { ?entity p:P1088 ?statement . ?statement psv:P1088 ?value . BIND(\"P1088\" AS ?property) }\n  ?statement a wikibase:BestRank .\n  ?value wikibase:quantityAmount ?amount ; wikibase:quantityUnit ?unitEntity .\n  OPTIONAL { ?value wikibase:quantityLowerBound ?lower }\n  OPTIONAL { ?value wikibase:quantityUpperBound ?upper }\n}\nORDER BY ?item ?property ?amount",
+  "items": 24,
   "properties": [
     "P1088"
   ]

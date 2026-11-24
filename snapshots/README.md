@@ -16,4 +16,5 @@ These copies are the datasets' own, not the project's: their licenses, below, ap
 | Folder | Dataset | License |
 |---|---|---|
 | `mrds_deposits/` | USGS Mineral Resources Data System (MRDS) | US public domain (a work of the U.S. Geological Survey) |
-| `wikidata_quantities/` | Wikidata: Mohs hardness statements of the items in `data/crosswalks/wikidata_things.csv` | CC0 1.0 |
+| `wikidata_quantities/` | Wikidata: Mohs hardness statements of the items in `data/crosswalks/wikidata_things.csv` and `ore_minerals.csv` | CC0 1.0 |
+| `wikidata_items/` | Wikidata: the English label, description and chemical formula of the same items | CC0 1.0 |

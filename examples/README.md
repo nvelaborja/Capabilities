@@ -32,7 +32,7 @@ uv run capabilities explore --profile middle-kingdom-egypt
 - **Implied:** crucibles, casting molds, rope, timber (felled from standing trees), heat ≥ 1085 °C, and the actions cut timber, reeds, and plant fiber.
 - **Reachable:** the materials taken from those sources: granite (quarried by pounding), limestone (quarried with chisels), malachite (mined with stone hammers), and flint; then charcoal, clay and bloomery furnaces, bellows, fire drills, fire pistons, flint blades, stone choppers, wooden rollers.
 - **Actions:** cut and drill everything up to granite's hardness via sand abrasive; move any load; shape granite by pounding (limestone is a *maybe*, because dolerite's toughness hasn't been sourced yet).
-- **One step away:** iron is **one ingredient away**: a hematite deposit (mined with stone hammers) or a bog iron deposit (dug for limonite) unlocks bloom iron, and with it steel, hardened steel, steel chisels and steel spears. Tin is one away: tin-bearing gravel, streamed for cassiterite.
+- **One step away:** iron is **one ingredient away**: a deposit of an iron ore, hematite, magnetite, goethite or siderite (mined with stone hammers), or a bog iron deposit (dug for limonite), unlocks bloom iron, and with it steel, hardened steel, steel chisels and steel spears. Tin is one away: tin-bearing gravel, streamed for cassiterite.
 - **Warning:** implies access to some tin ore (cassiterite); all known sources are regional, so it may have been traded.
 
 **What-if:** `--hypothetical hematite` (iron ore) unlocks bloom iron, steel, hardened steel, steel chisels, and steel spears. No smelting know-how is needed, because the tool asks what was within reach of the ingredients.
