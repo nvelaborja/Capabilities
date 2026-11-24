@@ -72,9 +72,16 @@ class TestSnapshot:
         assert not is_current(repo_root, build_dir)
 
 
+# The source kinds of the upstream ore minerals (ADR 0045), whose places come from the ore crosswalk, not mrds_sources.
+ORE_SOURCES = {
+    f"{mineral}-deposit"
+    for mineral in ("azurite", "cuprite", "tenorite", "chalcocite", "bornite", "chalcopyrite", "magnetite", "goethite", "siderite")
+}
+
+
 class TestOccurrences:
     def test_each_deposit_is_an_occurrence_of_every_source_kind_the_crosswalk_matches(self, mrds_build):
-        found = {(row["source_id"], row["record_id"]) for row in occurrences(mrds_build[0])}
+        found = {(row["source_id"], row["record_id"]) for row in occurrences(mrds_build[0]) if row["source_id"] not in ORE_SOURCES}
         assert found == {
             ("hematite-deposit", "10001442"),  # Copper Wonder lists hematite and malachite, so it is both
             ("malachite-deposit", "10001442"),
@@ -87,6 +94,19 @@ class TestOccurrences:
             ("malachite-deposit", "10025716"),
             ("native-copper-deposit", "10080379"),  # ore mineral "Copper"
         }
+
+    def test_an_upstream_ore_minerals_places_are_the_deposits_listing_it_as_an_ore(self, mrds_build):
+        found = {(row["source_id"], row["record_id"]) for row in occurrences(mrds_build[0]) if row["source_id"] in ORE_SOURCES}
+        assert found == {
+            ("azurite-deposit", "10001442"),  # Copper Wonder: azurite and chalcopyrite among its ores
+            ("chalcopyrite-deposit", "10001442"),
+            ("chalcopyrite-deposit", "10008106"),  # Leadville District: chalcopyrite, magnetite and chalcocite
+            ("magnetite-deposit", "10008106"),
+            ("chalcocite-deposit", "10008106"),
+            ("chalcopyrite-deposit", "10025716"),  # McGraw Mine
+        }
+        # Hopong lists magnetite too, but in this build it has no coordinates, so it can't be placed.
+        assert ("magnetite-deposit", UNPLACED) not in found
 
     @pytest.mark.parametrize(
         ("record_id", "why"),
@@ -122,13 +142,15 @@ class TestOccurrences:
         with duckdb.connect() as connection:
             connection.execute("load spatial")
             point = connection.execute(
-                "select st_astext(geometry::geometry) from read_parquet(?) where record_id = '10008106'", [path]
+                "select distinct st_astext(geometry::geometry) from read_parquet(?) where record_id = '10008106'", [path]
             ).fetchall()
         assert point == [("POINT (-106.26 39.24)",)]
 
     def test_every_occurrence_names_its_upstream_record_and_snapshot(self, mrds_build):
         build_dir, snapshot = mrds_build
-        row = next(row for row in occurrences(build_dir) if row["record_id"] == "10008106")
+        row = next(
+            row for row in occurrences(build_dir) if (row["source_id"], row["record_id"]) == ("hematite-deposit", "10008106")
+        )
         assert json.loads(row["provenance"]) == {
             "layer": "upstream",
             "dataset": "mrds",
@@ -141,7 +163,7 @@ class TestOccurrences:
     def test_the_manifest_records_the_snapshot_and_the_number_of_occurrences(self, mrds_build):
         build_dir, snapshot = mrds_build
         manifest = json.loads((graph_dir(build_dir) / MANIFEST_FILE).read_text())
-        assert manifest["tables"][OCCURRENCES_FILE] == 10
+        assert manifest["tables"][OCCURRENCES_FILE] == 16  # 10 of curated source kinds, 6 of upstream ore minerals
         # The sample was just downloaded, so it is newer than the cold backup and is used; Wikidata comes from its backup.
         assert manifest["upstream"]["mrds_deposits"] == {
             **{key: snapshot[key] for key in ("url", "retrieved_at", "sha256", "rows", "license")}, "copy": "download"
@@ -157,7 +179,7 @@ class TestEveryDatasetIsRequired:
         # built_dir (conftest) never downloads anything, like CI and a fresh clone.
         manifest = json.loads((graph_dir(built_dir) / MANIFEST_FILE).read_text())
         assert {name: snapshot["copy"] for name, snapshot in manifest["upstream"].items()} == {
-            "mrds_deposits": "backup", "wikidata_quantities": "backup",
+            "mrds_deposits": "backup", "wikidata_items": "backup", "wikidata_quantities": "backup",
         }
         assert manifest["tables"][OCCURRENCES_FILE] > 0
 

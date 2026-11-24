@@ -452,11 +452,30 @@ def about(graph: Graph, key: str) -> dict:
     for field in ("notes", "origin", "availability", "regions", "era"):
         if thing.get(field):
             view[field] = thing[field].strip() if isinstance(thing[field], str) else thing[field]
+    if upstream := node_source(graph, key):
+        view["upstream"] = upstream
     return view
 
 
+def node_source(graph: Graph, node_id: str) -> dict | None:
+    """Where a node that came from upstream came from (ADR 0045), and the crosswalk that brought it in: a dataset and
+    record (a mineral from its Wikidata item, a deposit's places from MRDS), or the curated route it copies. None for a
+    curated node."""
+    provenance = graph.upstream_nodes.get(node_id)
+    if not provenance:
+        return None
+    source = {"crosswalk": provenance["crosswalk"]}
+    if "dataset" in provenance:
+        source |= {"dataset": DATASET_LABELS.get(provenance["dataset"], provenance["dataset"]), "record": provenance["record"]}
+        if provenance.get("url"):
+            source["url"] = provenance["url"]
+    if "copied_from" in provenance:
+        source["copied_from"] = {"id": provenance["copied_from"], "label": graph.label(provenance["copied_from"])}
+    return source
+
+
 # How upstream datasets are named in the app.
-DATASET_LABELS = {"wikidata": "Wikidata"}
+DATASET_LABELS = {"wikidata": "Wikidata", "mrds": "MRDS"}
 
 
 def quantity_source(graph: Graph, thing_id: str, quantity: str) -> dict:
@@ -492,16 +511,45 @@ def references(item: dict) -> list[dict]:
 
 
 def leads_to(graph: Graph, levels: Levels, context: StatusContext, key: str) -> list[dict]:
-    """What the node is used to make directly, most advanced first, with the routes that use it."""
+    """What the node is used to make directly, most advanced first, with the routes that use it.
+
+    A route that asks for a class counts for its members too (smelting copper ore for azurite), as it does for the
+    reasoner, unless the member's own values rule it out of the requirement's conditions.
+    """
     actions = sorted(referenced_actions(graph))
+    classes = _classes_of(graph, key)
     via: dict[str, list[str]] = defaultdict(list)
     for route_id, route in sorted(graph.routes.items()):
-        if any(_is_requirement(r, key) for r in route["requires"]):
-            for product in _main_products(graph, route_id, actions):
-                via[product].append(route.get("label", route_id))
+        label = route.get("label", route_id)
+        named = any(_is_requirement(r, key) for r in route["requires"])
+        class_requirements = [r for r in route["requires"] if r.get("category") in classes]
+        for product in _main_products(graph, route_id, actions):
+            if named:
+                via[product].append(label)
+            elif as_class := _class_it_may_fill(graph, context, key, class_requirements, product):
+                via[product].append(f"{label} (as {graph.label(as_class).lower()})")
     rows = [{"id": p, "label": node_label(graph, p), "kind": "action" if ":" in p else graph.kind(p), "status": context.status(p),
              "level": levels.of(p), "via": routes} for p, routes in via.items() if p != key]
     return _ranked(levels, rows)
+
+
+def _classes_of(graph: Graph, key: str) -> set[str]:
+    """The categories a thing belongs to, directly or through sub-categories."""
+    if graph.kind(key) in (None, "category"):
+        return set()
+    return {c for c, thing in graph.things.items() if thing["kind"] == "category" and key in graph.members(c)}
+
+
+def _class_it_may_fill(graph: Graph, context: StatusContext, key: str, requirements: list[dict], product: str) -> str | None:
+    """The first class requirement the thing may fill for this product: ruled out only when its known values fail a
+    condition (a chisel softer than the stone it would cut); unknown values may still hold."""
+    target = parse_action(product)[1] if ":" in product else None
+    have = context.reach.quantities.get(key, {})
+    def may_meet(condition: dict) -> bool:
+        threshold = condition_rhs(graph, context.reach.quantities, condition, target)
+        return compare(have.get(condition["quantity"]), condition["op"], threshold) != Tri.NO
+
+    return next((r["category"] for r in requirements if all(may_meet(c) for c in r.get("where", []))), None)
 
 
 def _is_requirement(requirement: dict, key: str) -> bool:

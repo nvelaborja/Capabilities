@@ -1,0 +1,11 @@
+id: roasted-copper-ore
+kind: material
+label: Roasted copper ore
+origin: produced
+is_a: [copper-ore]
+description: Copper sulphide ore after roasting. Most of its sulphur has gone off as sulphur dioxide, leaving copper oxides (with some sulphide and metallic copper) that are smelted like oxide ore.
+references:
+  - citation: "Haubner, R. & Strobl, S. (2023). Considerations on Copper Smelting from Fahlores and the Metallurgy of Cu-As Bronzes. Berg- und Hüttenmännische Monatshefte 168 (9), 434–444."
+    doi: 10.1007/s00501-022-01230-6
+    supports: "The roasted ore may contain Cu2O, Cu2S and metallic Cu; it is then smelted in a charcoal-fired shaft furnace."
+    status: unverified

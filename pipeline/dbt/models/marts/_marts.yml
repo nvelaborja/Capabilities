@@ -36,6 +36,22 @@ models:
                 values: [curated, upstream, override]
       - name: value
         data_tests: [not_null]
+  - name: curation_queue
+    description: >
+      The gaps the build finds, as a to-do list (build/graph/curation_queue.parquet, ADR 0045): ore candidates from
+      MRDS, extracted materials with no route, sources with no places, routes with only unverified references, upstream
+      disagreements and stale overrides.
+    columns:
+      - name: id
+        data_tests: [unique, not_null]
+      - name: kind
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [ore_candidate, extracted_without_route, source_without_places, route_unverified, upstream_disagreement, stale_override]
+      - name: detail
+        data_tests: [not_null]
   - name: source_occurrences
     description: >
       Where each source kind is found: one row per source kind and located upstream record, with a point geometry

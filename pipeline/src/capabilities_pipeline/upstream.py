@@ -71,11 +71,14 @@ class ZipDataset(Dataset):
 @dataclass(frozen=True)
 class WikidataDataset(Dataset):
     """The result of a SPARQL query to Wikidata, as CSV. What is asked for comes from the curated layer: the items in
-    the Wikidata crosswalk and the properties our quantities name (ADR 0043)."""
+    the Wikidata crosswalks, and for quantities the properties our quantities name (ADR 0043, ADR 0045)."""
+
+    def query(self, root: Path) -> tuple[str, dict]:
+        """The query, and what the snapshot should record about it."""
+        raise NotImplementedError
 
     def download(self, url: str, scratch: Path, root: Path) -> tuple[Path, Path, dict]:
-        items, properties = crosswalked_items(root), quantity_properties(root)
-        query = quantities_query(items, properties)
+        query, about = self.query(root)
         download = scratch / "result.csv"
         request = urllib.request.Request(
             url,
@@ -83,7 +86,26 @@ class WikidataDataset(Dataset):
             headers={"User-Agent": USER_AGENT, "Accept": "text/csv"},
         )
         save(request, download)
-        return download, download, {"query": query, "items": len(items), "properties": sorted(properties)}
+        return download, download, {"query": query, **about}
+
+
+@dataclass(frozen=True)
+class WikidataQuantities(WikidataDataset):
+    """Each crosswalked item's best-ranked statements of the properties our quantities name."""
+
+    def query(self, root: Path) -> tuple[str, dict]:
+        items, properties = crosswalked_items(root), quantity_properties(root)
+        return quantities_query(items, properties), {"items": len(items), "properties": sorted(properties)}
+
+
+@dataclass(frozen=True)
+class WikidataItems(WikidataDataset):
+    """Each crosswalked item's English label and description, and its chemical formula (P274): what an upstream node
+    is called and described with (ADR 0045)."""
+
+    def query(self, root: Path) -> tuple[str, dict]:
+        items = crosswalked_items(root)
+        return items_query(items), {"items": len(items)}
 
 
 MRDS = ZipDataset(
@@ -100,14 +122,21 @@ MRDS = ZipDataset(
     ),
 )
 
-WIKIDATA = WikidataDataset(
+WIKIDATA = WikidataQuantities(
     name="wikidata_quantities",
     url="https://query.wikidata.org/sparql",
     license="CC0 1.0 (Wikidata's structured data)",
     columns=("item", "property", "amount", "lower", "upper", "unit"),
 )
 
-DATASETS = (MRDS, WIKIDATA)
+WIKIDATA_ITEMS = WikidataItems(
+    name="wikidata_items",
+    url="https://query.wikidata.org/sparql",
+    license="CC0 1.0 (Wikidata's structured data)",
+    columns=("item", "label", "description", "formula"),
+)
+
+DATASETS = (MRDS, WIKIDATA, WIKIDATA_ITEMS)
 
 
 def fetch(dataset: Dataset, build_dir: Path, url: str | None = None, root: Path | None = None) -> dict:
@@ -143,13 +172,40 @@ def save(request: urllib.request.Request, path: Path):
         return response.headers
 
 
+# The crosswalks that match our things to Wikidata items: curated things (ADR 0043), and the ore minerals that become
+# upstream nodes (ADR 0045).
+WIKIDATA_CROSSWALKS = ("wikidata_things.csv", "ore_minerals.csv")
+
+
 def crosswalked_items(root: Path) -> list[str]:
-    """The Wikidata items our things are matched to (data/crosswalks/wikidata_things.csv)."""
-    path = root / "data" / "crosswalks" / "wikidata_things.csv"
-    if not path.is_file():
-        return []
-    with path.open(newline="", encoding="utf-8") as file:
-        return sorted({row["wikidata"].strip() for row in csv.DictReader(file) if row["wikidata"].strip()})
+    """Every Wikidata item a crosswalk names. Rows marked as reviewed and rejected (class none) are left out: nothing in
+    the graph is built from them."""
+    items = set()
+    for name in WIKIDATA_CROSSWALKS:
+        path = root / "data" / "crosswalks" / name
+        if not path.is_file():
+            continue
+        with path.open(newline="", encoding="utf-8") as file:
+            items |= {
+                row["wikidata"].strip() for row in csv.DictReader(file)
+                if row["wikidata"].strip() and row.get("class") != "none"
+            }
+    return sorted(items)
+
+
+def items_query(items: list[str]) -> str:
+    """SPARQL for each item's English label and description, and its chemical formulas (one row per formula)."""
+    if not items:
+        raise ValueError("Nothing to ask Wikidata: no crosswalked items.")
+    values = " ".join(f"wd:{item}" for item in items)
+    return f"""SELECT (STRAFTER(STR(?entity), "/entity/") AS ?item) ?label ?description ?formula
+WHERE {{
+  VALUES ?entity {{ {values} }}
+  OPTIONAL {{ ?entity rdfs:label ?label . FILTER(LANG(?label) = "en") }}
+  OPTIONAL {{ ?entity schema:description ?description . FILTER(LANG(?description) = "en") }}
+  OPTIONAL {{ ?entity wdt:P274 ?formula }}
+}}
+ORDER BY ?item ?formula"""
 
 
 def quantity_properties(root: Path) -> dict[str, str]:

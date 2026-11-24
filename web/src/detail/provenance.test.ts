@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { QuantitySource } from "../api/types";
-import { sourceLines } from "./provenance";
+import { nodeOrigin, sourceLines } from "./provenance";
 
 const upstream = {
   dataset: "Wikidata",
@@ -45,5 +45,27 @@ describe("sourceLines", () => {
   it("points a curated value at the sources, and says when there are none", () => {
     expect(sourceLines({ layer: "curated" }, true)).toEqual([{ text: "Curated: see the sources below." }]);
     expect(sourceLines({ layer: "curated" }, false)).toEqual([{ text: "Curated, with no source yet." }]);
+  });
+});
+
+describe("nodeOrigin", () => {
+  const crosswalk = "data/crosswalks/ore_minerals.csv";
+
+  it("links a mineral to its Wikidata item", () => {
+    const upstream = { crosswalk, dataset: "Wikidata", record: "Q108212", url: "https://www.wikidata.org/wiki/Q108212" };
+    expect(nodeOrigin(upstream)).toEqual({
+      text: "From Wikidata",
+      link: { href: "https://www.wikidata.org/wiki/Q108212", label: "Q108212" },
+    });
+  });
+
+  it("names the records a deposit's places come from when there is no single record to open", () => {
+    const upstream = { crosswalk, dataset: "MRDS", record: "deposits listing Azurite as an ore mineral" };
+    expect(nodeOrigin(upstream)).toEqual({ text: "From MRDS (deposits listing Azurite as an ore mineral)" });
+  });
+
+  it("names the route a mining route copies", () => {
+    const upstream = { crosswalk, copied_from: { id: "mine-malachite", label: "Mining malachite with stone hammers" } };
+    expect(nodeOrigin(upstream)).toEqual({ text: "A copy of Mining malachite with stone hammers" });
   });
 });

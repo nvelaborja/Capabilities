@@ -1,0 +1,27 @@
+id: roast-copper-sulphide-ore
+kind: route
+label: Roasting copper sulphide ore
+achieves: { thing: roasted-copper-ore }
+techniques: [copper-smelting]
+requires:
+  - { role: consumed, category: copper-sulphide-ore }
+  - { role: consumed, thing: charcoal, notes: Burnt on an open roasting bed to heat the ore and the air. }
+  - role: effect
+    effect: heat
+    notes: The temperature isn't recorded yet (TODO-source). Once started, the roasting reaction gives off heat of its own.
+outputs:
+  - { thing: roasted-copper-ore }
+notes: >-
+  An open bed, not a furnace: air must reach the ore for the sulphur to burn off, which a closed shaft furnace prevents.
+  Copper-iron sulphides (chalcopyrite, bornite) were often taken through more steps: the partly roasted ore is melted to a
+  sulphide matte, roasted again, then reduced. That is folded into this one route for now. Some smelters skipped roasting
+  and co-smelted sulphides with oxide ores, which isn't recorded yet.
+references:
+  - citation: "Haubner, R. & Strobl, S. (2023). Considerations on Copper Smelting from Fahlores and the Metallurgy of Cu-As Bronzes. Berg- und Hüttenmännische Monatshefte 168 (9), 434–444."
+    doi: 10.1007/s00501-022-01230-6
+    supports: "Roasting on an open bed of burning charcoal, with access to oxygen (a shaft furnace is useless for it); the reaction is exothermic once started; three or more steps were used when pure oxides were hard to form."
+    status: unverified
+  - citation: "Calgaro, I., Radivojević, M., Veronesi, U. & Yermolayeva, A. S. (2023). Copper smelting technology at 2nd millennium BC Taldysai (Kazakhstan) and its place in the wider Eurasian metalmaking framework. Author's accepted manuscript, UCL Discovery."
+    url: https://discovery.ucl.ac.uk/id/eprint/10172870/
+    supports: "At Taldysai, copper oxides and sulphides were most likely co-smelted in a single step."
+    status: unverified

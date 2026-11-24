@@ -66,6 +66,35 @@ sources:
             data_tests: [unique, not_null]
           - name: notes
             data_tests: [not_null]
+      - name: ore_minerals
+        description: >
+          Ore minerals that join the graph from upstream (data/crosswalks/ore_minerals.csv, ADR 0045): each row's
+          Wikidata item, MRDS name, ore class, the curated route it is mined like, and the reference for its class.
+          Rows with class none were reviewed and rejected, and build nothing.
+        columns:
+          - name: id
+            data_tests: [unique]
+          - name: wikidata
+            data_tests: [unique, not_null]
+          - name: mrds_ore
+            data_tests: [unique, not_null]
+          - name: class
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: [copper-ore, copper-sulphide-ore, iron-ore, tin-ore, none]
+          - name: citation
+            data_tests: [not_null]
+          - name: supports
+            data_tests: [not_null]
+      - name: wikidata_items
+        description: >
+          The English label and description, and the chemical formula, of every crosswalked Wikidata item, as the
+          SPARQL query returned them (ADR 0045).
+        columns:
+          - name: item
+            data_tests: [not_null]
       - name: wikidata_quantities
         description: >
           Wikidata's best-ranked quantity statements for the crosswalked items, as the SPARQL query returned them, every

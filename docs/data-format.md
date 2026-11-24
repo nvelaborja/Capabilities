@@ -23,7 +23,7 @@ data/
   verbs/                 parameterized actions: cut, drill, shape, finish (target), move (load)
   routes/                ways to obtain things, produce effects, or perform verbs
   profiles/              curated starting sets (e.g. Middle Kingdom Egypt)
-  crosswalks/            CSV tables matching upstream records to our ids (MRDS deposits to source kinds, things to Wikidata items)
+  crosswalks/            CSV tables matching upstream records to our ids (MRDS deposits to source kinds, things to Wikidata items, ore minerals that join the graph)
   overrides/             replacements for upstream values we believe are wrong, with the reason and references
   suppressions/          upstream records left out of the build, with why
   LICENSE                CC BY-NC-SA 4.0 (the data); the code is PolyForm Noncommercial 1.0.0
@@ -136,7 +136,7 @@ A curated set of things a group is known to have made (`{ id: copper-saw }`) or 
 
 ### Crosswalk (`data/crosswalks/*.csv`)
 
-A hand-kept table that matches records in an upstream dataset to our ids ([ADR 0034](adr/0034-build-the-graph-from-upstream-datasets-and-a-curated-layer.md)). It is CSV rather than YAML because it is a table, and the build loads it as written. There are two:
+A hand-kept table that matches records in an upstream dataset to our ids ([ADR 0034](adr/0034-build-the-graph-from-upstream-datasets-and-a-curated-layer.md)). It is CSV rather than YAML because it is a table, and the build loads it as written. There are three:
 
 `mrds_sources.csv` matches USGS MRDS deposits to source kinds, which places each source on the map ([ADR 0041](adr/0041-place-sources-with-mrds-deposits-through-a-crosswalk.md)):
 
@@ -173,6 +173,25 @@ Match only when the item is the same thing. Our copper and tin are the metals, a
 After adding or changing a row, query Wikidata again (`cd pipeline && uv run dg launch --assets 'upstream/wikidata_quantities'`, then `uv run capabilities backup` and commit): the snapshot holds only the items that were crosswalked when it was taken, and until then the thing keeps its curated value, if it has one.
 
 Don't keep a curated value that Wikidata gives: remove it, and the references that backed only it. The upstream value is the one used, every build has it ([ADR 0044](adr/0044-require-every-upstream-dataset-with-cold-backups-in-git.md)), and a copy in the curated layer would only go stale.
+
+`ore_minerals.csv` brings ore minerals into the graph from upstream ([ADR 0045](adr/0045-bring-ore-minerals-in-from-upstream-roast-sulphides-and-queue-the-gaps.md)). Each row becomes three nodes: the mineral (a material in its ore class, named and described from Wikidata, with its quantities from Wikidata), its deposit (a source whose places are the MRDS deposits listing it as an ore) and a mining route copied from a curated one.
+
+| Column | Meaning |
+|---|---|
+| `id` | Our id for the mineral; its nodes are `<id>`, `<id>-deposit` and `mine-<id>`. None may clash with a curated id. Empty for a rejected row. |
+| `wikidata` | Its Wikidata item |
+| `mrds_ore` | Its name in MRDS's ore field (`Chalcopyrite`), which places its deposits |
+| `class` | The ore class it joins: `copper-ore`, `copper-sulphide-ore` (roasted before smelting), `iron-ore`, `tin-ore`; or `none` for a mineral reviewed and rejected |
+| `mined_like` | The curated route it is mined like (`mine-malachite`, `mine-hematite`); empty for a rejected row |
+| `citation`, `url`, `supports` | The reference that puts it in its class (or rejects it), and what it supports. Credited in CREDITS.md |
+| `notes` | Added to its description |
+
+```csv
+id,wikidata,mrds_ore,class,mined_like,citation,url,supports,notes
+siderite,Q192669,Siderite,iron-ore,mine-hematite,"Föll, H. ...",https://...,"Siderite is relatively easy to smelt...",An iron carbonate.
+```
+
+Add a mineral only with a reference that it was smelted as its class says; leave it in the curation queue otherwise (`uv run capabilities queue`). Rejecting a mineral (`none`, with the reference that says why) takes it off the queue. After adding rows, query Wikidata again, as for `wikidata_things.csv`.
 
 ### Override (`data/overrides/*.yaml`)
 

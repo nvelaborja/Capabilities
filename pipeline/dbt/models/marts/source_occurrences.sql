@@ -10,8 +10,11 @@ with deposits as (
         )
 ),
 
+-- The curated rules, and one for each upstream ore mineral's deposits: MRDS deposits that list it as an ore (ADR 0045).
 crosswalk as (
-    select * from {{ source('raw', 'mrds_sources') }}
+    select source_id, field, value, deposit_type from {{ source('raw', 'mrds_sources') }}
+    union all
+    select id || '-deposit', 'ore', mrds_ore, null from {{ source('raw', 'ore_minerals') }} where class <> 'none'
 ),
 
 snapshot as (

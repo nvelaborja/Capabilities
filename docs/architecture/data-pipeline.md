@@ -1,13 +1,13 @@
 # Data pipeline
 
-Reference for how the graph is built: inputs, stages, tables, outputs, checks and commands. The diagram is the `pipeline` view at `/architecture/`. For background on the tools, see [DuckDB](technologies/duckdb.md), [dbt](technologies/dbt.md), [Parquet](technologies/parquet.md) and [Dagster](technologies/dagster.md). Decisions: [ADR 0034](../adr/0034-build-the-graph-from-upstream-datasets-and-a-curated-layer.md) (a built graph from a curated layer and, later, upstream datasets) [ADR 0038](../adr/0038-serve-the-app-from-a-built-graph-artifact.md) (the artifact the app reads), [ADR 0040](../adr/0040-orchestrate-the-build-with-dagster.md) (Dagster, and the quick build without it), [ADR 0041](../adr/0041-place-sources-with-mrds-deposits-through-a-crosswalk.md) (MRDS deposits as source occurrences) [ADR 0043](../adr/0043-take-quantities-from-wikidata-with-upstream-first-and-overrides.md) (quantities from Wikidata, upstream first, with overrides) and [ADR 0044](../adr/0044-require-every-upstream-dataset-with-cold-backups-in-git.md) (every dataset required, with cold backups in git). Spatial work uses [DuckDB spatial and GeoParquet](technologies/duckdb-spatial-and-geoparquet.md); Wikidata is queried with [SPARQL](technologies/wikidata-and-sparql.md).
+Reference for how the graph is built: inputs, stages, tables, outputs, checks and commands. The diagram is the `pipeline` view at `/architecture/`. For background on the tools, see [DuckDB](technologies/duckdb.md), [dbt](technologies/dbt.md), [Parquet](technologies/parquet.md) and [Dagster](technologies/dagster.md). Decisions: [ADR 0034](../adr/0034-build-the-graph-from-upstream-datasets-and-a-curated-layer.md) (a built graph from a curated layer and, later, upstream datasets) [ADR 0038](../adr/0038-serve-the-app-from-a-built-graph-artifact.md) (the artifact the app reads), [ADR 0040](../adr/0040-orchestrate-the-build-with-dagster.md) (Dagster, and the quick build without it), [ADR 0041](../adr/0041-place-sources-with-mrds-deposits-through-a-crosswalk.md) (MRDS deposits as source occurrences) [ADR 0043](../adr/0043-take-quantities-from-wikidata-with-upstream-first-and-overrides.md) (quantities from Wikidata, upstream first, with overrides) [ADR 0044](../adr/0044-require-every-upstream-dataset-with-cold-backups-in-git.md) (every dataset required, with cold backups in git) and [ADR 0045](../adr/0045-bring-ore-minerals-in-from-upstream-roast-sulphides-and-queue-the-gaps.md) (ore minerals from upstream as nodes, and the curation queue). Spatial work uses [DuckDB spatial and GeoParquet](technologies/duckdb-spatial-and-geoparquet.md); Wikidata is queried with [SPARQL](technologies/wikidata-and-sparql.md).
 
 ## Summary
 
 | | |
 |---|---|
-| **Inputs** | The curated layer: `data/**/*.yaml` (quantities, things, verbs, routes, profiles, overrides), `data/crosswalks/*.csv`, `data/suppressions/*.csv`, `examples/**/*.yaml` (jobs) and `schema/*.json`. A copy of every upstream dataset, USGS MRDS and Wikidata's quantity statements: the latest download in `build/upstream/` or the cold backup in `snapshots/`, whichever is newer. Every dataset is required ([ADR 0044](../adr/0044-require-every-upstream-dataset-with-cold-backups-in-git.md)). |
-| **Output** | `build/graph/graph_nodes.parquet` (one row per node), `build/graph/graph_facts.parquet` (where each quantity value comes from), `build/graph/source_occurrences.parquet` (where sources are found, GeoParquet) and `build/graph/manifest.json`. |
+| **Inputs** | The curated layer: `data/**/*.yaml` (quantities, things, verbs, routes, profiles, overrides), `data/crosswalks/*.csv`, `data/suppressions/*.csv`, `examples/**/*.yaml` (jobs) and `schema/*.json`. A copy of every upstream dataset (USGS MRDS, and Wikidata's quantity statements and item descriptions): the latest download in `build/upstream/` or the cold backup in `snapshots/`, whichever is newer. Every dataset is required ([ADR 0044](../adr/0044-require-every-upstream-dataset-with-cold-backups-in-git.md)). |
+| **Output** | `build/graph/graph_nodes.parquet` (one row per node), `build/graph/graph_facts.parquet` (where each quantity value comes from), `build/graph/source_occurrences.parquet` (where sources are found, GeoParquet), `build/graph/curation_queue.parquet` (the gaps the build found) and `build/graph/manifest.json`. |
 | **Run by** | `uv run capabilities build`, or automatically by `need`, `explore`, `check` and `serve` when the output is missing or stale. Or Dagster: the same steps as assets, plus downloading upstream snapshots, with lineage, checks and run history (see [Orchestration](#orchestration-dagster)). Only Dagster downloads. |
 | **Code** | `pipeline/src/capabilities_pipeline/build.py` (extract, load, run dbt, manifest), `upstream.py` (downloading and loading snapshots), `assets.py` and `definitions.py` (the same steps as Dagster assets), and `pipeline/dbt/` (the dbt project). Reading: `packages/core/src/capabilities/built.py`. |
 | **Engine** | DuckDB with its spatial extension, through dbt Core and the dbt-duckdb adapter. |
@@ -49,7 +49,9 @@ The `upstream/mrds_deposits` asset downloads `https://mrdata.usgs.gov/mrds/mrds-
 | `rows` | How many rows it holds. |
 | `license` | The dataset's license. |
 
-The `upstream/wikidata_quantities` asset sends one SPARQL query to `https://query.wikidata.org/sparql` ([Wikidata and SPARQL](technologies/wikidata-and-sparql.md)). The query is built from the curated layer: the items in `data/crosswalks/wikidata_things.csv`, and the property each quantity names in its `wikidata` field (today only `P1088`, Mohs hardness, expected in unit `Q199`). It asks for each item's best-ranked statements of those properties, with their amount, lower and upper bounds and unit, and keeps the CSV result unchanged as `wikidata_quantities.parquet`. Its `snapshot.json` adds the `query` itself, the number of `items` asked about and the `properties`. On 2026-11-24 it returned 11 statements for the 15 crosswalked items.
+The `upstream/wikidata_quantities` asset sends one SPARQL query to `https://query.wikidata.org/sparql` ([Wikidata and SPARQL](technologies/wikidata-and-sparql.md)). The query is built from the curated layer: the items in `data/crosswalks/wikidata_things.csv` and `ore_minerals.csv` (rows not rejected), and the property each quantity names in its `wikidata` field (today only `P1088`, Mohs hardness, expected in unit `Q199`). It asks for each item's best-ranked statements of those properties, with their amount, lower and upper bounds and unit, and keeps the CSV result unchanged as `wikidata_quantities.parquet`. Its `snapshot.json` adds the `query` itself, the number of `items` asked about and the `properties`. On 2026-11-24 it returned 18 statements for the 24 crosswalked items.
+
+The `upstream/wikidata_items` asset sends a second query for the same items: each one's English label and description, and its chemical formula (P274), one row per formula. It names and describes the upstream ore minerals ([ADR 0045](../adr/0045-bring-ore-minerals-in-from-upstream-roast-sulphides-and-queue-the-gaps.md)). Its result, `wikidata_items.parquet`, has the columns `item`, `label`, `description` and `formula`.
 
 USGS refuses Python's default user agent, so downloads send a generic one (`dataset-snapshot/1.0`), and so does the Wikidata query.
 
@@ -85,6 +87,10 @@ Every table is replaced on every build. The crosswalks and suppressions are load
 
 **`raw.wikidata_things`**: the crosswalk `data/crosswalks/wikidata_things.csv`: `id`, `wikidata` (a Q id) and `notes`.
 
+**`raw.ore_minerals`**: the crosswalk `data/crosswalks/ore_minerals.csv`: `id`, `wikidata`, `mrds_ore`, `class`, `mined_like`, `citation`, `url`, `supports`, `notes` ([data format](../data-format.md)).
+
+**`raw.wikidata_items`**: the Wikidata items snapshot, as text.
+
 **`raw.suppressed_records`**: `data/suppressions/suppressed_records.csv`: `dataset` (`mrds` or `wikidata`), `record_id` and `reason`.
 
 **`raw.wikidata_quantities`**: the Wikidata snapshot as the query returned it, every column text: `item` (Q id), `property` (P id), `amount`, `lower`, `upper` (empty when the statement has no bounds) and `unit` (Q id; `Q199`, "1", for Mohs).
@@ -116,6 +122,8 @@ The build runs `dbt build` on `pipeline/dbt`: `capabilities build` through dbt's
 - `raw.curated_documents`: `ordinal` and `path` are unique and not null; `node_type` is not null and one of the seven known types; `id` is not null.
 - `raw.wikidata_things`: `id` is unique, not null and names a curated node; `wikidata` is unique and not null; `notes` is not null.
 - `raw.wikidata_quantities`: `item`, `property` and `amount` are not null.
+- `raw.ore_minerals`: `id` is unique; `wikidata` and `mrds_ore` are unique and not null; `class` is one of the ore classes or `none`; `citation` and `supports` are not null.
+- `raw.wikidata_items`: `item` is not null.
 - `raw.suppressed_records`: `dataset` is `mrds` or `wikidata`; `record_id` and `reason` are not null.
 - `raw.mrds_sources`: `source_id` is not null and names a curated node; `field` is `ore` or `commodity`; `value` and `notes` are not null.
 - `raw.mrds_deposits`: `dep_id` is unique and not null.
@@ -127,7 +135,9 @@ The build runs `dbt build` on `pipeline/dbt`: `capabilities build` through dbt's
 - `crosswalk_rows_are_distinct`: no rule is listed twice.
 - `stg_mrds_coordinates_are_numbers`: no published coordinate fails to read as a number.
 - `occurrences_are_valid_points`: every occurrence is a valid point within latitude ±90 and longitude ±180.
-- `wikidata_crosswalk_ids_are_items`: every `wikidata` value is a Q id.
+- `ore_minerals_are_new_and_well_formed`: a row that builds nodes has an id that clashes with no curated node (nor its `-deposit` and `mine-` ids) and a `mined_like` that is a curated route whose label names the material it mines; a rejected row has neither.
+- `crosswalked_items_are_in_the_wikidata_items_snapshot`: every item either crosswalk names (rejected rows aside) is in the items snapshot; one added since the last download stops the build until it is downloaded again.
+- `wikidata_crosswalk_ids_are_items`: both crosswalks, rejected ore rows included, name Q ids.
 - `wikidata_units_match`: every Wikidata value is in the unit its quantity expects (`wikidata.unit`); one in another unit would otherwise be read unconverted.
 - `overrides_target_upstream_values`: every override's thing is in the Wikidata crosswalk, and its quantity is read from Wikidata. A value only the curated layer gives is corrected in its own file.
 
@@ -150,6 +160,18 @@ Tests: `kind` not null; `label` not null for every node (overrides have none).
 **`stg_curated__quantity_properties`** (view). Each quantity that names a Wikidata property: `quantity`, `property`, and the `unit` its values must be in.
 
 **`stg_wikidata__quantities`** (view). One row per Wikidata statement, typed: `record_id` (the item), `property`, `amount`, `low` and `high` (the bounds, or the amount when there are none), `unit`.
+
+**`stg_crosswalk__wikidata_items`** (view). Which Wikidata item each of our things is: the rows of both Wikidata crosswalks, rejected ore minerals left out. `graph_facts` reads values through it.
+
+**`stg_wikidata__items`** (view). One row per item: `label`, `description`, and its first `formula`.
+
+**`stg_ore_minerals__nodes`** (view). The upstream nodes ([ADR 0045](../adr/0045-bring-ore-minerals-in-from-upstream-roast-sulphides-and-queue-the-gaps.md)): for each ore crosswalk row, three documents, with `node_type`, `id`, `kind`, `label`, `document`, `provenance` and `position` (their order after the curated nodes):
+
+- the mineral: a material in its class, `origin: extracted`, labelled from Wikidata (capitalised; MRDS's name if Wikidata has none), described from Wikidata's description and formula and the row's `notes`, citing the row's reference;
+- `<id>-deposit`: a regional source;
+- `mine-<id>`: the `mined_like` route as a JSON patch, with the mineral, its deposit, its label (the template's, with the template material's name replaced) and its outputs swapped in. Its references are the template's, each made `unverified`, with `supports` prefixed "Cited for the route this copies (<template label>): ".
+
+Each node's provenance is `{"layer": "upstream", "crosswalk": "data/crosswalks/ore_minerals.csv", ...}` with what it came from: the mineral `"dataset": "wikidata", "record": <Q id>, "url": ...`; the deposit `"dataset": "mrds", "record": "deposits listing <MRDS name> as an ore mineral"`; the route `"copied_from": <template>`.
 
 **`stg_mrds__deposits`** (view). One row per MRDS deposit, typed.
 
@@ -182,20 +204,20 @@ Tests: `record_id` is unique and not null; `first_production_qualifier` is `befo
 
 Suppressed Wikidata items are left out before the choice is made. Tests: `id` unique and not null; `node_id` not null and in `graph_nodes`; `layer` one of the three; `value` not null.
 
-With the 2026-11-24 snapshot there are 23 facts: 11 from Wikidata and 12 curated. The curated layer has no value where Wikidata gives one ([ADR 0044](../adr/0044-require-every-upstream-dataset-with-cold-backups-in-git.md)), so none disagree.
+With the 2026-11-24 snapshots there are 30 facts: 18 from Wikidata and 12 curated. The curated layer has no value where Wikidata gives one ([ADR 0044](../adr/0044-require-every-upstream-dataset-with-cold-backups-in-git.md)), so none disagree.
 
-**`graph_nodes`** (mart, `models/marts/`, written as Parquet). The built graph.
+**`graph_nodes`** (mart, `models/marts/`, written as Parquet). The built graph: the curated nodes in read order, then the upstream nodes of `stg_ore_minerals__nodes`.
 
 | Column | Meaning |
 |---|---|
 | `ordinal` | Read order. |
 | `node_type`, `id`, `kind`, `label` | As above. Overrides aren't nodes and are left out. |
 | `document` | The full document as JSON: what the app parses. Its `quantities` are the values `graph_facts` chose, so the reasoner uses upstream values and overrides without knowing where they came from. |
-| `provenance` | Where the node came from: `{"layer": "curated", "path": "<file>"}`. Where each of its quantity values came from is in `graph_facts`. |
+| `provenance` | Where the node came from: `{"layer": "curated", "path": "<file>"}`, or an upstream node's (above). Where each of its quantity values came from is in `graph_facts`. |
 
 Tests: `ordinal` unique and not null; `id` unique and not null, across every type of node; `provenance` not null.
 
-**`source_occurrences`** (mart, written as GeoParquet). Where each source kind is found ([ADR 0036](../adr/0036-place-sources-and-profiles-in-space-and-time.md)). It has one row per source kind and MRDS deposit, for every deposit with coordinates that matches a crosswalk rule and isn't suppressed. A deposit that matches two source kinds appears twice.
+**`source_occurrences`** (mart, written as GeoParquet). Where each source kind is found ([ADR 0036](../adr/0036-place-sources-and-profiles-in-space-and-time.md)). It has one row per source kind and MRDS deposit, for every deposit with coordinates that matches a crosswalk rule and isn't suppressed. The rules are those of `mrds_sources`, plus one per upstream ore mineral: its deposit is every MRDS deposit listing it as an ore. A deposit that matches two source kinds appears twice.
 
 | Column | Meaning |
 |---|---|
@@ -220,17 +242,30 @@ The marts' `external` materialization (a dbt-duckdb feature) writes each result 
 - dbt-duckdb writes an empty table as **one row of nulls**, so its columns keep their types. Skip rows whose `id` is null; the manifest's counts already do.
 - DuckDB writes no GeoParquet metadata for a file with no rows, so `geometry` reads back as WKB bytes. Cast it (`geometry::geometry`) before using spatial functions.
 
+**`curation_queue`** (mart, written as Parquet). The gaps the build found, as a to-do list ([ADR 0045](../adr/0045-bring-ore-minerals-in-from-upstream-roast-sulphides-and-queue-the-gaps.md)). One row per item:
+
+| Column | Meaning |
+|---|---|
+| `id` | `<kind>/<subject>`. |
+| `kind` | `ore_candidate`, `extracted_without_route`, `source_without_places`, `route_unverified`, `upstream_disagreement` or `stale_override`. |
+| `subject`, `label` | What the item is about: an MRDS ore name (lower case) or a node or fact id, and how to show it. |
+| `detail` | What is missing, and what to do. |
+| `priority` | For ore candidates, the number of MRDS deposits of copper, iron or tin listing the mineral as an ore; otherwise null. |
+| `evidence` | JSON: the deposits and metals for a candidate, the values behind a disagreement, and so on. |
+
+An ore candidate is a mineral listed on at least 20 such deposits and not yet reviewed: in neither the ore crosswalk nor `mrds_sources`. Tests: `id` unique and not null; `kind` one of the six; `detail` not null. With the 2026-11-24 snapshots there are 186 items: 135 ore candidates (galena first, on 6,326 deposits), 49 routes with only unverified references, and 2 sources with no places. `uv run capabilities queue` prints them.
+
 ### 4. Publish
 
 The build counts the rows in each Parquet file and writes **`build/graph/manifest.json`**, with the fingerprint recorded at load time:
 
 | Field | Meaning |
 |---|---|
-| `format_version` | The artifact's shape (`FORMAT_VERSION` in `built.py`, now 3: `graph_facts.parquet` was added). Bumping it makes every older build stale. |
+| `format_version` | The artifact's shape (`FORMAT_VERSION` in `built.py`, now 4: `curation_queue.parquet` was added). Bumping it makes every older build stale. |
 | `fingerprint` | SHA-256 over the path and bytes of every input file and of the pipeline's code (below). |
 | `built_at` | UTC time of the build. |
 | `git_commit` | The commit checked out, if git is available. |
-| `tables` | Row count per file, e.g. `{"graph_nodes.parquet": 167, "graph_facts.parquet": 23, "source_occurrences.parquet": 14488}`. |
+| `tables` | Row count per file, e.g. `{"graph_nodes.parquet": 197, "graph_facts.parquet": 30, "source_occurrences.parquet": 35311, "curation_queue.parquet": 186}`. |
 | `upstream` | The snapshot loaded for every dataset: `url`, `retrieved_at`, `sha256`, `rows`, `license`, and `copy` (`download` or `backup`). |
 
 The manifest is written **last**. If anything fails earlier, no manifest matches the current inputs, so the failed build is never read as current.
@@ -241,13 +276,13 @@ The same steps are Dagster assets ([Dagster](technologies/dagster.md)). `assets.
 
 | Asset | Group | Step | Checks |
 |---|---|---|---|
-| `upstream/mrds_deposits`, `upstream/wikidata_quantities` | upstream | Download (`fetch_or_fall_back` in `upstream.py`), or the cold backup when the network fails. Their URLs come from the `downloads` resource, which tests point at a local zip, a local stand-in for the SPARQL endpoint, or a port that refuses connections. | None |
-| `raw/curated_documents`, `raw/mrds_sources`, `raw/wikidata_things`, `raw/suppressed_records`, `raw/mrds_deposits`, `raw/wikidata_quantities`, `raw/upstream_snapshots` | raw | Load (`load_inputs`): one multi-asset, since the fingerprint is taken once before anything is read. The keys are the dbt sources' keys, so lineage runs into dbt. | The source tests above |
-| `stg_curated__documents`, `stg_curated__quantities`, `stg_curated__overrides`, `stg_curated__quantity_properties`, `stg_mrds__deposits`, `stg_wikidata__quantities` | staging | dbt views | Their tests above |
-| `graph_facts`, `graph_nodes`, `source_occurrences` | marts | dbt marts, written as Parquet | Their tests above |
+| `upstream/mrds_deposits`, `upstream/wikidata_quantities`, `upstream/wikidata_items` | upstream | Download (`fetch_or_fall_back` in `upstream.py`), or the cold backup when the network fails. Their URLs come from the `downloads` resource, which tests point at a local zip, a local stand-in for the SPARQL endpoint, or a port that refuses connections. | None |
+| `raw/curated_documents`, `raw/mrds_sources`, `raw/wikidata_things`, `raw/ore_minerals`, `raw/suppressed_records`, `raw/mrds_deposits`, `raw/wikidata_quantities`, `raw/wikidata_items`, `raw/upstream_snapshots` | raw | Load (`load_inputs`): one multi-asset, since the fingerprint is taken once before anything is read. The keys are the dbt sources' keys, so lineage runs into dbt. | The source tests above |
+| `stg_curated__documents`, `stg_curated__quantities`, `stg_curated__overrides`, `stg_curated__quantity_properties`, `stg_crosswalk__wikidata_items`, `stg_wikidata__items`, `stg_ore_minerals__nodes`, `stg_mrds__deposits`, `stg_wikidata__quantities` | staging | dbt views | Their tests above |
+| `graph_facts`, `graph_nodes`, `source_occurrences`, `curation_queue` | marts | dbt marts, written as Parquet | Their tests above |
 | `graph_manifest` | marts | Publish (`write_manifest`) | None |
 
-Every dbt test that belongs to one model or source is an asset check (58 today). Tests that compare two tables, such as `crosswalk_maps_to_sources`, still run in `dbt build` but aren't attached to an asset. "Materialize all" downloads both datasets again; to rebuild from the snapshots you have, select everything except the `upstream` group. Loading the definitions runs `dbt parse` first, so the asset list always matches the dbt project. dbt's files for each Dagster run go in `build/dbt/target/<run>/`.
+Every dbt test that belongs to one model or source is an asset check (73 today). Tests that compare two tables, such as `crosswalk_maps_to_sources`, still run in `dbt build` but aren't attached to an asset. "Materialize all" downloads both datasets again; to rebuild from the snapshots you have, select everything except the `upstream` group. Loading the definitions runs `dbt parse` first, so the asset list always matches the dbt project. dbt's files for each Dagster run go in `build/dbt/target/<run>/`.
 
 ## Freshness
 
@@ -267,13 +302,15 @@ A build is current when `manifest.json` exists, its `fingerprint` equals the fin
 | `need`, `explore`, `check`, `serve` | The built graph (`load_built` via `current_graph`), and `graph_facts.parquet` (`load_facts`) as `Graph.facts` | They answer questions from what the pipeline built, upstream values included. The detail pane shows where each quantity value came from (`quantity_source` in `views.py`). |
 | `serve`, for the map | `source_occurrences.parquet` (`load_occurrences`) and the manifest's `upstream` | Where each source is found, for `GET /api/occurrences/{id}` ([ADR 0042](../adr/0042-show-where-things-are-found-on-a-maplibre-map.md)). It reads the longitude and latitude columns, so the server needs no spatial extension. |
 | `validate` | The curated YAML (`Graph.from_curated`) | It checks what people wrote, file by file. |
-| `credits` | The curated YAML | The works cited are in the curated layer. |
+| `credits` | The curated YAML, and the references of `data/crosswalks/ore_minerals.csv` | The works cited are in the curated layer. |
+| `queue` | `curation_queue.parquet` (`load_queue`) | The gaps the last build found. |
 | Reasoner and view tests | The built graph (the `graph` fixture: built once per test run from the cold backups), the curated YAML (`curated_graph`), or small graphs built in the test | The answers the app gives. |
 | Pipeline and server tests, `test_cli` | A build made once per test run in a temporary directory, from the cold backups | They test the real path, with no network. |
 | Upstream tests (`pipeline/tests/test_upstream.py`) | A snapshot of 14 real MRDS records (`pipeline/tests/fixtures/mrds-sample.csv`), "downloaded" from a local file | Every crosswalk rule and year rule, with no network. |
-| Wikidata tests (`pipeline/tests/test_wikidata.py`) | 4 real Wikidata statements (`pipeline/tests/fixtures/wikidata-sample.csv`), served by a local stand-in for the SPARQL endpoint (`wikidata_endpoint` in `conftest.py`) | The query, the snapshot, precedence, overrides (and stale ones) and suppressions, with no network. |
+| Ore mineral tests (`pipeline/tests/test_ore_minerals.py`) | The built graph from the cold backups | The upstream nodes, roasting, and the queue. |
+| Wikidata tests (`pipeline/tests/test_wikidata.py`) | 4 real Wikidata statements (`pipeline/tests/fixtures/wikidata-sample.csv`) and every crosswalked item's label, description and formula (the committed backup, `snapshots/wikidata_items/`), served by a local stand-in for the SPARQL endpoint (`wikidata_endpoint` in `conftest.py`) | The query, the snapshot, precedence, overrides (and stale ones) and suppressions, with no network. |
 
-The built graph has the curated graph's documents in the same order, except that each thing's quantities are the values `graph_facts` chose. `pipeline/tests/test_build.py` checks both. Copies of the data made for tests (`data_copy`) link to the real cold backups; a test that needs a dataset missing replaces the link with a copy that leaves it out.
+The built graph has the curated graph's documents in the same order, except that each thing's quantities are the values `graph_facts` chose, followed by the upstream nodes. `pipeline/tests/test_build.py` checks both. Copies of the data made for tests (`data_copy`) link to the real cold backups; a test that needs a dataset missing replaces the link with a copy that leaves it out.
 
 ## Files and configuration
 
@@ -315,6 +352,7 @@ cd pipeline && uv run dg launch --assets '*'   # a full build as a Dagster run, 
 cd pipeline && uv run dg launch --assets 'upstream/mrds_deposits'   # just download a new MRDS snapshot
 cd pipeline && uv run dg launch --assets 'upstream/wikidata_quantities'   # just query Wikidata again
 uv run capabilities backup                     # make newer downloads the cold backups in snapshots/ (then commit)
+uv run capabilities queue                      # the curation queue: what to review next
 ```
 
 To look at the output from Python:
@@ -333,7 +371,7 @@ duckdb.sql("select id, layer, value, curated_value, disagrees from 'build/graph/
 
 | Milestone | Change to the pipeline |
 |---|---|
-| M1 | Done: Dagster runs the build; MRDS, the MRDS crosswalk and `source_occurrences`, served by `GET /api/occurrences/{id}` to the map; Wikidata's quantities through a crosswalk, overrides, suppressions and `graph_facts`. Still to come: upstream nodes in `graph_nodes` and a `curation_queue` mart (slice 4b); Pleiades' ancient mines and quarries as occurrences (slice 4c). |
+| M1 | Done: Dagster runs the build; MRDS, the MRDS crosswalk and `source_occurrences`, served by `GET /api/occurrences/{id}` to the map; Wikidata's quantities through a crosswalk, overrides, suppressions and `graph_facts`; every dataset required, with cold backups; upstream ore minerals as nodes, roasting, and `curation_queue`. Still to come: Pleiades' ancient mines and quarries as occurrences (slice 4c). |
 | M2 | Citation checks against OpenAlex and Crossref; a `reference_checks` mart. |
 | M3 | The agent curation stage and its append-only audit log. |
 | M5 | Raw and staging tables move to Apache Iceberg with an Apache Polaris catalog; the build still exports this artifact for the app. |

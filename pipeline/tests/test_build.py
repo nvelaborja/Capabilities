@@ -1,3 +1,4 @@
+import csv
 import json
 
 import duckdb
@@ -25,11 +26,14 @@ class TestBuiltGraph:
         for bucket in BUCKETS:
             # The same documents in the same order (some answers list things in load order), except that a thing's
             # quantities are the values graph_facts chose.
+            # Upstream nodes (ADR 0045) come after the curated ones.
+            curated_ids = getattr(curated, bucket)
             without_quantities = lambda graph: [  # noqa: E731
                 (node_id, {key: value for key, value in document.items() if key != "quantities"})
-                for node_id, document in getattr(graph, bucket).items()
+                for node_id, document in getattr(graph, bucket).items() if node_id in curated_ids
             ]
             assert without_quantities(built) == without_quantities(curated), bucket
+            assert list(getattr(built, bucket))[: len(curated_ids)] == list(curated_ids), bucket
 
     def test_a_things_quantities_are_the_values_its_facts_chose(self, repo_root, built_dir):
         rows = duckdb.sql(
@@ -50,13 +54,26 @@ class TestBuiltGraph:
         ).fetchall()
         provenance = {node_id: json.loads(value) for node_id, value in rows}
         assert provenance["quarry-granite"] == {"layer": "curated", "path": "data/routes/quarry-granite.yaml"}
-        assert {value["layer"] for value in provenance.values()} == {"curated"}
+        # Every other node is an upstream ore mineral, its deposit or its mining route, each saying where it came from:
+        # the mineral from its Wikidata item, the deposit's places from MRDS, the route from the template it copies.
+        assert {value["layer"] for value in provenance.values()} == {"curated", "upstream"}
+        assert (provenance["azurite"]["dataset"], provenance["azurite"]["record"]) == ("wikidata", "Q108212")
+        assert (provenance["azurite-deposit"]["dataset"], provenance["azurite-deposit"]["record"]) == (
+            "mrds", "deposits listing Azurite as an ore mineral",
+        )
+        assert provenance["mine-azurite"]["copied_from"] == "mine-malachite"
+        assert {value["crosswalk"] for value in provenance.values() if value["layer"] == "upstream"} == {
+            "data/crosswalks/ore_minerals.csv",
+        }
 
     def test_the_manifest_records_the_inputs_and_how_many_nodes(self, repo_root, built_dir):
         manifest = json.loads((graph_dir(built_dir) / MANIFEST_FILE).read_text())
         assert manifest["fingerprint"] == fingerprint(repo_root, built_dir)
         curated = Graph.from_curated(repo_root)
-        assert manifest["tables"][NODES_FILE] == sum(len(getattr(curated, bucket)) for bucket in BUCKETS)
+        with (repo_root / "data" / "crosswalks" / "ore_minerals.csv").open(newline="", encoding="utf-8") as file:
+            minerals = sum(1 for row in csv.DictReader(file) if row["class"] != "none")
+        # Each upstream ore mineral is three nodes: the mineral, its deposit and its mining route (ADR 0045).
+        assert manifest["tables"][NODES_FILE] == sum(len(getattr(curated, bucket)) for bucket in BUCKETS) + 3 * minerals
 
 
 class TestFreshness:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import csv
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterator
@@ -59,6 +60,21 @@ def credits_path(root: Path) -> Path:
 def all_documents(graph: Graph) -> Iterator[tuple[str, dict]]:
     for bucket in (graph.quantities, graph.things, graph.verbs, graph.routes, graph.profiles, graph.jobs, graph.overrides):
         yield from bucket.items()
+    yield from ore_crosswalk_references(graph.root)
+
+
+def ore_crosswalk_references(root: Path) -> Iterator[tuple[str, dict]]:
+    """The reference behind each row of the ore crosswalk (ADR 0045), as a document citing it: the mineral's id, or for
+    a rejected row, its MRDS name."""
+    path = root / "data" / "crosswalks" / "ore_minerals.csv"
+    if not path.is_file():
+        return
+    with path.open(newline="", encoding="utf-8") as file:
+        for row in csv.DictReader(file):
+            reference = {"citation": row["citation"], "supports": row["supports"], "status": "unverified"}
+            if row.get("url"):
+                reference["url"] = row["url"]
+            yield row["id"] or row["mrds_ore"].lower(), {"references": [reference]}
 
 
 def references_in(value: object) -> Iterator[dict]:

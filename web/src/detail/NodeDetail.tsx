@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import type { About, ExplainResponse, ExploreResponse, QuantitySource, SelectionRequest } from "../api/types";
+import type { About, ExplainResponse, NodeUpstream, ExploreResponse, QuantitySource, SelectionRequest } from "../api/types";
 import type { Catalog } from "../catalog";
 import { CHIP_ICONS, NodeChip } from "../chips/NodeChip";
 import { STATUS_LABELS } from "../legend/Legend";
@@ -10,7 +10,7 @@ import { DetailShell } from "./DetailShell";
 import { ExpandAllDialog } from "./ExpandAllDialog";
 import { ItemChips, type QuickAdd } from "./ItemChips";
 import { chipStatus, kindName, statusTri, waysHeading } from "./marks";
-import { sourceLines } from "./provenance";
+import { nodeOrigin, sourceLines } from "./provenance";
 import { References } from "./References";
 import { Routes, type StatusOf } from "./Routes";
 
@@ -228,6 +228,26 @@ function Needs({ data, statusOf, onDrill, quickAdd, onExpandAll }: NeedsProps) {
   );
 }
 
+/** "From Wikidata (Q108212 ↗), brought in by data/crosswalks/ore_minerals.csv." for a node that came from upstream. */
+function NodeOrigin({ upstream }: { upstream: NodeUpstream }) {
+  const origin = nodeOrigin(upstream);
+  return (
+    <p className="detail-note node-source">
+      {origin.text}
+      {origin.link && (
+        <>
+          {" ("}
+          <a href={origin.link.href} target="_blank" rel="noreferrer">
+            {origin.link.label} ↗
+          </a>
+          {")"}
+        </>
+      )}
+      , brought in by <code>{upstream.crosswalk}</code>.
+    </p>
+  );
+}
+
 function AboutSection({ about, statusOf, onDrill }: { about: About; statusOf: StatusOf; onDrill: (id: string) => void }) {
   const facts: { term: string; value: string; source?: QuantitySource }[] = (about.quantities ?? []).map((q) => ({
     term: q.label,
@@ -241,6 +261,9 @@ function AboutSection({ about, statusOf, onDrill }: { about: About; statusOf: St
   return (
     <div className="about">
       {about.description && <p className="description">{about.description}</p>}
+      {about.upstream && (
+        <NodeOrigin upstream={about.upstream} />
+      )}
       {about.target && (
         <p>
           Acting on{" "}
