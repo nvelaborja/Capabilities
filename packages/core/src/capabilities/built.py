@@ -2,7 +2,9 @@
 
 A build directory holds `graph/graph_nodes.parquet` (one row per node, its full document as JSON, and its provenance),
 `graph/graph_facts.parquet` (where each quantity value comes from: upstream, curated or an override, ADR 0043),
-`graph/curation_queue.parquet` (the gaps the build found, ADR 0045), `graph/source_occurrences.parquet` (where sources are found, from upstream datasets, ADR 0036 and ADR 0041) and
+`graph/curation_queue.parquet` (the gaps the build found, ADR 0045), `graph/source_occurrences.parquet` (where sources
+are found, from upstream datasets, ADR 0036 and ADR 0041), `graph/reference_checks.parquet` (each cited work checked
+against OpenAlex and Crossref, ADR 0047) and
 `graph/manifest.json`, which records the fingerprint of the inputs it was built from. A build is current when
 that fingerprint matches the inputs on disk now; otherwise the question commands and the server rebuild first.
 """
@@ -19,11 +21,12 @@ from pathlib import Path
 from .graph import Graph, LoadError
 
 # Bump when the artifact's shape changes, so older builds are rebuilt rather than misread.
-FORMAT_VERSION = 4
+FORMAT_VERSION = 5
 NODES_FILE = "graph_nodes.parquet"
 FACTS_FILE = "graph_facts.parquet"
 QUEUE_FILE = "curation_queue.parquet"
 OCCURRENCES_FILE = "source_occurrences.parquet"
+CHECKS_FILE = "reference_checks.parquet"
 MANIFEST_FILE = "manifest.json"
 SNAPSHOT_FILE = "snapshot.json"
 # Cold backups of every upstream dataset, kept in git, so the graph builds offline or when a download fails (ADR 0044).
@@ -112,6 +115,7 @@ def load_built(root: Path, build_dir: Path) -> Graph:
     ).fetchall()
     graph = Graph.from_documents(root, ((node_type, json.loads(document), provenance) for node_type, document, provenance in rows))
     graph.facts = load_facts(build_dir)
+    graph.reference_checks = load_reference_checks(build_dir)
     for _, document, provenance in rows:
         source = json.loads(provenance)
         if source.get("layer") == "upstream":
@@ -138,6 +142,34 @@ def load_facts(build_dir: Path) -> dict[str, dict]:
         facts[fact["id"]] = {key: json.loads(value) if key in FACT_JSON and value is not None else value
                              for key, value in fact.items()}
     return facts
+
+
+CHECK_COLUMNS = (
+    "citation", "result", "note", "match_service", "match_id", "match_doi", "match_title", "match_year", "free_copy",
+    "links", "checked_at",
+)
+
+
+def load_reference_checks(build_dir: Path) -> dict[str, dict]:
+    """Each cited work checked against OpenAlex and Crossref (ADR 0047), by citation. Empty for a build without them."""
+    import duckdb
+
+    path = graph_dir(build_dir) / CHECKS_FILE
+    if not path.is_file():
+        return {}
+    columns = ", ".join(
+        "links::varchar" if name == "links"
+        else "strftime(checked_at at time zone 'UTC', '%Y-%m-%dT%H:%M:%SZ')" if name == "checked_at"
+        else name
+        for name in CHECK_COLUMNS
+    )
+    rows = duckdb.sql(f"select {columns} from read_parquet(?) where id is not null", params=[str(path)]).fetchall()
+    checks = {}
+    for row in rows:
+        check = dict(zip(CHECK_COLUMNS, row))
+        check["links"] = {link["url"]: link["state"] for link in json.loads(check["links"] or "[]")}
+        checks[check["citation"]] = check
+    return checks
 
 
 # The occurrence columns the app uses. The geometry is left out: the longitude and latitude columns hold the same point,

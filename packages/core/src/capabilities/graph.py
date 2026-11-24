@@ -123,6 +123,8 @@ class Graph:
     facts: dict[str, dict] = field(default_factory=dict)
     # Where each node of a built graph that came from upstream came from (ADR 0045), by id. Empty for the curated graph.
     upstream_nodes: dict[str, dict] = field(default_factory=dict)
+    # Each cited work checked against OpenAlex and Crossref (ADR 0047), by citation. Empty for the curated graph.
+    reference_checks: dict[str, dict] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         self.routes_achieving: dict[str, list[str]] = {}

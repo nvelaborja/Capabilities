@@ -116,6 +116,21 @@ export interface Reference {
   url?: string;
   supports?: string;
   status?: "unverified" | "secondary" | "verified";
+  /** What the citation check found for the work (ADR 0047); only in a built graph. */
+  check?: ReferenceCheck;
+}
+
+/** A cited work looked up in OpenAlex and Crossref, and this reference's link checked (ADR 0047). */
+export interface ReferenceCheck {
+  result: "found" | "review_found" | "possible" | "not_found" | "doi_disagrees" | "not_searched" | "not_checked_yet";
+  checked_at: string | null;
+  note?: string;
+  /** The record matched, with a link to it. */
+  match?: { service: string; url: string; title: string | null; year: number | null };
+  /** A free copy of the work, where OpenAlex knows one. */
+  free_copy?: string;
+  /** Whether this reference's own link still loads: refused means the site turned an automated check away. */
+  link?: "works" | "refused" | "broken";
 }
 
 /** One direct requirement of a route, met / missing / unknown, with the reason when it isn't simply met. */

@@ -118,6 +118,12 @@ sources:
             data_tests: [not_null]
           - name: supports
             data_tests: [not_null]
+          - name: status
+            description: How far the reference has been checked; empty means unverified (ADR 0047).
+            data_tests:
+              - accepted_values:
+                  arguments:
+                    values: [unverified, secondary, verified]
       - name: wikidata_items
         description: >
           The English label and description, and the chemical formula, of every crosswalked Wikidata item, as the
@@ -150,6 +156,28 @@ sources:
           - name: record_id
             data_tests: [not_null]
           - name: reason
+            data_tests: [not_null]
+      - name: reference_candidates
+        description: >
+          What OpenAlex and Crossref hold for each work the curated layer cites, as downloaded (ADR 0047): a few
+          candidates per lookup, by DOI or by searching, or one row saying the lookup found nothing; and one row per
+          cited link, with the HTTP status it answered. Every column as text. Which candidate is the work is dbt's call.
+        columns:
+          - name: service
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: [openalex, crossref, link]
+          - name: lookup
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: [doi, search, link]
+          - name: query
+            data_tests: [not_null]
+          - name: status
             data_tests: [not_null]
       - name: upstream_snapshots
         description: One row per upstream dataset loaded, with where and when it was retrieved, for provenance.

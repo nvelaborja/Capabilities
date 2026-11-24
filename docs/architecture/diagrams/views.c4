@@ -49,7 +49,7 @@ views {
       include capabilities.curated
     }
     group '1b Download upstream (Dagster)' {
-      include mrds, wikidata, pleiades
+      include mrds, wikidata, pleiades, openalex, crossref
       include capabilities.pipeline.dagster, capabilities.pipeline.downloader
       include capabilities.snapshots, capabilities.backups
     }
@@ -58,13 +58,13 @@ views {
       include capabilities.warehouse.rawDocuments, capabilities.warehouse.rawCrosswalk, capabilities.warehouse.rawWikidataCrosswalk
       include capabilities.warehouse.rawOreMinerals, capabilities.warehouse.rawWikidataItems, capabilities.warehouse.rawSuppressions
       include capabilities.warehouse.rawWikidata, capabilities.warehouse.rawMrds, capabilities.warehouse.rawSnapshots, capabilities.warehouse.rawLoads
-      include capabilities.warehouse.rawPleiades, capabilities.warehouse.rawPleiadesRules
+      include capabilities.warehouse.rawPleiades, capabilities.warehouse.rawPleiadesRules, capabilities.warehouse.rawReferenceCandidates
     }
     group '3a/3b Transform and test (dbt)' {
       include capabilities.pipeline.dbt
       include capabilities.warehouse.stgDocuments, capabilities.warehouse.stgCuratedQuantities, capabilities.warehouse.stgWikidata
-      include capabilities.warehouse.stgOreNodes, capabilities.warehouse.stgMrds, capabilities.warehouse.stgPleiades
-      include capabilities.artifact.graphNodes, capabilities.artifact.graphFacts, capabilities.artifact.queue, capabilities.artifact.occurrences
+      include capabilities.warehouse.stgOreNodes, capabilities.warehouse.stgMrds, capabilities.warehouse.stgPleiades, capabilities.warehouse.stgReferences
+      include capabilities.artifact.graphNodes, capabilities.artifact.graphFacts, capabilities.artifact.queue, capabilities.artifact.occurrences, capabilities.artifact.checks
     }
     group '4 Publish' {
       include capabilities.artifact.manifest
@@ -84,6 +84,8 @@ views {
     exclude capabilities.pipeline.downloader -> mrds
     exclude capabilities.pipeline.downloader -> wikidata
     exclude capabilities.pipeline.downloader -> pleiades
+    exclude capabilities.pipeline.downloader -> openalex
+    exclude capabilities.pipeline.downloader -> crossref
     exclude capabilities.pipeline.downloader -> capabilities.curated
     autoLayout LeftRight
   }

@@ -6,12 +6,12 @@ Reference for how the graph is built: inputs, stages, tables, outputs, checks an
 
 | | |
 |---|---|
-| **Inputs** | The curated layer: `data/**/*.yaml` (quantities, things, verbs, routes, profiles, overrides), `data/crosswalks/*.csv`, `data/suppressions/*.csv`, `examples/**/*.yaml` (jobs) and `schema/*.json`. A copy of every upstream dataset (USGS MRDS, Wikidata's quantity statements and item descriptions, and Pleiades' places): the latest download in `build/upstream/` or the cold backup in `snapshots/`, whichever is newer. Every dataset is required ([ADR 0044](../adr/0044-require-every-upstream-dataset-with-cold-backups-in-git.md)). |
-| **Output** | `build/graph/graph_nodes.parquet` (one row per node), `build/graph/graph_facts.parquet` (where each quantity value comes from), `build/graph/source_occurrences.parquet` (where sources are found, GeoParquet), `build/graph/curation_queue.parquet` (the gaps the build found) and `build/graph/manifest.json`. |
+| **Inputs** | The curated layer: `data/**/*.yaml` (quantities, things, verbs, routes, profiles, overrides), `data/crosswalks/*.csv`, `data/suppressions/*.csv`, `examples/**/*.yaml` (jobs) and `schema/*.json`. A copy of every upstream dataset (USGS MRDS, Wikidata's quantity statements and item descriptions, Pleiades' places, and what OpenAlex and Crossref hold for each cited work): the latest download in `build/upstream/` or the cold backup in `snapshots/`, whichever is newer. Every dataset is required ([ADR 0044](../adr/0044-require-every-upstream-dataset-with-cold-backups-in-git.md)). |
+| **Output** | `build/graph/graph_nodes.parquet` (one row per node), `build/graph/graph_facts.parquet` (where each quantity value comes from), `build/graph/source_occurrences.parquet` (where sources are found, GeoParquet), `build/graph/curation_queue.parquet` (the gaps the build found), `build/graph/reference_checks.parquet` (each cited work checked against OpenAlex and Crossref) and `build/graph/manifest.json`. |
 | **Run by** | `uv run capabilities build`, or automatically by `need`, `explore`, `check` and `serve` when the output is missing or stale. Or Dagster: the same steps as assets, plus downloading upstream snapshots, with lineage, checks and run history (see [Orchestration](#orchestration-dagster)). Only Dagster downloads. |
-| **Code** | `pipeline/src/capabilities_pipeline/build.py` (extract, load, run dbt, manifest), `upstream.py` (downloading and loading snapshots), `assets.py` and `definitions.py` (the same steps as Dagster assets), and `pipeline/dbt/` (the dbt project). Reading: `packages/core/src/capabilities/built.py`. |
+| **Code** | `pipeline/src/capabilities_pipeline/build.py` (extract, load, run dbt, manifest), `upstream.py` (downloading and loading snapshots), `citations.py` (looking up cited works and checking links), `assets.py` and `definitions.py` (the same steps as Dagster assets), and `pipeline/dbt/` (the dbt project). Reading: `packages/core/src/capabilities/built.py`. |
 | **Engine** | DuckDB with its spatial extension, through dbt Core and the dbt-duckdb adapter. |
-| **Time** | About 7 seconds with `capabilities build`; about 45 seconds as a Dagster run that downloads MRDS again. The Wikidata query takes under a second. |
+| **Time** | About 7 seconds with `capabilities build`; about 45 seconds as a Dagster run that downloads MRDS again. The Wikidata query takes under a second; looking up the cited works about a minute and a half, mostly Crossref's limit of one search a second. |
 
 ## Stages
 
@@ -31,7 +31,14 @@ data/crosswalks/mrds_sources.csv ───────────────�
 USGS MRDS ──▶ build/upstream/mrds_deposits/ ─────▶ raw.mrds_deposits ──▶ stg_mrds__deposits ─────┼─▶ source_occurrences ──────▶ source_occurrences.parquet
 data/crosswalks/pleiades_sources.csv ────────────▶ raw.pleiades_sources ─────────────────────────┤
 Pleiades ──▶ build/upstream/pleiades_places/ ────▶ raw.pleiades_places ──▶ stg_pleiades__workings ┤
-             (Parquet + snapshot.json)            raw.upstream_snapshots ────────────────────────┘                             manifest.json (last)
+             (Parquet + snapshot.json)            raw.upstream_snapshots ────────────────────────┘
+OpenAlex, Crossref ──▶ build/upstream/reference_ ▶ raw.reference_candidates ▶ stg_references__candidates ─┬─▶ reference_checks ──▶ reference_checks.parquet
+and each cited link    candidates/
+(every reference in the documents and nodes) ────────────────────────────▶ stg_references__cited ──────┘
+                                                                                                                  ▼
+                                                                              every mart above ─────────────▶ curation_queue ──▶ curation_queue.parquet
+
+                                                                                                                                       manifest.json (last)
 ```
 
 ### 1b. Download (Dagster only)
@@ -59,11 +66,13 @@ The `upstream/wikidata_items` asset sends a second query for the same items: eac
 
 The `upstream/pleiades_places` asset downloads `https://atlantides.org/downloads/pleiades/dumps/pleiades-places-latest.csv.gz`, the daily dump of every place in Pleiades (6.5 MB compressed; 42,544 places on 2026-11-24), checks its 26 columns and keeps it unchanged as `pleiades_places.parquet` ([ADR 0046](../adr/0046-place-ancient-mines-and-quarries-from-pleiades.md)). DuckDB reads the gzip directly, so the file hashed is the file converted. License: CC BY 3.0.
 
-USGS refuses Python's default user agent, so downloads send a generic one (`dataset-snapshot/1.0`), and so does the Wikidata query.
+The `upstream/reference_candidates` asset looks up every work the curated layer cites ([ADR 0047](../adr/0047-check-citations-against-openalex-and-crossref.md), [OpenAlex and Crossref](technologies/openalex-and-crossref.md)). `cited_works` in `citations.py` reads every reference in the YAML and the ore crosswalk's (rows not rejected); a work is its citation text, so a book cited by eleven routes is looked up once. A work with a DOI is looked up by it in OpenAlex (`/works/doi:<doi>`, free) and Crossref (`/works/<doi>`). A work with a year in brackets is searched for: OpenAlex by its title (`search=`, what follows the year up to the first full stop, without an edition or "as summarized in"), Crossref by the whole citation (`query.bibliographic=`). Five candidates each are kept; a lookup that finds nothing is one row with no candidate. A web page or undated work isn't searched. Then every cited URL is requested once and its HTTP status kept. Requests pause between each other to stay inside Crossref's anonymous limit (one search a second) and OpenAlex's (ten a second); a 429, a server error, an answer cut short or one that isn't JSON is retried three times, then fails, and the download falls back to the cold backup. Only web (http and https) links are opened; any other address is recorded as `not a web address`, and a malformed one or one that can't be reached as `unreachable: <why>`, without stopping the rest. No key is needed; `OPENALEX_API_KEY`, if set, is sent. Only bibliographic fields are kept, never an abstract. The result, `reference_candidates.parquet`, has the columns `citation`, `service` (`openalex`, `crossref` or `link`), `lookup` (`doi`, `search` or `link`), `query`, `status`, `rank`, `record_id`, `doi`, `title`, `year`, `authors`, `type`, `oa_url`, `pdf_url` and `score` (Crossref's relevance). Its `snapshot.json` adds `crossref_url`, the number of `works` and how many were `searched`. On 2026-11-24: 43 works, 27 searched or looked up by DOI, 24 links; 242 rows, in about a minute and a half.
+
+USGS refuses Python's default user agent, so downloads send a generic one (`dataset-snapshot/1.0`), and so do the Wikidata query and the reference lookups. None sends an email address, so Crossref treats us as an anonymous user.
 
 **When a download fails.** If the network fails (offline, a refused connection, a timeout) and the dataset has a cold backup, the asset uses the backup instead: it logs a warning and records `copy: backup` and the `download_error` in its metadata, and the run goes on (`fetch_or_fall_back`). Any other failure, such as changed columns, fails the asset.
 
-**Cold backups.** `snapshots/<dataset>/` in the repository holds a copy of each dataset, in git: the Parquet, every value unchanged but compressed with zstd (MRDS: 15 MB, down from 32 MB; Pleiades: 5.1 MB), and the same `snapshot.json` as the download. `uv run capabilities backup` replaces a backup with a newer download (`back_up`); commit the result. Nothing in a build downloads: a build reads the downloads and the backups ([ADR 0044](../adr/0044-require-every-upstream-dataset-with-cold-backups-in-git.md)).
+**Cold backups.** `snapshots/<dataset>/` in the repository holds a copy of each dataset, in git: the Parquet, every value unchanged but compressed with zstd (MRDS: 15 MB, down from 32 MB; Pleiades: 5.1 MB; the reference candidates: 28 KB), and the same `snapshot.json` as the download. `uv run capabilities backup` replaces a backup with a newer download (`back_up`); commit the result. Nothing in a build downloads: a build reads the downloads and the backups ([ADR 0044](../adr/0044-require-every-upstream-dataset-with-cold-backups-in-git.md)).
 
 ### 1a. Extract
 
@@ -97,7 +106,7 @@ Every table is replaced on every build. The crosswalks and suppressions are load
 
 **`raw.wikidata_items`**: the Wikidata items snapshot, as text.
 
-**`raw.suppressed_records`**: `data/suppressions/suppressed_records.csv`: `dataset` (`mrds` or `wikidata`), `record_id` and `reason`.
+**`raw.suppressed_records`**: `data/suppressions/suppressed_records.csv`: `dataset` (`mrds`, `wikidata` or `pleiades`), `record_id` and `reason`.
 
 **`raw.wikidata_quantities`**: the Wikidata snapshot as the query returned it, every column text: `item` (Q id), `property` (P id), `amount`, `lower`, `upper` (empty when the statement has no bounds) and `unit` (Q id; `Q199`, "1", for Mohs).
 
@@ -107,11 +116,13 @@ Every table is replaced on every build. The crosswalks and suppressions are load
 
 **`raw.pleiades_places`**: the Pleiades snapshot as downloaded, all 26 columns as text (`id`, `title`, `description`, `featureTypes`, `tags`, `reprLat`, `reprLong`, `locationPrecision`, `minDate`, `maxDate`, `timePeriodsKeys` and the rest).
 
+**`raw.reference_candidates`**: what OpenAlex and Crossref answered for each cited work, and how each cited link answered, every column as text (above).
+
 **`raw.upstream_snapshots`**
 
 | Column | Type | Meaning |
 |---|---|---|
-| `dataset` | varchar | `mrds_deposits` or `wikidata_quantities`. |
+| `dataset` | varchar | The dataset: `mrds_deposits`, `wikidata_quantities`, `wikidata_items`, `pleiades_places` or `reference_candidates`. |
 | `url`, `retrieved_at`, `sha256`, `license` | | From `snapshot.json`. |
 | `row_count` | bigint | Rows in the snapshot. |
 | `copy` | varchar | `download` or `backup`: which copy was loaded. |
@@ -132,11 +143,12 @@ The build runs `dbt build` on `pipeline/dbt`: `capabilities build` through dbt's
 - `raw.curated_documents`: `ordinal` and `path` are unique and not null; `node_type` is not null and one of the seven known types; `id` is not null.
 - `raw.wikidata_things`: `id` is unique, not null and names a curated node; `wikidata` is unique and not null; `notes` is not null.
 - `raw.wikidata_quantities`: `item`, `property` and `amount` are not null.
-- `raw.ore_minerals`: `id` is unique; `wikidata` and `mrds_ore` are unique and not null; `class` is one of the ore classes or `none`; `citation` and `supports` are not null.
+- `raw.ore_minerals`: `id` is unique; `wikidata` and `mrds_ore` are unique and not null; `class` is one of the ore classes or `none`; `citation` and `supports` are not null; `status`, when given, is `unverified`, `secondary` or `verified`.
 - `raw.wikidata_items`: `item` is not null.
 - `raw.suppressed_records`: `dataset` is `mrds`, `wikidata` or `pleiades`; `record_id` and `reason` are not null.
 - `raw.pleiades_sources`: `target` is not null and names a curated node; `places` is `mine` or `quarry`; `word` and `notes` are not null.
 - `raw.pleiades_places`: `id` is unique and not null.
+- `raw.reference_candidates`: `service` is `openalex`, `crossref` or `link`; `lookup` is `doi`, `search` or `link`; `query` and `status` are not null.
 - `raw.mrds_sources`: `source_id` is not null and names a curated node; `field` is `ore` or `commodity`; `value` and `notes` are not null.
 - `raw.mrds_deposits`: `dep_id` is unique and not null.
 - `raw.upstream_snapshots`: `dataset` is unique and not null; `retrieved_at` is not null.
@@ -153,6 +165,8 @@ The build runs `dbt build` on `pipeline/dbt`: `capabilities build` through dbt's
 - `wikidata_crosswalk_ids_are_items`: both crosswalks, rejected ore rows included, name Q ids.
 - `wikidata_units_match`: every Wikidata value is in the unit its quantity expects (`wikidata.unit`); one in another unit would otherwise be read unconverted.
 - `overrides_target_upstream_values`: every override's thing is in the Wikidata crosswalk, and its quantity is read from Wikidata. A value only the curated layer gives is corrected in its own file.
+
+Macros in `pipeline/dbt/macros/citations.sql` reduce names and titles for comparing (`plain_text`: no accents, punctuation or capitals), split a title into its distinct words (`title_words`), and measure how alike two titles are (`word_overlap`: the words they share over the words either has).
 
 Macros (`pipeline/dbt/macros/quantity_json.sql`) turn a low and high into a quantity value as the curated layer writes it (one number, or `[low, high]`; whole numbers as integers), and read the low and high ends back out of one.
 
@@ -275,13 +289,34 @@ The marts' `external` materialization (a dbt-duckdb feature) writes each result 
 | Column | Meaning |
 |---|---|
 | `id` | `<kind>/<subject>`. |
-| `kind` | `ore_candidate`, `extracted_without_route`, `source_without_places`, `route_unverified`, `upstream_disagreement`, `stale_override` or `unmatched_place`. |
-| `subject`, `label` | What the item is about: an MRDS ore name (lower case) or a node or fact id, and how to show it. |
+| `kind` | `ore_candidate`, `extracted_without_route`, `source_without_places`, `route_unverified`, `upstream_disagreement`, `stale_override`, `unread_reference` or `unmatched_place`. |
+| `subject`, `label` | What the item is about: an MRDS ore name (lower case), a node or fact id, or a work's check id (`ref-…`, labelled with its citation), and how to show it. |
 | `detail` | What is missing, and what to do. |
-| `priority` | For ore candidates, the number of MRDS deposits of copper, iron or tin listing the mineral as an ore; for unmatched places, the number of places; otherwise null. |
+| `priority` | For ore candidates, the number of MRDS deposits of copper, iron or tin listing the mineral as an ore; for unread references, the number of routes citing the work; for unmatched places, the number of places; otherwise null. |
 | `evidence` | JSON: the deposits and metals for a candidate, the values behind a disagreement, and so on. |
 
-An ore candidate is a mineral listed on at least 20 such deposits and not yet reviewed: in neither the ore crosswalk nor `mrds_sources`. An unmatched place group is the located Pleiades mines and quarries that no rule matches and none suppressed, by a material they name (gold, marble…), or naming none. They come last, after every other kind: where a material was found matters least to the app's questions ([ADR 0046](../adr/0046-place-ancient-mines-and-quarries-from-pleiades.md)). Tests: `id` unique and not null; `kind` one of the seven; `detail` not null. With the 2026-11-24 snapshots there are 221 items: 135 ore candidates (galena first, on 6,326 deposits), 49 routes with only unverified references, 2 sources with no places, and 35 groups of unmatched places (236 naming no material, then gold, 100). `uv run capabilities queue` prints them.
+An ore candidate is a mineral listed on at least 20 such deposits and not yet reviewed: in neither the ore crosswalk nor `mrds_sources`. An unmatched place group is the located Pleiades mines and quarries that no rule matches and none suppressed, by a material they name (gold, marble…), or naming none. They come last, after every other kind: where a material was found matters least to the app's questions ([ADR 0046](../adr/0046-place-ancient-mines-and-quarries-from-pleiades.md)). An unread reference is a work not yet verified everywhere it is cited: the reading queue, ranked by how many routes cite it, saying what the check found and offering a free copy ([ADR 0047](../adr/0047-check-citations-against-openalex-and-crossref.md)). Tests: `id` unique and not null; `kind` one of the eight; `detail` not null. With the 2026-11-24 snapshots there are 264 items: 135 ore candidates (galena first, on 6,326 deposits), 49 routes with only unverified references, 2 sources with no places, 43 unread references (Craddock and Tylecote first, 11 routes each), and 35 groups of unmatched places (236 naming no material, then gold, 100). `uv run capabilities queue` prints them.
+
+**`stg_references__cited`** (view). Every reference in the graph, one row per use: `node_id`, `node_type`, `citation`, `doi` and `url` (with whitespace trimmed from both ends, as the download trims it), `status`, and `copied`: true for a mining route copied for an ore mineral, whose references are its template's, marked unverified (ADR 0045). It walks each document with `json_tree`, so a reference nested anywhere (a route's, a profile item's, an override's) is found: in the curated documents, example jobs included, and in the upstream nodes (an ore mineral's reference, and those a copied mining route keeps).
+
+**`stg_references__candidates`** (view). The candidates of `raw.reference_candidates`, typed (`rank`, `year` integers; `score` a double; `doi` lower case), with `title_words`, `main_title_words` (before a colon) and `plain_authors` for comparing. Link rows are left out.
+
+**`reference_checks`** (mart, written as Parquet). Every cited work, checked ([ADR 0047](../adr/0047-check-citations-against-openalex-and-crossref.md)). From the citation it reads the year in brackets, the title after it (up to the first full stop, without an edition), and the first author's surname at the start. A candidate's title score is the `word_overlap` of the two titles, whole or before a colon, whichever is higher. A candidate is the work when its title scores at least 0.8, it isn't a review, its authors include the surname, and its year is the cited year give or take one (another edition is only possible). The surname must be a whole word among the authors (Fall isn't Fallon). A review (`book-review`, `review`) with the title, from the cited year to five years after, is a review of it. A title scoring at least 0.5 is a possible match. The best candidate is the work, else a review, else a possible match, by title score, closeness of year, OpenAlex first, then rank.
+
+| Column | Meaning |
+|---|---|
+| `id` | `ref-` and the first 12 hex digits of the citation's MD5. |
+| `citation`, `doi` | The work, and the DOI cited for it (the largest, if uses disagree; `citations.py` makes the same choice). |
+| `statuses`, `verified` | The statuses its uses give, and `verified` when every use is, leaving out copied routes: they follow their template, where a person reads the work. A work cited in the ore crosswalk takes the row's `status`. |
+| `cited_by`, `routes` | The nodes citing it, and how many are routes (copied mining routes included). |
+| `result` | `found`, `review_found`, `possible`, `not_found`, `doi_disagrees` (the DOI cited leads to a different work), `not_searched` (a web page or undated work) or `not_checked_yet` (not looked up the way it is cited now: cited since the last download, or its DOI added or changed since). |
+| `note` | Why, in words: what differs for a possible match ("the year differs (cited 1992, found 1978): perhaps another edition"), and the meaning of the other results. |
+| `match_service`, `match_id`, `match_doi`, `match_title`, `match_year`, `match_authors`, `match_type`, `title_score` | The record matched, for a work found, a review, a possible match or a wrong DOI's work. |
+| `free_copy` | For a work found only: OpenAlex's PDF link, else its best open-access link, for the record matched or another OpenAlex record with its DOI. Not for a review or a possible match, whose copy may not be the work. |
+| `links` | JSON: each URL cited for the work, its `status` and `state`: `works` (2xx or 3xx), `refused` (401, 403 or 429: the site turns automated requests away) or `broken` (any other answer, `unreachable`, or `not a web address`). |
+| `checked_at` | When the candidates were retrieved. |
+
+Tests: `id` and `citation` unique and not null; `result` one of the seven; `cited_by` not null. A check never changes a reference's status. With the lookup of 2026-11-24: 16 works found, 4 known only by reviews, 5 possible, 2 not found and 16 not searched; 23 of 24 links work and Britannica's refuses; 4 works have a free copy.
 
 ### 4. Publish
 
@@ -289,11 +324,11 @@ The build counts the rows in each Parquet file and writes **`build/graph/manifes
 
 | Field | Meaning |
 |---|---|
-| `format_version` | The artifact's shape (`FORMAT_VERSION` in `built.py`, now 4: `curation_queue.parquet` was added). Bumping it makes every older build stale. |
+| `format_version` | The artifact's shape (`FORMAT_VERSION` in `built.py`, now 5: `reference_checks.parquet` was added). Bumping it makes every older build stale. |
 | `fingerprint` | SHA-256 over the path and bytes of every input file and of the pipeline's code (below). |
 | `built_at` | UTC time of the build. |
 | `git_commit` | The commit checked out, if git is available. |
-| `tables` | Row count per file, e.g. `{"graph_nodes.parquet": 197, "graph_facts.parquet": 30, "source_occurrences.parquet": 35732, "curation_queue.parquet": 221}`. |
+| `tables` | Row count per file, e.g. `{"graph_nodes.parquet": 197, "graph_facts.parquet": 30, "source_occurrences.parquet": 35732, "curation_queue.parquet": 264, "reference_checks.parquet": 43}`. |
 | `upstream` | The snapshot loaded for every dataset: `url`, `retrieved_at`, `sha256`, `rows`, `license`, and `copy` (`download` or `backup`). |
 
 The manifest is written **last**. If anything fails earlier, no manifest matches the current inputs, so the failed build is never read as current.
@@ -304,13 +339,13 @@ The same steps are Dagster assets ([Dagster](technologies/dagster.md)). `assets.
 
 | Asset | Group | Step | Checks |
 |---|---|---|---|
-| `upstream/mrds_deposits`, `upstream/wikidata_quantities`, `upstream/wikidata_items`, `upstream/pleiades_places` | upstream | Download (`fetch_or_fall_back` in `upstream.py`), or the cold backup when the network fails. Their URLs come from the `downloads` resource, which tests point at a local zip or gzip, a local stand-in for the SPARQL endpoint, or a port that refuses connections. | None |
-| `raw/curated_documents`, `raw/mrds_sources`, `raw/wikidata_things`, `raw/ore_minerals`, `raw/suppressed_records`, `raw/pleiades_sources`, `raw/mrds_deposits`, `raw/wikidata_quantities`, `raw/wikidata_items`, `raw/pleiades_places`, `raw/upstream_snapshots` | raw | Load (`load_inputs`): one multi-asset, since the fingerprint is taken once before anything is read. The keys are the dbt sources' keys, so lineage runs into dbt. | The source tests above |
-| `stg_curated__documents`, `stg_curated__quantities`, `stg_curated__overrides`, `stg_curated__quantity_properties`, `stg_crosswalk__wikidata_items`, `stg_wikidata__items`, `stg_ore_minerals__nodes`, `stg_mrds__deposits`, `stg_wikidata__quantities`, `stg_pleiades__workings` | staging | dbt views | Their tests above |
-| `graph_facts`, `graph_nodes`, `source_occurrences`, `curation_queue` | marts | dbt marts, written as Parquet | Their tests above |
+| `upstream/mrds_deposits`, `upstream/wikidata_quantities`, `upstream/wikidata_items`, `upstream/pleiades_places`, `upstream/reference_candidates` | upstream | Download (`fetch_or_fall_back` in `upstream.py`), or the cold backup when the network fails. Their URLs come from the `downloads` resource (`openalex_url` and `crossref_url` for the references), which tests point at a local zip or gzip, local stand-ins for the SPARQL endpoint and for OpenAlex and Crossref, or a port that refuses connections. | None |
+| `raw/curated_documents`, `raw/mrds_sources`, `raw/wikidata_things`, `raw/ore_minerals`, `raw/suppressed_records`, `raw/pleiades_sources`, `raw/mrds_deposits`, `raw/wikidata_quantities`, `raw/wikidata_items`, `raw/pleiades_places`, `raw/reference_candidates`, `raw/upstream_snapshots` | raw | Load (`load_inputs`): one multi-asset, since the fingerprint is taken once before anything is read. The keys are the dbt sources' keys, so lineage runs into dbt. | The source tests above |
+| `stg_curated__documents`, `stg_curated__quantities`, `stg_curated__overrides`, `stg_curated__quantity_properties`, `stg_crosswalk__wikidata_items`, `stg_wikidata__items`, `stg_ore_minerals__nodes`, `stg_mrds__deposits`, `stg_wikidata__quantities`, `stg_pleiades__workings`, `stg_references__cited`, `stg_references__candidates` | staging | dbt views | Their tests above |
+| `graph_facts`, `graph_nodes`, `source_occurrences`, `reference_checks`, `curation_queue` | marts | dbt marts, written as Parquet | Their tests above |
 | `graph_manifest` | marts | Publish (`write_manifest`) | None |
 
-Every dbt test that belongs to one model or source is an asset check (73 today). Tests that compare two tables, such as `crosswalk_maps_to_sources`, still run in `dbt build` but aren't attached to an asset. "Materialize all" downloads both datasets again; to rebuild from the snapshots you have, select everything except the `upstream` group. Loading the definitions runs `dbt parse` first, so the asset list always matches the dbt project. dbt's files for each Dagster run go in `build/dbt/target/<run>/`.
+Every dbt test that belongs to one model or source is an asset check (94 today). Tests that compare two tables, such as `crosswalk_maps_to_sources`, still run in `dbt build` but aren't attached to an asset. "Materialize all" downloads every dataset again, and looks up every cited work; to rebuild from the snapshots you have, select everything except the `upstream` group. Loading the definitions runs `dbt parse` first, so the asset list always matches the dbt project. dbt's files for each Dagster run go in `build/dbt/target/<run>/`.
 
 ## Freshness
 
@@ -331,11 +366,13 @@ A build is current when `manifest.json` exists, its `fingerprint` equals the fin
 | `serve`, for the map | `source_occurrences.parquet` (`load_occurrences`) and the manifest's `upstream` | Where each source is found, for `GET /api/occurrences/{id}` ([ADR 0042](../adr/0042-show-where-things-are-found-on-a-maplibre-map.md)). It reads the longitude and latitude columns, so the server needs no spatial extension. |
 | `validate` | The curated YAML (`Graph.from_curated`) | It checks what people wrote, file by file. |
 | `credits` | The curated YAML, and the references of `data/crosswalks/ore_minerals.csv` | The works cited are in the curated layer. |
-| `queue` | `curation_queue.parquet` (`load_queue`) | The gaps the last build found. |
+| `queue` | `curation_queue.parquet` (`load_queue`) | The gaps the last build found, the reading queue among them. |
+| `serve`, for the detail pane | `reference_checks.parquet` (`load_reference_checks`) as `Graph.reference_checks` | What the check found for each reference's work, shown under it (`reference_check` in `views.py`). |
 | Reasoner and view tests | The built graph (the `graph` fixture: built once per test run from the cold backups), the curated YAML (`curated_graph`), or small graphs built in the test | The answers the app gives. |
 | Pipeline and server tests, `test_cli` | A build made once per test run in a temporary directory, from the cold backups | They test the real path, with no network. |
 | Upstream tests (`pipeline/tests/test_upstream.py`) | A snapshot of 14 real MRDS records (`pipeline/tests/fixtures/mrds-sample.csv`), "downloaded" from a local file | Every crosswalk rule and year rule, with no network. |
 | Pleiades tests (`pipeline/tests/test_pleiades.py`) | 13 real Pleiades places (`pipeline/tests/fixtures/pleiades-sample.csv`), gzipped and "downloaded" from a local file; and every place, from the cold backup | Matching by tag and by text, "Iron Age", class-level copper mines, dates, approximate locations, unmatched places in the queue, suppressions, and class-level places on a mineral's map. |
+| Citation tests (`pipeline/tests/test_citations.py`) | What OpenAlex and Crossref answered on 2026-11-24 (the committed backup, `snapshots/reference_candidates/`), served by a local stand-in for both (`scholarly_endpoint` in `conftest.py`), with links answered from the backup too (`lookups_offline`); a local service that is always busy or answers a web page | A download gives back the backup unchanged; each work looked up once; DOIs, searches and web pages; retries and the fallback; only web links opened; every result, a wrong DOI, a citation or DOI added since the lookup, free copies only for works found, and the reading queue (copied routes and the ore crosswalk's `status`), with no network. |
 | Ore mineral tests (`pipeline/tests/test_ore_minerals.py`) | The built graph from the cold backups | The upstream nodes, roasting, and the queue. |
 | Wikidata tests (`pipeline/tests/test_wikidata.py`) | 4 real Wikidata statements (`pipeline/tests/fixtures/wikidata-sample.csv`) and every crosswalked item's label, description and formula (the committed backup, `snapshots/wikidata_items/`), served by a local stand-in for the SPARQL endpoint (`wikidata_endpoint` in `conftest.py`) | The query, the snapshot, precedence, overrides (and stale ones) and suppressions, with no network. |
 
@@ -401,7 +438,7 @@ duckdb.sql("select id, layer, value, curated_value, disagrees from 'build/graph/
 | Milestone | Change to the pipeline |
 |---|---|
 | M1 | Done: Dagster runs the build; MRDS, the MRDS crosswalk and `source_occurrences`, served by `GET /api/occurrences/{id}` to the map; Wikidata's quantities through a crosswalk, overrides, suppressions and `graph_facts`; every dataset required, with cold backups; upstream ore minerals as nodes, roasting, and `curation_queue`. Pleiades' ancient mines and quarries as occurrences of sources and ore classes, and `unmatched_place` in the queue (slice 4c, [ADR 0046](../adr/0046-place-ancient-mines-and-quarries-from-pleiades.md)). |
-| M2 | Citation checks against OpenAlex and Crossref; a `reference_checks` mart. |
+| M2 | Done: every cited work looked up in OpenAlex and Crossref, and every cited link checked (`upstream/reference_candidates`); the `reference_checks` mart; the reading queue (`unread_reference`) ([ADR 0047](../adr/0047-check-citations-against-openalex-and-crossref.md)). |
 | M3 | The agent curation stage and its append-only audit log. |
 | M5 | Raw and staging tables move to Apache Iceberg with an Apache Polaris catalog; the build still exports this artifact for the app. |
 

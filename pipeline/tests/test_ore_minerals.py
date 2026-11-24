@@ -53,7 +53,7 @@ class TestOreMineralNodes:
     def test_a_crosswalked_item_missing_from_the_wikidata_snapshot_stops_the_build(self, data_copy, tmp_path):
         # given: a row added after the last download, so Wikidata's copy has no name or description for it
         crosswalk = data_copy / "data" / "crosswalks" / "ore_minerals.csv"
-        row = 'covellite,Q99999999,Covellite,copper-sulphide-ore,mine-malachite,"A citation.",,"What it supports.",\n'
+        row = 'covellite,Q99999999,Covellite,copper-sulphide-ore,mine-malachite,"A citation.",,"What it supports.",,\n'
         crosswalk.write_text(crosswalk.read_text() + row, encoding="utf-8")
         # then: the build stops rather than build the node without its Wikidata data
         with pytest.raises(BuildError, match="crosswalked_items_are_in_the_wikidata_items_snapshot"):

@@ -6,7 +6,7 @@ The project itself is free for non-commercial use: the code under the [PolyForm 
 
 ## Datasets
 
-The upstream datasets the graph is built from ([ADR 0034](docs/adr/0034-build-the-graph-from-upstream-datasets-and-a-curated-layer.md)). USGS MRDS (since 2026-11-22), Wikidata and Pleiades (since 2026-11-24) are ingested; the others are not yet, and each row says what it will be used for. Licenses were checked on 2026-11-20. Before a new dataset is ingested, it gets a row here. A cold backup of each ingested dataset is kept in [`snapshots/`](snapshots/README.md) under the dataset's own license ([ADR 0044](docs/adr/0044-require-every-upstream-dataset-with-cold-backups-in-git.md)).
+The upstream datasets the graph is built from ([ADR 0034](docs/adr/0034-build-the-graph-from-upstream-datasets-and-a-curated-layer.md)). USGS MRDS (since 2026-11-22), Wikidata, Pleiades, OpenAlex and Crossref (since 2026-11-24) are ingested; the others are not yet, and each row says what it will be used for. Licenses were checked on 2026-11-20. Before a new dataset is ingested, it gets a row here. A cold backup of each ingested dataset is kept in [`snapshots/`](snapshots/README.md) under the dataset's own license ([ADR 0044](docs/adr/0044-require-every-upstream-dataset-with-cold-backups-in-git.md)).
 
 | Dataset | Used for | License | Credit |
 |---|---|---|---|
@@ -15,8 +15,8 @@ The upstream datasets the graph is built from ([ADR 0034](docs/adr/0034-build-th
 | [Pleiades](https://pleiades.stoa.org/) | Ancient mines and quarries, and the periods they are attested in: where our sources and ore classes were worked in antiquity ([ADR 0046](docs/adr/0046-place-ancient-mines-and-quarries-from-pleiades.md)) | CC BY 3.0 | Pleiades contributors, *Pleiades: A Gazetteer of Past Places*, https://pleiades.stoa.org. Snapshot of the daily dump `pleiades-places-latest.csv.gz` retrieved 2026-11-24, kept in `snapshots/pleiades_places/` |
 | [Cliopatria](https://github.com/Seshat-Global-History-Databank/cliopatria) | Borders of past polities over time | CC BY 4.0 | Seshat: Global History Databank. Paper: [Scientific Data (2025), doi:10.1038/s41597-025-04516-9](https://doi.org/10.1038/s41597-025-04516-9) |
 | [Seshat: Global History Databank](https://seshat-db.com/) | Comparing the reasoner with what past societies had | CC BY-NC-SA | Seshat: Global History Databank. TODO: add the exact attribution line Seshat asks for when the data is ingested |
-| [OpenAlex](https://openalex.org/) | Checking that cited works exist | CC0 1.0 | OurResearch |
-| [Crossref](https://www.crossref.org/) | Checking that cited works exist | Bibliographic metadata: no restrictions. Abstracts are copyrighted, so we don't store them | Crossref and its members |
+| [OpenAlex](https://openalex.org/) | Checking that cited works exist, and finding free copies to read ([ADR 0047](docs/adr/0047-check-citations-against-openalex-and-crossref.md)) | CC0 1.0 | OurResearch. Snapshot of the works found for each citation, retrieved 2026-11-24, kept in `snapshots/reference_candidates/` |
+| [Crossref](https://www.crossref.org/) | Checking that cited works exist, and that their DOIs lead to them ([ADR 0047](docs/adr/0047-check-citations-against-openalex-and-crossref.md)) | Bibliographic metadata: no restrictions. Abstracts are copyrighted, so we don't store them | Crossref and its members. Snapshot of the works found for each citation, retrieved 2026-11-24, kept in `snapshots/reference_candidates/` |
 
 Not used: [Mindat](https://www.mindat.org/). Its terms forbid copying its data into another product.
 

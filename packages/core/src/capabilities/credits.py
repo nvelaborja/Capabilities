@@ -66,7 +66,7 @@ def ore_crosswalk_references(root: Path) -> Iterator[tuple[str, dict]]:
     """The reference behind each row of the ore crosswalk (ADR 0045), as a document citing it: the mineral's id, or for
     a rejected row, its MRDS name."""
     for row in ore_crosswalk_rows(root):
-        reference = {"citation": row["citation"], "supports": row["supports"], "status": "unverified"}
+        reference = {"citation": row["citation"], "supports": row["supports"], "status": row.get("status") or "unverified"}
         if row.get("url"):
             reference["url"] = row["url"]
         yield row["id"] or row["mrds_ore"].lower(), {"references": [reference]}

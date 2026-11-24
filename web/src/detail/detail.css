@@ -436,6 +436,14 @@
   color: var(--text-muted);
 }
 
+.reference-check {
+  color: var(--text-muted);
+}
+
+.reference-check a {
+  color: var(--accent);
+}
+
 .source-verified {
   color: var(--met);
 }

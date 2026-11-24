@@ -1,13 +1,15 @@
 import csv
 import gzip
 import io
+import json
 import shutil
 import threading
 import zipfile
+from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from types import SimpleNamespace
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, unquote, urlparse
 
 import pytest
 
@@ -149,8 +151,134 @@ def wikidata_endpoint():
     server.shutdown()
 
 
+# What OpenAlex and Crossref answered for every cited work, and how every cited link answered: the committed backup
+# (OpenAlex CC0; Crossref's bibliographic metadata, no abstracts). The stand-in rebuilds each response from it, so a
+# download through the stand-in gives back the backup, and nothing in the tests asks the real services (ADR 0047).
+REFERENCES_BACKUP = REPO_ROOT / "snapshots" / "reference_candidates" / "reference_candidates.parquet"
+
+
+def _reference_rows() -> list[dict]:
+    import duckdb
+
+    relation = duckdb.sql("select * from read_parquet(?)", params=[str(REFERENCES_BACKUP)])
+    return [dict(zip(relation.columns, row)) for row in relation.fetchall()]
+
+
+def _openalex_work(row: dict) -> dict:
+    return {
+        "id": row["record_id"],
+        "doi": f"https://doi.org/{row['doi']}" if row["doi"] else None,
+        "display_name": row["title"],
+        "publication_year": int(row["year"]) if row["year"] else None,
+        "authorships": [{"author": {"display_name": name}} for name in row["authors"].split("; ")] if row["authors"] else [],
+        "type": row["type"],
+        "open_access": {"oa_url": row["oa_url"]},
+        "best_oa_location": {"pdf_url": row["pdf_url"]} if row["pdf_url"] else None,
+    }
+
+
+def _crossref_work(row: dict) -> dict:
+    work = {
+        "DOI": row["doi"],
+        "title": [row["title"]] if row["title"] else [],
+        "issued": {"date-parts": [[int(row["year"]) if row["year"] else None]]},
+        "type": row["type"],
+        "score": json.loads(row["score"]) if row["score"] else None,
+    }
+    if row["authors"]:
+        work["author"] = [{"name": name} for name in row["authors"].split("; ")]
+    return work
+
+
+class _ScholarlyEndpoint(BaseHTTPRequestHandler):
+    """OpenAlex under /openalex and Crossref under /crossref: /works?search= (or ?query.bibliographic=) and /works/<doi>."""
+
+    def do_GET(self):
+        url = urlparse(self.path)
+        service, _, path = url.path.lstrip("/").partition("/")
+        self.server.requests.append(self.path)
+        if path == "works":
+            params = parse_qs(url.query)
+            lookup, query = "search", params["search" if service == "openalex" else "query.bibliographic"][0]
+        else:
+            lookup, query = "doi", unquote(path.removeprefix("works/")).removeprefix("doi:")
+        answered = [row for row in self.server.rows
+                    if (row["service"], row["lookup"], row["query"]) == (service, lookup, query) and row["rank"]]
+        # Two citations can send the same search (the same paper, cited directly and as summarized); the service gave
+        # both the same answer, so one of them is the answer.
+        first = min((row["citation"] for row in answered), default=None)
+        candidates = sorted((row for row in answered if row["citation"] == first), key=lambda row: int(row["rank"]))
+        work = _openalex_work if service == "openalex" else _crossref_work
+        if lookup == "doi" and not candidates:
+            return self._send(404, {})
+        if lookup == "doi":
+            body = work(candidates[0]) if service == "openalex" else {"message": work(candidates[0])}
+        else:
+            works = [work(row) for row in candidates]
+            body = {"results": works} if service == "openalex" else {"message": {"items": works}}
+        self._send(200, body)
+
+    def _send(self, status: int, body: dict):
+        data = json.dumps(body).encode()
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def log_message(self, *args):
+        pass
+
+
 @pytest.fixture(scope="session")
-def upstream_built_dir(tmp_path_factory, mrds_zip, wikidata_endpoint, pleiades_gz) -> Path:
+def scholarly_endpoint():
+    """A local stand-in for the OpenAlex and Crossref APIs, answering from the committed backup, and keeping the requests
+    it was sent. `links` is how each cited link answered when the backup was made."""
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _ScholarlyEndpoint)
+    server.rows, server.requests = _reference_rows(), []
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{server.server_port}"
+    links = {row["query"]: row["status"] for row in server.rows if row["service"] == "link"}
+    yield SimpleNamespace(openalex_url=f"{base}/openalex", crossref_url=f"{base}/crossref", requests=server.requests,
+                          links=links)
+    server.shutdown()
+
+
+@contextmanager
+def offline_lookups(links: dict[str, str]):
+    """Reference lookups with no waiting between requests, and every cited link answered from `links` (200 when it isn't
+    listed) instead of the web."""
+    from capabilities_pipeline import citations
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(citations, "pause", lambda seconds: None)
+        patch.setattr(citations.Lookups, "open_link", lambda self, url: links.get(url, "200"))
+        yield
+
+
+@pytest.fixture(scope="session")
+def lookups_offline(scholarly_endpoint):
+    """Returns a context in which reference lookups never wait and never touch the web (see offline_lookups)."""
+    return lambda: offline_lookups(scholarly_endpoint.links)
+
+
+@pytest.fixture(scope="session")
+def fetch_references(scholarly_endpoint):
+    """Downloads the reference candidates through the stand-in into a build directory, for the given data root."""
+    from dataclasses import replace
+
+    from capabilities_pipeline.upstream import REFERENCES, fetch
+
+    def download(build_dir: Path, root: Path = REPO_ROOT, links: dict[str, str] | None = None) -> dict:
+        dataset = replace(REFERENCES, crossref_url=scholarly_endpoint.crossref_url)
+        with offline_lookups(scholarly_endpoint.links | (links or {})):
+            return fetch(dataset, build_dir, scholarly_endpoint.openalex_url, root=root)
+
+    return download
+
+
+@pytest.fixture(scope="session")
+def upstream_built_dir(tmp_path_factory, mrds_zip, wikidata_endpoint, pleiades_gz, fetch_references) -> Path:
     """The repository's graph built once with snapshots of the MRDS and Wikidata samples, so it has source occurrences
     and upstream quantity values."""
     from capabilities.built import run_build
@@ -161,6 +289,7 @@ def upstream_built_dir(tmp_path_factory, mrds_zip, wikidata_endpoint, pleiades_g
     fetch(WIKIDATA, build_dir, wikidata_endpoint.url, root=REPO_ROOT)
     fetch(WIKIDATA_ITEMS, build_dir, wikidata_endpoint.url, root=REPO_ROOT)
     fetch(PLEIADES, build_dir, pleiades_gz)
+    fetch_references(build_dir)
     run_build(REPO_ROOT, build_dir)
     return build_dir
 

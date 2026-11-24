@@ -6,9 +6,10 @@ snapshots were downloaded before. definitions.py is what Dagster loads.
 """
 
 # No `from __future__ import annotations`: Dagster inspects the `context` annotation at definition time.
+from dataclasses import replace
 from pathlib import Path
 
-from capabilities.built import FACTS_FILE, NODES_FILE, OCCURRENCES_FILE, QUEUE_FILE, graph_dir
+from capabilities.built import CHECKS_FILE, FACTS_FILE, NODES_FILE, OCCURRENCES_FILE, QUEUE_FILE, graph_dir
 from dagster import (
     AssetExecutionContext,
     AssetKey,
@@ -30,7 +31,7 @@ from dagster_dbt import (
 )
 
 from .build import DBT_PROJECT, dbt_environment, dbt_target_path, load_inputs, write_manifest
-from .upstream import MRDS, PLEIADES, WIKIDATA, WIKIDATA_ITEMS, Dataset, fetch_or_fall_back
+from .upstream import MRDS, PLEIADES, REFERENCES, WIKIDATA, WIKIDATA_ITEMS, Dataset, fetch_or_fall_back
 
 
 class UpstreamDownloads(ConfigurableResource):
@@ -39,6 +40,8 @@ class UpstreamDownloads(ConfigurableResource):
     mrds_url: str = MRDS.url
     wikidata_url: str = WIKIDATA.url
     pleiades_url: str = PLEIADES.url
+    openalex_url: str = REFERENCES.url
+    crossref_url: str = REFERENCES.crossref_url
 
 
 def definitions(root: Path, build_dir: Path) -> Definitions:
@@ -91,6 +94,15 @@ def definitions(root: Path, build_dir: Path) -> Definitions:
     def pleiades_snapshot(context: AssetExecutionContext, downloads: UpstreamDownloads) -> MaterializeResult:
         return download(context, PLEIADES, downloads.pleiades_url)
 
+    @asset(
+        key=AssetKey(["upstream", REFERENCES.name]),
+        group_name="upstream",
+        description="What OpenAlex and Crossref hold for each work the curated layer cites (a few candidates each, by "
+        "DOI or by searching), and whether each cited link still loads. dbt scores the candidates (ADR 0047).",
+    )
+    def reference_candidates_snapshot(context: AssetExecutionContext, downloads: UpstreamDownloads) -> MaterializeResult:
+        return download(context, replace(REFERENCES, crossref_url=downloads.crossref_url), downloads.openalex_url)
+
     def download(context: AssetExecutionContext, dataset: Dataset, url: str) -> MaterializeResult:
         """Download a dataset. Offline, or when its server is down, the build goes on with the cold backup (ADR 0044),
         and the run says so: the asset's metadata names the copy used and the error."""
@@ -114,6 +126,7 @@ def definitions(root: Path, build_dir: Path) -> Definitions:
         WIKIDATA.name: "The Wikidata quantities snapshot, loaded into DuckDB as text.",
         WIKIDATA_ITEMS.name: "The Wikidata items snapshot (labels, descriptions, formulas), loaded into DuckDB as text.",
         PLEIADES.name: "The Pleiades places snapshot, loaded into DuckDB as text.",
+        REFERENCES.name: "What OpenAlex and Crossref hold for the works we cite, and our links' statuses, as text.",
         "pleiades_sources": "The hand-kept crosswalk of rules matching Pleiades mines and quarries to our sources and ore "
         "classes (data/crosswalks).",
         "upstream_snapshots": "Where and when each upstream snapshot was retrieved, and which copy was used, for provenance.",
@@ -124,7 +137,9 @@ def definitions(root: Path, build_dir: Path) -> Definitions:
         WIKIDATA.name: [wikidata_snapshot],
         WIKIDATA_ITEMS.name: [wikidata_items_snapshot],
         PLEIADES.name: [pleiades_snapshot],
-        "upstream_snapshots": [mrds_snapshot, wikidata_snapshot, wikidata_items_snapshot, pleiades_snapshot],
+        REFERENCES.name: [reference_candidates_snapshot],
+        "upstream_snapshots": [mrds_snapshot, wikidata_snapshot, wikidata_items_snapshot, pleiades_snapshot,
+                               reference_candidates_snapshot],
     }
 
     @multi_asset(
@@ -153,13 +168,13 @@ def definitions(root: Path, build_dir: Path) -> Definitions:
         yield MaterializeResult(
             asset_key=raw["pleiades_sources"], metadata={"rules": loaded["crosswalks"]["pleiades_sources"]}
         )
-        for dataset in (MRDS, WIKIDATA, WIKIDATA_ITEMS, PLEIADES):
+        for dataset in (MRDS, WIKIDATA, WIKIDATA_ITEMS, PLEIADES, REFERENCES):
             snapshot = loaded["upstream"][dataset.name]
             yield MaterializeResult(asset_key=raw[dataset.name], metadata={"rows": snapshot["rows"], "copy": snapshot["copy"]})
         yield MaterializeResult(asset_key=raw["upstream_snapshots"], metadata={"datasets": len(loaded["upstream"])})
 
     @asset(
-        deps=[get_asset_key_for_model([graph_models], name) for name in ("graph_nodes", "graph_facts", "source_occurrences", "curation_queue")],
+        deps=[get_asset_key_for_model([graph_models], name) for name in ("graph_nodes", "graph_facts", "source_occurrences", "curation_queue", "reference_checks")],
         group_name="marts",
         description="graph/manifest.json: what the built graph was made from. The app reads only a build whose "
         "manifest matches its inputs (ADR 0038).",
@@ -172,12 +187,14 @@ def definitions(root: Path, build_dir: Path) -> Definitions:
                 "facts": manifest["tables"][FACTS_FILE],
                 "queue": manifest["tables"][QUEUE_FILE],
                 "occurrences": manifest["tables"][OCCURRENCES_FILE],
+                "reference_checks": manifest["tables"][CHECKS_FILE],
                 "fingerprint": manifest["fingerprint"],
                 "path": str(graph_dir(build_dir)),
             }
         )
 
     return Definitions(
-        assets=[mrds_snapshot, wikidata_snapshot, wikidata_items_snapshot, pleiades_snapshot, raw_tables, graph_models, graph_manifest],
+        assets=[mrds_snapshot, wikidata_snapshot, wikidata_items_snapshot, pleiades_snapshot, reference_candidates_snapshot,
+                raw_tables, graph_models, graph_manifest],
         resources={"dbt": DbtCliResource(project_dir=project), "downloads": UpstreamDownloads()},
     )
