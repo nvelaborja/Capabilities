@@ -458,21 +458,24 @@ def about(graph: Graph, key: str) -> dict:
 
 
 def node_source(graph: Graph, node_id: str) -> dict | None:
-    """Where a node that came from upstream came from (ADR 0045): its dataset and record, and the crosswalk that
-    brought it in. None for a curated node."""
+    """Where a node that came from upstream came from (ADR 0045), and the crosswalk that brought it in: a dataset and
+    record (a mineral from its Wikidata item, a deposit's places from MRDS), or the curated route it copies. None for a
+    curated node."""
     provenance = graph.upstream_nodes.get(node_id)
     if not provenance:
         return None
-    return {
-        "dataset": DATASET_LABELS.get(provenance["dataset"], provenance["dataset"]),
-        "record": provenance["record"],
-        "url": provenance["url"],
-        "crosswalk": provenance["crosswalk"],
-    }
+    source = {"crosswalk": provenance["crosswalk"]}
+    if "dataset" in provenance:
+        source |= {"dataset": DATASET_LABELS.get(provenance["dataset"], provenance["dataset"]), "record": provenance["record"]}
+        if provenance.get("url"):
+            source["url"] = provenance["url"]
+    if "copied_from" in provenance:
+        source["copied_from"] = {"id": provenance["copied_from"], "label": graph.label(provenance["copied_from"])}
+    return source
 
 
 # How upstream datasets are named in the app.
-DATASET_LABELS = {"wikidata": "Wikidata"}
+DATASET_LABELS = {"wikidata": "Wikidata", "mrds": "MRDS"}
 
 
 def quantity_source(graph: Graph, thing_id: str, quantity: str) -> dict:

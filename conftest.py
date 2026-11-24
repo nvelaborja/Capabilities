@@ -1,4 +1,5 @@
 import csv
+import io
 import shutil
 import threading
 import zipfile
@@ -86,8 +87,21 @@ def sample_rows():
 # Four real Wikidata hardness statements (CC0), retrieved 2026-11-24, for hematite, limonite, granite and copper. Our
 # curated values match them since ADR 0043 was accepted; tests that need a disagreement change a curated value.
 WIKIDATA_SAMPLE = REPO_ROOT / "pipeline" / "tests" / "fixtures" / "wikidata-sample.csv"
-# The same items' labels, descriptions and formulas, with azurite and chalcopyrite from the ore crosswalk (CC0, 2026-11-24).
-WIKIDATA_ITEMS_SAMPLE = REPO_ROOT / "pipeline" / "tests" / "fixtures" / "wikidata-items-sample.csv"
+# The labels, descriptions and formulas of every crosswalked item: the committed backup (CC0), answered as CSV. Every
+# crosswalked item must be in it (ADR 0044), so a sample would have to list them all anyway.
+WIKIDATA_ITEMS_BACKUP = REPO_ROOT / "snapshots" / "wikidata_items" / "wikidata_items.parquet"
+
+
+def _items_csv() -> bytes:
+    import duckdb
+
+    rows = duckdb.sql("select item, label, description, formula from read_parquet(?) order by all",
+                      params=[str(WIKIDATA_ITEMS_BACKUP)]).fetchall()
+    out = io.StringIO()
+    writer = csv.writer(out, lineterminator="\n")
+    writer.writerow(["item", "label", "description", "formula"])
+    writer.writerows(rows)
+    return out.getvalue().encode()
 
 
 class _SparqlEndpoint(BaseHTTPRequestHandler):
@@ -95,8 +109,8 @@ class _SparqlEndpoint(BaseHTTPRequestHandler):
         body = self.rfile.read(int(self.headers["Content-Length"])).decode()
         query = parse_qs(body)["query"][0]
         self.server.queries.append(query)
-        # Each of our two queries gets its own sample: the labels query asks for rdfs:label.
-        result = (WIKIDATA_ITEMS_SAMPLE if "rdfs:label" in query else WIKIDATA_SAMPLE).read_bytes()
+        # Each of our two queries gets its own answer: the labels query asks for rdfs:label.
+        result = _items_csv() if "rdfs:label" in query else WIKIDATA_SAMPLE.read_bytes()
         self.send_response(200)
         self.send_header("Content-Type", "text/csv")
         self.send_header("Content-Length", str(len(result)))

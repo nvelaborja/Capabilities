@@ -135,8 +135,9 @@ The build runs `dbt build` on `pipeline/dbt`: `capabilities build` through dbt's
 - `crosswalk_rows_are_distinct`: no rule is listed twice.
 - `stg_mrds_coordinates_are_numbers`: no published coordinate fails to read as a number.
 - `occurrences_are_valid_points`: every occurrence is a valid point within latitude ±90 and longitude ±180.
-- `wikidata_crosswalk_ids_are_items`: every `wikidata` value is a Q id.
-- `ore_minerals_are_new_and_well_formed`: a row that builds nodes has an id that clashes with no curated node (nor its `-deposit` and `mine-` ids) and a `mined_like` that is a curated route; a rejected row has neither.
+- `ore_minerals_are_new_and_well_formed`: a row that builds nodes has an id that clashes with no curated node (nor its `-deposit` and `mine-` ids) and a `mined_like` that is a curated route whose label names the material it mines; a rejected row has neither.
+- `crosswalked_items_are_in_the_wikidata_items_snapshot`: every item either crosswalk names (rejected rows aside) is in the items snapshot; one added since the last download stops the build until it is downloaded again.
+- `wikidata_crosswalk_ids_are_items`: both crosswalks, rejected ore rows included, name Q ids.
 - `wikidata_units_match`: every Wikidata value is in the unit its quantity expects (`wikidata.unit`); one in another unit would otherwise be read unconverted.
 - `overrides_target_upstream_values`: every override's thing is in the Wikidata crosswalk, and its quantity is read from Wikidata. A value only the curated layer gives is corrected in its own file.
 
@@ -168,9 +169,9 @@ Tests: `kind` not null; `label` not null for every node (overrides have none).
 
 - the mineral: a material in its class, `origin: extracted`, labelled from Wikidata (capitalised; MRDS's name if Wikidata has none), described from Wikidata's description and formula and the row's `notes`, citing the row's reference;
 - `<id>-deposit`: a regional source;
-- `mine-<id>`: the `mined_like` route as a JSON patch, with the mineral, its deposit, its label (the template's, with the template material's name replaced) and its outputs swapped in.
+- `mine-<id>`: the `mined_like` route as a JSON patch, with the mineral, its deposit, its label (the template's, with the template material's name replaced) and its outputs swapped in. Its references are the template's, each made `unverified`, with `supports` prefixed "Cited for the route this copies (<template label>): ".
 
-Each node's provenance is `{"layer": "upstream", "dataset": "wikidata", "record": <Q id>, "url": ..., "crosswalk": "data/crosswalks/ore_minerals.csv", "mined_like": <template>}`.
+Each node's provenance is `{"layer": "upstream", "crosswalk": "data/crosswalks/ore_minerals.csv", ...}` with what it came from: the mineral `"dataset": "wikidata", "record": <Q id>, "url": ...`; the deposit `"dataset": "mrds", "record": "deposits listing <MRDS name> as an ore mineral"`; the route `"copied_from": <template>`.
 
 **`stg_mrds__deposits`** (view). One row per MRDS deposit, typed.
 
@@ -252,7 +253,7 @@ The marts' `external` materialization (a dbt-duckdb feature) writes each result 
 | `priority` | For ore candidates, the number of MRDS deposits of copper, iron or tin listing the mineral as an ore; otherwise null. |
 | `evidence` | JSON: the deposits and metals for a candidate, the values behind a disagreement, and so on. |
 
-An ore candidate is a mineral listed on at least 20 such deposits and not yet reviewed: in neither the ore crosswalk nor `mrds_sources`. Tests: `id` unique and not null; `kind` one of the six; `detail` not null. With the 2026-11-24 snapshots there are 183 items: 135 ore candidates (galena first, on 6,326 deposits), 46 routes with only unverified references, and 2 sources with no places. `uv run capabilities queue` prints them.
+An ore candidate is a mineral listed on at least 20 such deposits and not yet reviewed: in neither the ore crosswalk nor `mrds_sources`. Tests: `id` unique and not null; `kind` one of the six; `detail` not null. With the 2026-11-24 snapshots there are 186 items: 135 ore candidates (galena first, on 6,326 deposits), 49 routes with only unverified references, and 2 sources with no places. `uv run capabilities queue` prints them.
 
 ### 4. Publish
 
@@ -264,7 +265,7 @@ The build counts the rows in each Parquet file and writes **`build/graph/manifes
 | `fingerprint` | SHA-256 over the path and bytes of every input file and of the pipeline's code (below). |
 | `built_at` | UTC time of the build. |
 | `git_commit` | The commit checked out, if git is available. |
-| `tables` | Row count per file, e.g. `{"graph_nodes.parquet": 197, "graph_facts.parquet": 30, "source_occurrences.parquet": 35311, "curation_queue.parquet": 183}`. |
+| `tables` | Row count per file, e.g. `{"graph_nodes.parquet": 197, "graph_facts.parquet": 30, "source_occurrences.parquet": 35311, "curation_queue.parquet": 186}`. |
 | `upstream` | The snapshot loaded for every dataset: `url`, `retrieved_at`, `sha256`, `rows`, `license`, and `copy` (`download` or `backup`). |
 
 The manifest is written **last**. If anything fails earlier, no manifest matches the current inputs, so the failed build is never read as current.
@@ -307,7 +308,7 @@ A build is current when `manifest.json` exists, its `fingerprint` equals the fin
 | Pipeline and server tests, `test_cli` | A build made once per test run in a temporary directory, from the cold backups | They test the real path, with no network. |
 | Upstream tests (`pipeline/tests/test_upstream.py`) | A snapshot of 14 real MRDS records (`pipeline/tests/fixtures/mrds-sample.csv`), "downloaded" from a local file | Every crosswalk rule and year rule, with no network. |
 | Ore mineral tests (`pipeline/tests/test_ore_minerals.py`) | The built graph from the cold backups | The upstream nodes, roasting, and the queue. |
-| Wikidata tests (`pipeline/tests/test_wikidata.py`) | 4 real Wikidata statements (`pipeline/tests/fixtures/wikidata-sample.csv`) and 6 items' descriptions (`wikidata-items-sample.csv`), served by a local stand-in for the SPARQL endpoint (`wikidata_endpoint` in `conftest.py`) | The query, the snapshot, precedence, overrides (and stale ones) and suppressions, with no network. |
+| Wikidata tests (`pipeline/tests/test_wikidata.py`) | 4 real Wikidata statements (`pipeline/tests/fixtures/wikidata-sample.csv`) and every crosswalked item's label, description and formula (the committed backup, `snapshots/wikidata_items/`), served by a local stand-in for the SPARQL endpoint (`wikidata_endpoint` in `conftest.py`) | The query, the snapshot, precedence, overrides (and stale ones) and suppressions, with no network. |
 
 The built graph has the curated graph's documents in the same order, except that each thing's quantities are the values `graph_facts` chose, followed by the upstream nodes. `pipeline/tests/test_build.py` checks both. Copies of the data made for tests (`data_copy`) link to the real cold backups; a test that needs a dataset missing replaces the link with a copy that leaves it out.
 

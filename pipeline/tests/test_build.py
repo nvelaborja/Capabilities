@@ -54,11 +54,17 @@ class TestBuiltGraph:
         ).fetchall()
         provenance = {node_id: json.loads(value) for node_id, value in rows}
         assert provenance["quarry-granite"] == {"layer": "curated", "path": "data/routes/quarry-granite.yaml"}
-        # Every other node is an upstream ore mineral, its deposit or its mining route, naming its Wikidata item.
-        upstream = {node_id for node_id, value in provenance.items() if value["layer"] == "upstream"}
+        # Every other node is an upstream ore mineral, its deposit or its mining route, each saying where it came from:
+        # the mineral from its Wikidata item, the deposit's places from MRDS, the route from the template it copies.
         assert {value["layer"] for value in provenance.values()} == {"curated", "upstream"}
-        assert {"azurite", "azurite-deposit", "mine-azurite"} <= upstream
-        assert provenance["mine-azurite"]["record"] == "Q108212" and provenance["mine-azurite"]["mined_like"] == "mine-malachite"
+        assert (provenance["azurite"]["dataset"], provenance["azurite"]["record"]) == ("wikidata", "Q108212")
+        assert (provenance["azurite-deposit"]["dataset"], provenance["azurite-deposit"]["record"]) == (
+            "mrds", "deposits listing Azurite as an ore mineral",
+        )
+        assert provenance["mine-azurite"]["copied_from"] == "mine-malachite"
+        assert {value["crosswalk"] for value in provenance.values() if value["layer"] == "upstream"} == {
+            "data/crosswalks/ore_minerals.csv",
+        }
 
     def test_the_manifest_records_the_inputs_and_how_many_nodes(self, repo_root, built_dir):
         manifest = json.loads((graph_dir(built_dir) / MANIFEST_FILE).read_text())

@@ -23,9 +23,9 @@ And sometimes the evidence is missing: chrysocolla is common in oxidised copper 
 **Each row becomes three upstream nodes,** built in dbt (`stg_ore_minerals__nodes`) and appended to `graph_nodes` after the curated nodes:
 - the mineral: a material in its class, `origin: extracted`, named and described from Wikidata (label, description, formula), citing the row's reference, with its quantities from Wikidata ([0043](0043-take-quantities-from-wikidata-with-upstream-first-and-overrides.md));
 - its deposits: a regional source, whose places are the MRDS deposits that list it as an ore mineral, so it shows on the map ([0042](0042-show-where-things-are-found-on-a-maplibre-map.md));
-- a mining route: the `mined_like` route, with the mineral and its deposit in place of the template's, and the template's references and notes.
+- a mining route: the `mined_like` route, with the mineral and its deposit in place of the template's, and the template's notes. Its references are the template's too, but each marked `unverified` and saying it was cited for the template ("Cited for the route this copies (Mining hematite with stone tools): …"): what they support is about the template's mineral, so the copy stays in the queue until someone checks it for this one. The template's label must name its material, so the copy's can name the mineral.
 
-Each node's provenance names the Wikidata item, the crosswalk and the template. The detail pane says "From Wikidata (Q…), brought in by data/crosswalks/ore_minerals.csv".
+Each node's provenance names the crosswalk and what the node came from: the mineral its Wikidata item, the deposit MRDS (its places are the deposits listing the mineral), the route the template it copies. The detail pane says "From Wikidata (Q… ↗), brought in by data/crosswalks/ore_minerals.csv", or for a deposit "From MRDS (deposits listing Azurite as an ore mineral), …".
 
 **Copper sulphides are roasted.** A curated class, copper sulphide ore, and a route, roasting copper sulphide ore, which makes roasted copper ore, a member of copper ore. So a sulphide is mined, roasted, then smelted by the existing route. The matte steps for copper-iron sulphides are folded into the one route, and said so in its notes. Iron and tin sulphides get no route: pyrite is rejected, and stannite stays in the queue.
 
@@ -35,7 +35,7 @@ Each node's provenance names the Wikidata item, the crosswalk and the template. 
 - iron ore: magnetite and goethite (Hamilton 2007, Expedition), and siderite (Föll);
 - rejected: pyrite (Föll).
 
-**A second Wikidata snapshot**, `wikidata_items` (each crosswalked item's label, description and formula), required and backed up like the others ([0044](0044-require-every-upstream-dataset-with-cold-backups-in-git.md)). Both Wikidata queries ask about the items of both crosswalks.
+**A second Wikidata snapshot**, `wikidata_items` (each crosswalked item's label, description and formula), required and backed up like the others ([0044](0044-require-every-upstream-dataset-with-cold-backups-in-git.md)). Both Wikidata queries ask about the items of both crosswalks. The build stops if a crosswalked item isn't in the items snapshot: a row added since the last download needs a new download (and backup), or its node would be built without its Wikidata name and description. So adding a row takes the network.
 
 **The curation queue** is a mart, `curation_queue.parquet`, with one row per gap, most valuable first within each kind:
 - `ore_candidate`: an MRDS ore mineral listed on at least 20 copper, iron or tin deposits, not yet reviewed in either crosswalk, ranked by deposits;
@@ -52,7 +52,7 @@ Each node's provenance names the Wikidata item, the crosswalk and the template. 
 - Copper is now reachable from a sulphide deposit and stone tools: mined, roasted, smelted.
 - A node's "Leads to" now follows class membership as the reasoner does: a route that asks for a class counts for each member, labelled "(as copper ore)", unless the member's known values fail the requirement's conditions (a copper chisel doesn't lead to cutting granite). Before, every member of a class (malachite and hematite too) showed nothing there.
 - In the worked example, Egypt is one step from iron through any of five iron ores (magnetite, goethite and siderite deposits besides hematite and bog iron), and can cut, drill and finish the new minerals. The answers to the example's jobs are unchanged.
-- The first queue holds 135 ore candidates (galena and sphalerite, on 6,326 and 5,051 deposits, at the top), 46 routes with only unverified references, and 2 sources with no places (bog iron, dolerite). Many candidates aren't ores of these metals at all; rejecting them is curation work too, and the evidence for each is one query away.
+- The first queue holds 135 ore candidates (galena and sphalerite, on 6,326 and 5,051 deposits, at the top), 49 routes with only unverified references, and 2 sources with no places (bog iron, dolerite). Many candidates aren't ores of these metals at all; rejecting them is curation work too, and the evidence for each is one query away.
 - The crosswalk's references are credited in CREDITS.md like the curated layer's.
 - The build directory's format version is 4.
 - Composition (the formula containing the metal) isn't used yet to rank or filter candidates. It would need a Wikidata lookup of every candidate by name; agents (M3) are the natural place for it.

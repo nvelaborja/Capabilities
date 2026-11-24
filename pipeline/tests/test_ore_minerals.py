@@ -28,8 +28,18 @@ class TestOreMineralNodes:
         assert route["achieves"] == {"thing": "azurite"}
         assert route["requires"][0] == {"role": "consumed", "thing": "azurite-deposit"}
         assert route["requires"][1:] == template["requires"][1:]
-        assert route["references"] == template["references"]
         assert graph.things["azurite-deposit"]["kind"] == "source"
+
+    def test_its_route_keeps_the_templates_references_unverified_and_says_whose_they_are(self, graph):
+        # given: the iron template cites a checked source (status secondary) about mining hematite, not magnetite
+        template, route = graph.routes["mine-hematite"], graph.routes["mine-magnetite"]
+        assert template["references"][0]["status"] == "secondary"
+        # then: the copy keeps every citation, unverified, and says it was cited for the template
+        assert [r["citation"] for r in route["references"]] == [r["citation"] for r in template["references"]]
+        assert {r["status"] for r in route["references"]} == {"unverified"}
+        assert route["references"][0]["supports"] == (
+            "Cited for the route this copies (Mining hematite with stone tools): " + template["references"][0]["supports"]
+        )
 
     def test_its_deposits_are_on_the_map(self, built_dir):
         from capabilities.built import load_occurrences
@@ -39,6 +49,33 @@ class TestOreMineralNodes:
 
     def test_a_rejected_mineral_builds_nothing(self, graph):
         assert "pyrite" not in graph.things and "pyrite-deposit" not in graph.things
+
+    def test_a_crosswalked_item_missing_from_the_wikidata_snapshot_stops_the_build(self, data_copy, tmp_path):
+        # given: a row added after the last download, so Wikidata's copy has no name or description for it
+        crosswalk = data_copy / "data" / "crosswalks" / "ore_minerals.csv"
+        row = 'covellite,Q99999999,Covellite,copper-sulphide-ore,mine-malachite,"A citation.",,"What it supports.",\n'
+        crosswalk.write_text(crosswalk.read_text() + row, encoding="utf-8")
+        # then: the build stops rather than build the node without its Wikidata data
+        with pytest.raises(BuildError, match="crosswalked_items_are_in_the_wikidata_items_snapshot"):
+            build(data_copy, tmp_path / "build")
+
+    @pytest.mark.parametrize("change", [
+        pytest.param(("azurite,Q108212", "azurite,108212"), id="a Q id without its Q"),
+        pytest.param(("Q50769", "pyrite"), id="a rejected row naming a label, not an item"),
+    ])
+    def test_every_ore_mineral_names_a_wikidata_item(self, data_copy, tmp_path, change):
+        crosswalk = data_copy / "data" / "crosswalks" / "ore_minerals.csv"
+        crosswalk.write_text(crosswalk.read_text().replace(*change), encoding="utf-8")
+        with pytest.raises(BuildError, match="wikidata_crosswalk_ids_are_items"):
+            build(data_copy, tmp_path / "build")
+
+    def test_a_template_must_name_the_material_it_mines(self, data_copy, tmp_path):
+        # given: a template whose label doesn't name its material, so the copy would keep it ("Mining malachite…")
+        template = data_copy / "data" / "routes" / "mine-malachite.yaml"
+        template.write_text(template.read_text().replace("label: Mining malachite with stone hammers",
+                                                         "label: Mining copper ore with stone hammers"), encoding="utf-8")
+        with pytest.raises(BuildError, match="ore_minerals_are_new_and_well_formed"):
+            build(data_copy, tmp_path / "build")
 
     def test_a_mineral_may_not_reuse_a_curated_id(self, data_copy, tmp_path):
         crosswalk = data_copy / "data" / "crosswalks" / "ore_minerals.csv"
@@ -99,10 +136,20 @@ class TestProvenanceInTheApp:
     def test_an_upstream_node_says_where_it_came_from(self, graph):
         from capabilities.views import about
 
+        crosswalk = "data/crosswalks/ore_minerals.csv"
         assert about(graph, "azurite")["upstream"] == {
-            "dataset": "Wikidata",
-            "record": "Q108212",
-            "url": "https://www.wikidata.org/wiki/Q108212",
-            "crosswalk": "data/crosswalks/ore_minerals.csv",
+            "dataset": "Wikidata", "record": "Q108212", "url": "https://www.wikidata.org/wiki/Q108212", "crosswalk": crosswalk,
+        }
+        # A deposit's places come from MRDS, many records, so there is no one record to open.
+        assert about(graph, "azurite-deposit")["upstream"] == {
+            "dataset": "MRDS", "record": "deposits listing Azurite as an ore mineral", "crosswalk": crosswalk,
         }
         assert "upstream" not in about(graph, "malachite")
+
+    def test_a_copied_route_names_the_route_it_copies(self, graph):
+        from capabilities.views import node_source
+
+        assert node_source(graph, "mine-azurite") == {
+            "crosswalk": "data/crosswalks/ore_minerals.csv",
+            "copied_from": {"id": "mine-malachite", "label": "Mining malachite with stone hammers"},
+        }

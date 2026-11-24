@@ -185,6 +185,15 @@ export interface QuantitySource {
   override?: { reason: string; replaces: string; references: Reference[]; stale: boolean };
 }
 
+/** Where an upstream node came from: a mineral from its Wikidata item, a deposit's places from MRDS (no link). */
+export interface NodeUpstream {
+  crosswalk: string;
+  dataset?: string;
+  record?: string;
+  url?: string;
+  copied_from?: Named;
+}
+
 export interface About {
   description?: string | null;
   notes?: string;
@@ -194,8 +203,8 @@ export interface About {
   era?: string;
   quantities?: Quantity[];
   member_of?: Named[];
-  /** A node that came from upstream: its dataset and record, and the crosswalk that brought it in (ADR 0045). */
-  upstream?: { dataset: string; record: string; url: string; crosswalk: string };
+  /** A node that came from upstream (ADR 0045): the crosswalk that brought it in, and its dataset and record or the route it copies. */
+  upstream?: NodeUpstream;
   /** Actions: what is being acted on. */
   target?: Named;
   references: Reference[];

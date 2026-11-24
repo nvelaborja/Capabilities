@@ -1,4 +1,4 @@
-import type { QuantitySource } from "../api/types";
+import type { NodeUpstream, QuantitySource } from "../api/types";
 import { retrievedOn } from "../lib/dates";
 
 /** One line of where a value came from; `link` names the upstream record to open. */
@@ -30,4 +30,17 @@ export function sourceLines(source: QuantitySource, hasSources: boolean): Source
     return lines;
   }
   return [{ text: hasSources ? "Curated: see the sources below." : "Curated, with no source yet." }];
+}
+
+/**
+ * Where a node that came from upstream came from (ADR 0045), up to the crosswalk that brought it in: "From Wikidata"
+ * with its item to open, "From MRDS (deposits listing Azurite as an ore mineral)", or "A copy of" the route it copies.
+ */
+export function nodeOrigin(upstream: NodeUpstream): SourceLine {
+  if (upstream.dataset && upstream.record) {
+    return upstream.url
+      ? { text: `From ${upstream.dataset}`, link: { href: upstream.url, label: upstream.record } }
+      : { text: `From ${upstream.dataset} (${upstream.record})` };
+  }
+  return { text: upstream.copied_from ? `A copy of ${upstream.copied_from.label}` : "From upstream" };
 }

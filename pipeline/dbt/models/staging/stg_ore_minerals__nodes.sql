@@ -2,7 +2,8 @@
 --   * the mineral, a material in its ore class, named and described from Wikidata;
 --   * its deposits, a source whose places are the MRDS deposits that list it as an ore mineral;
 --   * a mining route, cloned from the curated route the row names (`mined_like`), with the mineral and its deposit in
---     place of the template's.
+--     place of the template's. The template's references are kept, unverified and saying they were cited for the
+--     template, since what they support is about its mineral, not this one.
 -- So a mineral reaches whatever its class reaches (copper ore is smelted to copper), and is mined as its kind of ore is.
 with ores as (
     select
@@ -25,6 +26,7 @@ templates as (
     select
         routes.id as template_id,
         routes.document as template,
+        routes.document ->> 'label' as template_label,
         routes.document -> 'achieves' ->> 'thing' as template_material,
         materials.label as template_material_label,
         (
@@ -44,15 +46,24 @@ reference as (
     from ores
 ),
 
+-- Where each node came from: the mineral from its Wikidata item, its deposits' places from MRDS, and its route from
+-- the template it copies.
 provenance as (
-    select id, json_object(
-        'layer', 'upstream',
-        'dataset', 'wikidata',
-        'record', wikidata,
-        'url', 'https://www.wikidata.org/wiki/' || wikidata,
-        'crosswalk', 'data/crosswalks/ore_minerals.csv',
-        'mined_like', mined_like
+    select id as mineral, 1 as part, json_object(
+        'layer', 'upstream', 'dataset', 'wikidata', 'record', wikidata,
+        'url', 'https://www.wikidata.org/wiki/' || wikidata, 'crosswalk', 'data/crosswalks/ore_minerals.csv'
     ) as provenance
+    from ores
+    union all
+    select id, 2, json_object(
+        'layer', 'upstream', 'dataset', 'mrds', 'record', 'deposits listing ' || mrds_ore || ' as an ore mineral',
+        'crosswalk', 'data/crosswalks/ore_minerals.csv'
+    )
+    from ores
+    union all
+    select id, 3, json_object(
+        'layer', 'upstream', 'copied_from', mined_like, 'crosswalk', 'data/crosswalks/ore_minerals.csv'
+    )
     from ores
 ),
 
@@ -112,7 +123,15 @@ routes as (
                     '"' || templates.template_source || '"',
                     '"' || ores.id || '-deposit"'
                 )::json,
-                'outputs', json_array(json_object('thing', ores.id))
+                'outputs', json_array(json_object('thing', ores.id)),
+                'references', (
+                    select to_json(list(json_merge_patch(reference.value, json_object(
+                        'status', 'unverified',
+                        'supports', 'Cited for the route this copies (' || templates.template_label || '): '
+                            || (reference.value ->> 'supports')
+                    )) order by reference.key::integer))
+                    from json_each(templates.template -> 'references') as reference
+                )
             )
         ) as document
     from ores
@@ -129,4 +148,4 @@ select
     -- After every curated node, mineral by mineral, so the order is the same on every build.
     row_number() over (order by nodes.mineral, nodes.part) as position
 from (select * from materials union all select * from sources union all select * from routes) as nodes
-join provenance on provenance.id = nodes.mineral
+join provenance using (mineral, part)
