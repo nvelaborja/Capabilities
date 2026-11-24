@@ -17,6 +17,7 @@ SCHEMA_BY_DIR = {
     "routes": "route",
     "profiles": "profile",
     "jobs": "job",
+    "overrides": "override",
 }
 
 # Thing kinds and the subdirectory of data/things/ they live in.
@@ -101,6 +102,12 @@ class Graph:
     routes: dict[str, dict] = field(default_factory=dict)
     profiles: dict[str, dict] = field(default_factory=dict)
     jobs: dict[str, dict] = field(default_factory=dict)
+    # Curated replacements for upstream values (ADR 0043). The build applies them; the built graph's documents already
+    # carry the result, so only the curated graph has them.
+    overrides: dict[str, dict] = field(default_factory=dict)
+    # Where each quantity value of a built graph came from, by fact id ("granite/quantities.hardness_mohs", ADR 0043).
+    # Empty for the curated graph, where every value is curated.
+    facts: dict[str, dict] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         self.routes_achieving: dict[str, list[str]] = {}
@@ -137,6 +144,7 @@ class Graph:
             root,
             quantities=buckets["quantity"], things=buckets["thing"], verbs=buckets["verb"],
             routes=buckets["route"], profiles=buckets["profile"], jobs=buckets["job"],
+            overrides=buckets["override"],
         )
 
     # ------------------------------------------------------------------ lookups

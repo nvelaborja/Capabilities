@@ -82,6 +82,7 @@ class _Checker:
             self.check_profile(profile_id, profile)
         for job_id, job in self.g.jobs.items():
             self.check_job(job_id, job)
+        self.check_overrides()
         self.check_gaps()
         return self.issues
 
@@ -216,6 +217,22 @@ class _Checker:
             self.check_band(where, "tolerance_mm", job["limits"]["precision"])
 
     # ------------------------------------------------------------------ evidence gaps (warnings)
+
+    def check_overrides(self) -> None:
+        overridden: dict[tuple[str, str], str] = {}
+        for override_id, override in self.g.overrides.items():
+            where = f"override {override_id}"
+            thing, quantity = override["thing"], override["quantity"]
+            if thing not in self.g.things:
+                self.error(where, f"unknown thing {thing!r}")
+            if quantity not in self.g.quantities:
+                self.error(where, f"unknown quantity {quantity!r}")
+            self.check_range(f"{where}.value", override["value"])
+            self.check_range(f"{where}.replaces.value", override["replaces"]["value"])
+            # Two overrides of one value would leave the build to pick between them.
+            if (thing, quantity) in overridden:
+                self.error(where, f"{thing}.{quantity} is already overridden by {overridden[thing, quantity]!r}")
+            overridden[thing, quantity] = override_id
 
     def check_gaps(self) -> None:
         outputs = {output["thing"] for route in self.g.routes.values() for output in route.get("outputs", [])}

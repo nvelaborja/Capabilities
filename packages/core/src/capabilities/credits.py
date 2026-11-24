@@ -57,7 +57,7 @@ def credits_path(root: Path) -> Path:
 
 
 def all_documents(graph: Graph) -> Iterator[tuple[str, dict]]:
-    for bucket in (graph.quantities, graph.things, graph.verbs, graph.routes, graph.profiles, graph.jobs):
+    for bucket in (graph.quantities, graph.things, graph.verbs, graph.routes, graph.profiles, graph.jobs, graph.overrides):
         yield from bucket.items()
 
 

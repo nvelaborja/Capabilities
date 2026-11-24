@@ -85,6 +85,27 @@ class TestBrokenData:
         # then: the mistake is reported as an error
         assert any(expected_message in m for m in messages), messages
 
+    def test_an_override_must_name_a_known_thing(self, data_copy, write_override):
+        write_override(data_copy, id="unobtainium-hardness", thing="unobtainium")
+        messages = [f"{i.where}: {i.message}" for i in validate(data_copy) if i.severity == "error"]
+        assert "override unobtainium-hardness: unknown thing 'unobtainium'" in messages
+
+    def test_a_value_can_be_overridden_only_once(self, data_copy, write_override):
+        write_override(data_copy)
+        write_override(data_copy, id="granite-hardness-again")
+        messages = [i.message for i in validate(data_copy) if i.severity == "error"]
+        assert any("already overridden by" in message for message in messages), messages
+
+    def test_an_override_must_give_a_reason_and_a_reference(self, data_copy, write_override):
+        path = write_override(data_copy)
+        path.write_text(path.read_text().split("reason:")[0], encoding="utf-8")
+        messages = [i.message for i in validate(data_copy) if i.severity == "error"]
+        assert any("'reason' is a required property" in message for message in messages), messages
+
+    def test_a_well_formed_override_is_valid(self, data_copy, write_override):
+        write_override(data_copy)
+        assert [str(i) for i in validate(data_copy) if i.severity == "error"] == []
+
     def test_warns_about_a_source_nothing_is_extracted_from(self, data_copy):
         # given: a source that no route uses
         (data_copy / "data/things/sources/lonely-outcrop.yaml").write_text("id: lonely-outcrop\nkind: source\nlabel: X\navailability: regional\n")

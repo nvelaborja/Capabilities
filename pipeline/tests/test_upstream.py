@@ -167,3 +167,18 @@ class TestCrosswalk:
         crosswalk.write_text(crosswalk.read_text() + "galena-deposit,ore,Galena,,Not in the graph.\n")
         with pytest.raises(BuildError, match="relationships"):
             build(data_copy, tmp_path / "build")
+
+
+class TestSuppressions:
+    def test_a_suppressed_deposit_is_not_an_occurrence(self, data_copy, tmp_path, mrds_zip):
+        # given: the Leadville District deposit (10008106) is suppressed as not belonging
+        suppressions = data_copy / "data" / "suppressions" / "suppressed_records.csv"
+        suppressions.write_text(suppressions.read_text() + 'mrds,10008106,"Test: a duplicate record."\n', encoding="utf-8")
+        build_dir = tmp_path / "build"
+        fetch(MRDS, build_dir, mrds_zip(tmp_path / "download"))
+        # when: building
+        build(data_copy, build_dir)
+        # then: it is on no map, and the other deposits still are
+        records = {row["record_id"] for row in occurrences(build_dir)}
+        assert "10008106" not in records
+        assert "10001442" in records

@@ -1,6 +1,7 @@
 """Reading the built graph, the artifact the pipeline produces and the app reads (ADR 0038).
 
 A build directory holds `graph/graph_nodes.parquet` (one row per node, its full document as JSON, and its provenance),
+`graph/graph_facts.parquet` (where each quantity value comes from: upstream, curated or an override, ADR 0043),
 `graph/source_occurrences.parquet` (where sources are found, from upstream datasets, ADR 0036 and ADR 0041) and
 `graph/manifest.json`, which records the fingerprint of the inputs it was built from. A build is current when
 that fingerprint matches the inputs on disk now; otherwise the question commands and the server rebuild first.
@@ -18,8 +19,9 @@ from pathlib import Path
 from .graph import Graph, LoadError
 
 # Bump when the artifact's shape changes, so older builds are rebuilt rather than misread.
-FORMAT_VERSION = 2
+FORMAT_VERSION = 3
 NODES_FILE = "graph_nodes.parquet"
+FACTS_FILE = "graph_facts.parquet"
 OCCURRENCES_FILE = "source_occurrences.parquet"
 MANIFEST_FILE = "manifest.json"
 SNAPSHOT_FILE = "snapshot.json"
@@ -103,7 +105,30 @@ def load_built(root: Path, build_dir: Path) -> Graph:
         "select node_type, document::varchar, provenance::varchar from read_parquet(?) order by ordinal",
         params=[str(nodes)],
     ).fetchall()
-    return Graph.from_documents(root, ((node_type, json.loads(document), provenance) for node_type, document, provenance in rows))
+    graph = Graph.from_documents(root, ((node_type, json.loads(document), provenance) for node_type, document, provenance in rows))
+    graph.facts = load_facts(build_dir)
+    return graph
+
+
+FACT_COLUMNS = ("id", "layer", "value", "curated_value", "upstream_value", "disagrees", "upstream", "override")
+FACT_JSON = {"value", "curated_value", "upstream_value", "upstream", "override"}
+
+
+def load_facts(build_dir: Path) -> dict[str, dict]:
+    """Where each quantity value came from (ADR 0043), by fact id. Empty for a build without the facts table."""
+    import duckdb
+
+    path = graph_dir(build_dir) / FACTS_FILE
+    if not path.is_file():
+        return {}
+    columns = ", ".join(f"{name}::varchar" if name in FACT_JSON else name for name in FACT_COLUMNS)
+    rows = duckdb.sql(f"select {columns} from read_parquet(?) where id is not null", params=[str(path)]).fetchall()
+    facts = {}
+    for row in rows:
+        fact = dict(zip(FACT_COLUMNS, row))
+        facts[fact["id"]] = {key: json.loads(value) if key in FACT_JSON and value is not None else value
+                             for key, value in fact.items()}
+    return facts
 
 
 # The occurrence columns the app uses. The geometry is left out: the longitude and latitude columns hold the same point,

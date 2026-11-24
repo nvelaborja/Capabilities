@@ -120,9 +120,9 @@ class TestWebUi:
 
 class TestOccurrences:
     @pytest.fixture(scope="class")
-    def mapped(self, repo_root, mrds_built_dir, tmp_path_factory) -> TestClient:
+    def mapped(self, repo_root, upstream_built_dir, tmp_path_factory) -> TestClient:
         """A server on a build with the 14-record MRDS sample."""
-        return TestClient(create_app(repo_root, web_dist=tmp_path_factory.mktemp("no-web-build"), build_dir=mrds_built_dir))
+        return TestClient(create_app(repo_root, web_dist=tmp_path_factory.mktemp("no-web-build"), build_dir=upstream_built_dir))
 
     def test_a_materials_places_are_the_occurrences_of_its_sources_as_geojson(self, mapped, graph):
         body = mapped.get("/api/occurrences/hematite").json()
@@ -148,3 +148,28 @@ class TestOccurrences:
 
     def test_only_materials_and_sources_have_places(self, client):
         assert client.get("/api/occurrences/copper-saw").status_code == 404
+
+
+class TestProvenance:
+    @pytest.fixture(scope="class")
+    def upstream(self, repo_root, upstream_built_dir, tmp_path_factory) -> TestClient:
+        """A server on a build with the Wikidata sample, in which granite's hardness comes from Wikidata."""
+        return TestClient(create_app(repo_root, web_dist=tmp_path_factory.mktemp("no-web-build"), build_dir=upstream_built_dir))
+
+    def hardness(self, client: TestClient, node: str) -> dict:
+        about = client.post("/api/explain", json={"profile": "middle-kingdom-egypt", "node": node}).json()["about"]
+        return next(quantity for quantity in about["quantities"] if quantity["id"] == "hardness_mohs")
+
+    def test_an_upstream_value_names_its_record_and_the_curated_value_it_differs_from(self, upstream):
+        granite = self.hardness(upstream, "granite")
+        assert granite["value"] == "5–7 Mohs"
+        assert granite["source"]["layer"] == "upstream"
+        assert granite["source"]["upstream"]["dataset"] == "Wikidata"
+        assert granite["source"]["upstream"]["url"] == "https://www.wikidata.org/wiki/Q41177"
+        assert granite["source"]["curated_value"] == "6–7 Mohs"
+
+    def test_an_upstream_value_that_agrees_shows_no_curated_value(self, upstream):
+        assert "curated_value" not in self.hardness(upstream, "hematite")["source"]
+
+    def test_a_curated_value_says_so(self, client):
+        assert self.hardness(client, "granite")["source"] == {"layer": "curated"}

@@ -11,7 +11,8 @@ from dataclasses import dataclass, field
 
 from .graph import Graph
 
-# How each upstream snapshot is named and linked in the app. Keys are the dataset names in the manifest.
+# The upstream datasets of places, and how each is named and linked in the app. Keys are the dataset names in the
+# manifest.
 DATASETS = {
     "mrds_deposits": {
         "id": "mrds",
@@ -81,12 +82,13 @@ def source_summary(graph: Graph, source: str, occurrences: list[dict]) -> dict:
 
 
 def datasets(snapshots: dict[str, dict]) -> list[dict]:
-    """The upstream snapshots loaded into the build, with when they were retrieved."""
-    known = []
-    for name, snapshot in sorted(snapshots.items()):
-        about = DATASETS.get(name, {"id": name, "label": name, "short": name, "home": snapshot.get("url")})
-        known.append({**about, "retrieved_at": snapshot.get("retrieved_at"), "license": snapshot.get("license")})
-    return known
+    """The upstream snapshots of places loaded into the build, with when they were retrieved. Datasets of other facts
+    (Wikidata's quantities) are left out: they put nothing on the map."""
+    return [
+        {**DATASETS[name], "retrieved_at": snapshot.get("retrieved_at"), "license": snapshot.get("license")}
+        for name, snapshot in sorted(snapshots.items())
+        if name in DATASETS
+    ]
 
 
 def feature(row: dict) -> dict:

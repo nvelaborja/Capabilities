@@ -587,3 +587,22 @@
 .expand-body .chip-row {
   margin-top: 0.3rem;
 }
+
+/* Where a value came from, under it (ADR 0043). */
+.fact-source {
+  display: flex;
+  flex-direction: column;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.fact-source a {
+  color: var(--accent);
+}
+
+/* An override is marked by a rule and the word "Overridden", never by colour alone (ADR 0019). */
+.fact-source-override {
+  margin-top: 0.15rem;
+  padding-left: 0.5rem;
+  border-left: 2px solid var(--accent);
+}

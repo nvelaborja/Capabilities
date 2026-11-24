@@ -16,6 +16,12 @@ SNAPSHOTS_RAW = AssetKey(["raw", "upstream_snapshots"])
 MRDS_STAGING = AssetKey("stg_mrds__deposits")
 CROSSWALK = AssetKey(["raw", "mrds_sources"])
 OCCURRENCES = AssetKey("source_occurrences")
+FACTS = AssetKey("graph_facts")
+WIKIDATA_SNAPSHOT = AssetKey(["upstream", "wikidata_quantities"])
+WIKIDATA_RAW = AssetKey(["raw", "wikidata_quantities"])
+WIKIDATA_STAGING = AssetKey("stg_wikidata__quantities")
+WIKIDATA_CROSSWALK = AssetKey(["raw", "wikidata_things"])
+SUPPRESSIONS = AssetKey(["raw", "suppressed_records"])
 
 
 @pytest.fixture
@@ -38,26 +44,34 @@ class TestDefinitions:
     def test_the_lineage_runs_from_the_curated_load_through_dbt_to_the_manifest(self, dagster_build):
         graph = asset_graph(dagster_build[0])
         assert graph.get(STAGING).parent_keys == {RAW}
-        assert graph.get(NODES).parent_keys == {STAGING}
-        assert graph.get(MANIFEST).parent_keys == {NODES, OCCURRENCES}
+        assert graph.get(NODES).parent_keys == {STAGING, FACTS}
+        assert graph.get(MANIFEST).parent_keys == {NODES, FACTS, OCCURRENCES}
 
     def test_the_lineage_runs_from_the_mrds_download_and_the_crosswalk_to_the_occurrences(self, dagster_build):
         graph = asset_graph(dagster_build[0])
         assert graph.get(MRDS_RAW).parent_keys == {MRDS_SNAPSHOT}
         assert graph.get(MRDS_STAGING).parent_keys == {MRDS_RAW}
         assert graph.get(CROSSWALK).parent_keys == set()
-        assert graph.get(OCCURRENCES).parent_keys == {MRDS_STAGING, CROSSWALK, SNAPSHOTS_RAW}
+        assert graph.get(OCCURRENCES).parent_keys == {MRDS_STAGING, CROSSWALK, SNAPSHOTS_RAW, SUPPRESSIONS}
+
+    def test_the_lineage_runs_from_the_wikidata_download_and_its_crosswalk_to_the_facts(self, dagster_build):
+        graph = asset_graph(dagster_build[0])
+        assert graph.get(WIKIDATA_RAW).parent_keys == {WIKIDATA_SNAPSHOT}
+        assert graph.get(WIKIDATA_STAGING).parent_keys == {WIKIDATA_RAW}
+        assert {WIKIDATA_STAGING, WIKIDATA_CROSSWALK, SUPPRESSIONS, SNAPSHOTS_RAW} <= graph.get(FACTS).parent_keys
 
     def test_assets_are_grouped_by_layer(self, dagster_build):
         graph = asset_graph(dagster_build[0])
         groups = {key: graph.get(key).group_name for key in (
-            MRDS_SNAPSHOT, RAW, MRDS_RAW, SNAPSHOTS_RAW, CROSSWALK, STAGING, MRDS_STAGING, NODES, OCCURRENCES, MANIFEST,
+            MRDS_SNAPSHOT, WIKIDATA_SNAPSHOT, RAW, MRDS_RAW, WIKIDATA_RAW, SNAPSHOTS_RAW, CROSSWALK, WIKIDATA_CROSSWALK,
+            SUPPRESSIONS, STAGING, MRDS_STAGING, WIKIDATA_STAGING, NODES, FACTS, OCCURRENCES, MANIFEST,
         )}
         assert groups == {
-            MRDS_SNAPSHOT: "upstream",
-            RAW: "raw", MRDS_RAW: "raw", SNAPSHOTS_RAW: "raw", CROSSWALK: "raw",
-            STAGING: "staging", MRDS_STAGING: "staging",
-            NODES: "marts", OCCURRENCES: "marts", MANIFEST: "marts",
+            MRDS_SNAPSHOT: "upstream", WIKIDATA_SNAPSHOT: "upstream",
+            RAW: "raw", MRDS_RAW: "raw", WIKIDATA_RAW: "raw", SNAPSHOTS_RAW: "raw", CROSSWALK: "raw",
+            WIKIDATA_CROSSWALK: "raw", SUPPRESSIONS: "raw",
+            STAGING: "staging", MRDS_STAGING: "staging", WIKIDATA_STAGING: "staging",
+            NODES: "marts", FACTS: "marts", OCCURRENCES: "marts", MANIFEST: "marts",
         }
 
     def test_dbt_tests_on_sources_and_models_are_asset_checks(self, dagster_build):
@@ -67,26 +81,31 @@ class TestDefinitions:
         assert (CROSSWALK, "source_not_null_raw_mrds_sources_source_id") in checks
         assert (NODES, "unique_graph_nodes_id") in checks
         assert (OCCURRENCES, "occurrences_are_valid_points") in checks
+        assert (FACTS, "unique_graph_facts_id") in checks
 
 
 class TestMaterializing:
-    def test_materializing_everything_downloads_mrds_and_builds_a_current_graph(
-        self, dagster_build, repo_root, tmp_path, mrds_zip
+    def test_materializing_everything_downloads_both_datasets_and_builds_a_current_graph(
+        self, dagster_build, repo_root, tmp_path, mrds_zip, wikidata_endpoint
     ):
         from capabilities_pipeline.assets import UpstreamDownloads
 
         defs, build_dir = dagster_build
-        downloads = UpstreamDownloads(mrds_url=mrds_zip(tmp_path / "download"))
+        downloads = UpstreamDownloads(mrds_url=mrds_zip(tmp_path / "download"), wikidata_url=wikidata_endpoint.url)
         result = materialize(list(defs.assets), resources={**defs.resources, "downloads": downloads})
         assert result.success
         assert all(evaluation.passed for evaluation in result.get_asset_check_evaluations())
         assert is_current(repo_root, build_dir)
         built, curated = load_built(repo_root, build_dir), Graph.from_curated(repo_root)
-        assert list(built.things.items()) == list(curated.things.items())
+        # The same things in the same order, with Wikidata's values where it has them (ADR 0043).
+        assert list(built.things) == list(curated.things)
+        assert built.things["granite"]["quantities"]["hardness_mohs"] == [5, 7]
         assert list(built.routes.items()) == list(curated.routes.items())
         manifest = json.loads((graph_dir(build_dir) / MANIFEST_FILE).read_text())
         # All fourteen sample records are placed, and eleven occurrences match a source kind.
         assert manifest["tables"][OCCURRENCES_FILE] == 11
         assert manifest["upstream"]["mrds_deposits"]["rows"] == 14
+        assert manifest["upstream"]["wikidata_quantities"]["rows"] == 4
         materialized = {event.asset_key for event in result.get_asset_materialization_events()}
         assert {RAW, CROSSWALK, MRDS_RAW, SNAPSHOTS_RAW, MRDS_SNAPSHOT, OCCURRENCES, MANIFEST} <= materialized
+        assert {WIKIDATA_SNAPSHOT, WIKIDATA_RAW, WIKIDATA_CROSSWALK, SUPPRESSIONS, FACTS} <= materialized

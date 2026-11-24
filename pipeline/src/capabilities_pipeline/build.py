@@ -13,7 +13,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import duckdb
-from capabilities.built import FORMAT_VERSION, MANIFEST_FILE, NODES_FILE, OCCURRENCES_FILE, fingerprint, graph_dir
+from capabilities.built import (
+    FACTS_FILE,
+    FORMAT_VERSION,
+    MANIFEST_FILE,
+    NODES_FILE,
+    OCCURRENCES_FILE,
+    fingerprint,
+    graph_dir,
+)
 from capabilities.graph import LoadError, load_documents
 
 from .upstream import load_upstream
@@ -47,7 +55,7 @@ def write_manifest(root: Path, build_dir: Path) -> dict:
         "fingerprint": loaded_fingerprint(build_dir),
         "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "git_commit": git_commit(root),
-        "tables": {name: row_count(graph_dir(build_dir) / name) for name in (NODES_FILE, OCCURRENCES_FILE)},
+        "tables": {name: row_count(graph_dir(build_dir) / name) for name in (NODES_FILE, FACTS_FILE, OCCURRENCES_FILE)},
         "upstream": loaded_snapshots(build_dir),
     }
     (graph_dir(build_dir) / MANIFEST_FILE).write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
@@ -56,19 +64,20 @@ def write_manifest(root: Path, build_dir: Path) -> dict:
 
 def load_inputs(root: Path, build_dir: Path) -> dict:
     """Every input into its raw table, and the inputs' fingerprint into raw.loads. Parsing them into columns is dbt's
-    job. Returns how many curated documents and crosswalk rows were loaded, and each upstream snapshot (None for a
-    dataset with none)."""
+    job. Returns how many curated documents, crosswalk rows and suppressions were loaded, and each upstream snapshot
+    (None for a dataset with none)."""
     # Taken before anything is read, so an edit made while loading leaves the graph stale.
     inputs = fingerprint(root, build_dir)
     graph_dir(build_dir).mkdir(parents=True, exist_ok=True)
     with duckdb.connect(str(build_dir / WAREHOUSE_FILE)) as connection:
         connection.execute("create schema if not exists raw")
         documents = load_curated_documents(connection, root)
-        crosswalks = load_crosswalks(connection, root)
+        crosswalks = load_tables(connection, root / "data" / "crosswalks")
+        suppressions = load_tables(connection, root / "data" / "suppressions")
         snapshots = load_upstream(connection, build_dir)
         connection.execute("create or replace table raw.loads (fingerprint varchar, loaded_at timestamptz)")
         connection.execute("insert into raw.loads values (?, now())", [inputs])
-    return {"documents": documents, "crosswalks": crosswalks, "upstream": snapshots}
+    return {"documents": documents, "crosswalks": crosswalks, "suppressions": suppressions, "upstream": snapshots}
 
 
 def load_curated_documents(connection: duckdb.DuckDBPyConnection, root: Path) -> int:
@@ -88,12 +97,12 @@ def load_curated_documents(connection: duckdb.DuckDBPyConnection, root: Path) ->
     return len(rows)
 
 
-def load_crosswalks(connection: duckdb.DuckDBPyConnection, root: Path) -> dict[str, int]:
-    """Each hand-kept crosswalk (ADR 0034) into raw.<its file name>, as text exactly as written. Not a dbt seed: a build
-    reads its inputs from `root`, and dbt can't safely read seeds from outside its project (ADR 0041). Returns each
-    crosswalk's number of rows."""
+def load_tables(connection: duckdb.DuckDBPyConnection, directory: Path) -> dict[str, int]:
+    """Each hand-kept table in `directory` (crosswalks and suppressions, ADR 0034) into raw.<its file name>, as text
+    exactly as written. Not dbt seeds: a build reads its inputs from `root`, and dbt can't safely read seeds from outside
+    its project (ADR 0041). Returns each table's number of rows."""
     rows = {}
-    for path in sorted((root / "data" / "crosswalks").glob("*.csv")):
+    for path in sorted(directory.glob("*.csv")):
         connection.execute(
             f'create or replace table raw."{path.stem}" as select * from read_csv(?, header = true, all_varchar = true)',
             [str(path)],
