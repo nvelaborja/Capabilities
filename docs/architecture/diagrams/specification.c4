@@ -44,5 +44,12 @@ specification {
     }
   }
 
+  // Where data goes next, drawn the way it flows (for the detailed pipeline view). Other relationships say which part
+  // acts on which, and often point against the flow ("the Loader reads the curated layer").
+  relationship lineage {
+    color green
+    line solid
+  }
+
   tag generated
 }

@@ -274,6 +274,34 @@ model {
   capabilities.warehouse.rawCrosswalk -> capabilities.artifact.occurrences 'match rules'
   capabilities.warehouse.rawSnapshots -> capabilities.artifact.occurrences 'retrieval time, for provenance'
 
+  // Lineage: the data, stage to stage, the way it flows (view pipeline).
+  mrds -[lineage]-> capabilities.snapshots 'mrds-csv.zip, as Parquet'
+  wikidata -[lineage]-> capabilities.snapshots 'two query results, as Parquet'
+  capabilities.snapshots -[lineage]-> capabilities.backups 'capabilities backup, when newer'
+  capabilities.curated -[lineage]-> capabilities.warehouse.rawDocuments 'every document, whole'
+  capabilities.curated -[lineage]-> capabilities.warehouse.rawCrosswalk 'mrds_sources.csv'
+  capabilities.curated -[lineage]-> capabilities.warehouse.rawWikidataCrosswalk 'wikidata_things.csv'
+  capabilities.curated -[lineage]-> capabilities.warehouse.rawOreMinerals 'ore_minerals.csv'
+  capabilities.curated -[lineage]-> capabilities.warehouse.rawSuppressions 'suppressed_records.csv'
+  capabilities.curated -[lineage]-> capabilities.warehouse.rawLoads 'the inputs fingerprint'
+  capabilities.snapshots -[lineage]-> capabilities.warehouse.rawMrds 'the download, if newest'
+  capabilities.snapshots -[lineage]-> capabilities.warehouse.rawWikidata 'the download, if newest'
+  capabilities.snapshots -[lineage]-> capabilities.warehouse.rawWikidataItems 'the download, if newest'
+  capabilities.backups -[lineage]-> capabilities.warehouse.rawMrds 'the backup, if newest'
+  capabilities.backups -[lineage]-> capabilities.warehouse.rawWikidata 'the backup, if newest'
+  capabilities.backups -[lineage]-> capabilities.warehouse.rawWikidataItems 'the backup, if newest'
+  capabilities.backups -[lineage]-> capabilities.warehouse.rawSnapshots 'which copy, and when retrieved'
+  capabilities.snapshots -[lineage]-> capabilities.warehouse.rawSnapshots 'which copy, and when retrieved'
+  capabilities.warehouse.rawLoads -[lineage]-> capabilities.artifact.manifest 'the fingerprint, written last'
+  capabilities.warehouse.rawSnapshots -[lineage]-> capabilities.artifact.manifest 'the copies used'
+  capabilities.artifact.graphNodes -[lineage]-> capabilities.artifact.manifest 'its row count'
+  capabilities.artifact.graphFacts -[lineage]-> capabilities.artifact.manifest 'its row count'
+  capabilities.artifact.occurrences -[lineage]-> capabilities.artifact.manifest 'its row count'
+  capabilities.artifact.queue -[lineage]-> capabilities.artifact.manifest 'its row count'
+  capabilities.artifact.graphNodes -[lineage]-> capabilities.core.built 'every node'
+  capabilities.artifact.graphFacts -[lineage]-> capabilities.core.built 'where each value came from'
+  capabilities.artifact.manifest -[lineage]-> capabilities.core.built 'is the build current?'
+
   // The build as a series of stages, like a deployment pipeline (view pipeline-overview). `capabilities build` runs
   // stages 2 to 4; Dagster's "materialize all" runs 1b to 4. Each stage names the parts that do it, in the detailed
   // pipeline view.

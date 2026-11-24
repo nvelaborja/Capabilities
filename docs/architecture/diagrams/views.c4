@@ -9,6 +9,7 @@ views {
     include capabilities.core.*, capabilities.pipeline.*
     exclude capabilities.core, capabilities.pipeline
     exclude element.kind = stage
+    exclude * -> * where kind is lineage
     style capabilities.artifact, capabilities.warehouse, capabilities.snapshots {
       border dashed
     }
@@ -43,14 +44,46 @@ views {
 
   view pipeline {
     title 'The data pipeline'
-    description 'How `capabilities build`, or Dagster, turns the curated layer and upstream snapshots into the built graph the app reads (docs/architecture/data-pipeline.md).'
-    include mrds, wikidata
-    include capabilities.curated
-    include capabilities.snapshots, capabilities.backups
-    include capabilities.pipeline.*
-    include capabilities.warehouse.*
-    include capabilities.artifact.*
-    include capabilities.core.built
+    description 'Every input, table and output of the build, stage by stage from left to right as in the pipeline at a glance. Green arrows are where the data goes next; each stage holds the part that does it (docs/architecture/data-pipeline.md).'
+    group '1a Curated layer' {
+      include capabilities.curated
+    }
+    group '1b Download upstream (Dagster)' {
+      include mrds, wikidata
+      include capabilities.pipeline.dagster, capabilities.pipeline.downloader
+      include capabilities.snapshots, capabilities.backups
+    }
+    group '2 Load: raw tables (DuckDB)' {
+      include capabilities.pipeline.loader
+      include capabilities.warehouse.rawDocuments, capabilities.warehouse.rawCrosswalk, capabilities.warehouse.rawWikidataCrosswalk
+      include capabilities.warehouse.rawOreMinerals, capabilities.warehouse.rawWikidataItems, capabilities.warehouse.rawSuppressions
+      include capabilities.warehouse.rawWikidata, capabilities.warehouse.rawMrds, capabilities.warehouse.rawSnapshots, capabilities.warehouse.rawLoads
+    }
+    group '3a/3b Transform and test (dbt)' {
+      include capabilities.pipeline.dbt
+      include capabilities.warehouse.stgDocuments, capabilities.warehouse.stgCuratedQuantities, capabilities.warehouse.stgWikidata
+      include capabilities.warehouse.stgOreNodes, capabilities.warehouse.stgMrds
+      include capabilities.artifact.graphNodes, capabilities.artifact.graphFacts, capabilities.artifact.queue, capabilities.artifact.occurrences
+    }
+    group '4 Publish' {
+      include capabilities.artifact.manifest
+    }
+    group '5 Serve' {
+      include capabilities.core.built
+    }
+    // Which part acts on which: kept in the model, left out here, since most point against the flow. Each part sits in
+    // the stage it does instead.
+    // Stages, not containers: the parts are grouped by what they do in the build.
+    exclude capabilities, capabilities.pipeline, capabilities.warehouse, capabilities.artifact, capabilities.core
+    exclude capabilities.pipeline.loader -> *
+    exclude capabilities.pipeline.dbt -> *
+    exclude capabilities.core.built -> *
+    exclude capabilities.pipeline.dagster -> capabilities.pipeline.loader
+    exclude capabilities.pipeline.dagster -> capabilities.pipeline.dbt
+    exclude capabilities.pipeline.downloader -> mrds
+    exclude capabilities.pipeline.downloader -> wikidata
+    exclude capabilities.pipeline.downloader -> capabilities.curated
     autoLayout LeftRight
   }
+
 }
