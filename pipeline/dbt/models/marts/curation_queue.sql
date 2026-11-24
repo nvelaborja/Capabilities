@@ -6,6 +6,8 @@
 --   route_unverified          a route whose references are all unchecked
 --   upstream_disagreement     a curated value that differs from upstream's
 --   stale_override            an override of an upstream value that has since changed
+--   unread_reference          a work cited but not yet read and verified everywhere it is cited, ranked by how many
+--                             routes depend on it, with a free copy where OpenAlex knows one (the reading queue, ADR 0047)
 --   unmatched_place           Pleiades mines and quarries that name a material no rule matches, by material. Last:
 --                             where a material was found matters least to the app's questions (ADR 0046)
 with nodes as (
@@ -135,6 +137,35 @@ unmatched_places as (
     group by material
 ),
 
+-- The reading queue: every work some use of which isn't verified, the most depended on first.
+unread_references as (
+    select
+        'unread_reference' as kind,
+        id as subject,
+        citation as label,
+        'Cited by ' || case
+                when routes = 0 then len(cited_by) || ' node' || case when len(cited_by) = 1 then '' else 's' end
+                else routes || ' route' || case when routes = 1 then '' else 's' end
+                    || case when len(cited_by) > routes then ' and ' || (len(cited_by) - routes) || ' other node'
+                        || case when len(cited_by) - routes = 1 then '' else 's' end else '' end
+            end
+            || '. ' || case result
+                when 'found' then 'Found in ' || case match_service when 'openalex' then 'OpenAlex' else 'Crossref' end
+                    || coalesce(', with a free copy: ' || free_copy, '') || '.'
+                when 'review_found' then 'Only a review of it is in '
+                    || case match_service when 'openalex' then 'OpenAlex' else 'Crossref' end || '.'
+                when 'possible' then 'Possibly in ' || case match_service when 'openalex' then 'OpenAlex' else 'Crossref' end
+                    || ' (' || note || ').'
+                else note
+            end
+            || ' Read it, and mark the claims it supports verified.' as detail,
+        routes as priority,
+        json_object('result', result, 'free_copy', free_copy, 'doi', coalesce(doi, match_doi),
+                    'statuses', statuses) as evidence
+    from {{ ref('reference_checks') }}
+    where not verified
+),
+
 queue as (
     select * from ore_candidates
     union all select * from extracted_without_route
@@ -142,6 +173,7 @@ queue as (
     union all select * from routes_unverified
     union all select * from disagreements
     union all select * from stale_overrides
+    union all select * from unread_references
     union all select * from unmatched_places
 )
 

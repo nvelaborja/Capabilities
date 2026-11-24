@@ -14,6 +14,7 @@ from pathlib import Path
 
 import duckdb
 from capabilities.built import (
+    CHECKS_FILE,
     FACTS_FILE,
     FORMAT_VERSION,
     MANIFEST_FILE,
@@ -58,7 +59,7 @@ def write_manifest(root: Path, build_dir: Path) -> dict:
         "git_commit": git_commit(root),
         "tables": {
             name: row_count(graph_dir(build_dir) / name)
-            for name in (NODES_FILE, FACTS_FILE, OCCURRENCES_FILE, QUEUE_FILE)
+            for name in (NODES_FILE, FACTS_FILE, OCCURRENCES_FILE, QUEUE_FILE, CHECKS_FILE)
         },
         "upstream": loaded_snapshots(build_dir),
     }

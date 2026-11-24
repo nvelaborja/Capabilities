@@ -181,8 +181,8 @@ class TestEveryDatasetIsRequired:
         # built_dir (conftest) never downloads anything, like CI and a fresh clone.
         manifest = json.loads((graph_dir(built_dir) / MANIFEST_FILE).read_text())
         assert {name: snapshot["copy"] for name, snapshot in manifest["upstream"].items()} == {
-            "mrds_deposits": "backup", "pleiades_places": "backup", "wikidata_items": "backup",
-            "wikidata_quantities": "backup",
+            "mrds_deposits": "backup", "pleiades_places": "backup", "reference_candidates": "backup",
+            "wikidata_items": "backup", "wikidata_quantities": "backup",
         }
         assert manifest["tables"][OCCURRENCES_FILE] > 0
 

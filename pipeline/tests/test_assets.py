@@ -32,6 +32,9 @@ PLEIADES_STAGING = AssetKey("stg_pleiades__workings")
 ITEMS_RAW = AssetKey(["raw", "wikidata_items"])
 CROSSWALKED_ITEMS = AssetKey("stg_crosswalk__wikidata_items")
 QUEUE = AssetKey("curation_queue")
+CHECKS = AssetKey("reference_checks")
+REFERENCES_SNAPSHOT = AssetKey(["upstream", "reference_candidates"])
+REFERENCES_RAW = AssetKey(["raw", "reference_candidates"])
 
 
 @pytest.fixture
@@ -55,7 +58,8 @@ class TestDefinitions:
         graph = asset_graph(dagster_build[0])
         assert graph.get(STAGING).parent_keys == {RAW}
         assert graph.get(NODES).parent_keys == {STAGING, FACTS, ORE_NODES}
-        assert graph.get(MANIFEST).parent_keys == {NODES, FACTS, OCCURRENCES, QUEUE}
+        assert graph.get(MANIFEST).parent_keys == {NODES, FACTS, OCCURRENCES, QUEUE, CHECKS}
+        assert graph.get(REFERENCES_RAW).parent_keys == {REFERENCES_SNAPSHOT}
 
     def test_the_lineage_runs_from_the_mrds_download_and_the_crosswalk_to_the_occurrences(self, dagster_build):
         graph = asset_graph(dagster_build[0])
@@ -113,15 +117,18 @@ class TestDefinitions:
 
 class TestMaterializing:
     def test_materializing_everything_downloads_every_dataset_and_builds_a_current_graph(
-        self, dagster_build, repo_root, tmp_path, mrds_zip, wikidata_endpoint, pleiades_gz
+        self, dagster_build, repo_root, tmp_path, mrds_zip, wikidata_endpoint, pleiades_gz, scholarly_endpoint,
+        lookups_offline,
     ):
         from capabilities_pipeline.assets import UpstreamDownloads
 
         defs, build_dir = dagster_build
         downloads = UpstreamDownloads(
             mrds_url=mrds_zip(tmp_path / "download"), wikidata_url=wikidata_endpoint.url, pleiades_url=pleiades_gz,
+            openalex_url=scholarly_endpoint.openalex_url, crossref_url=scholarly_endpoint.crossref_url,
         )
-        result = materialize(list(defs.assets), resources={**defs.resources, "downloads": downloads})
+        with lookups_offline():
+            result = materialize(list(defs.assets), resources={**defs.resources, "downloads": downloads})
         assert result.success
         assert all(evaluation.passed for evaluation in result.get_asset_check_evaluations())
         assert is_current(repo_root, build_dir)
@@ -143,6 +150,7 @@ class TestMaterializing:
         assert {WIKIDATA_SNAPSHOT, WIKIDATA_RAW, WIKIDATA_CROSSWALK, SUPPRESSIONS, FACTS} <= materialized
         assert {ITEMS_SNAPSHOT, ITEMS_RAW, ORE_RAW, ORE_NODES, QUEUE} <= materialized
         assert {PLEIADES_SNAPSHOT, PLEIADES_RAW, PLEIADES_RULES, PLEIADES_STAGING} <= materialized
+        assert {REFERENCES_SNAPSHOT, REFERENCES_RAW, CHECKS} <= materialized
 
     def test_offline_a_download_falls_back_to_the_cold_backup_and_says_so(self, dagster_build, wikidata_endpoint):
         from capabilities_pipeline.assets import UpstreamDownloads

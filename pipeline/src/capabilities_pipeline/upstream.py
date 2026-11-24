@@ -26,6 +26,9 @@ import yaml
 from capabilities.built import BACKUP_DIR, SNAPSHOT_FILE, upstream_dir
 from capabilities.graph import LoadError
 
+from .citations import COLUMNS as REFERENCE_COLUMNS
+from .citations import Lookups, cited_works, write_rows
+
 # Some servers (USGS among them) refuse Python's default user agent. This one is deliberately generic.
 USER_AGENT = "dataset-snapshot/1.0"
 TIMEOUT_S = 300
@@ -119,6 +122,29 @@ class WikidataItems(WikidataDataset):
         return items_query(items), {"items": len(items)}
 
 
+@dataclass(frozen=True)
+class ReferenceCandidates(Dataset):
+    """What OpenAlex and Crossref hold for each work the curated layer cites, and whether each cited link still loads
+    (ADR 0047). `url` is OpenAlex's API; Crossref's is `crossref_url`."""
+
+    crossref_url: str = ""
+
+    def download(self, url: str, scratch: Path, root: Path) -> tuple[Path, Path, dict]:
+        works = cited_works(root)
+        lookups = Lookups(url, self.crossref_url, USER_AGENT)
+        for work in works:
+            lookups.work(work)
+        for link in sorted({url for work in works for url in work.urls}):
+            lookups.link(link)
+        download = scratch / "candidates.csv"
+        write_rows(lookups.rows, download)
+        return download, download, {
+            "crossref_url": self.crossref_url,
+            "works": len(works),
+            "searched": sum(work.searchable for work in works),
+        }
+
+
 MRDS = ZipDataset(
     name="mrds_deposits",
     url="https://mrdata.usgs.gov/mrds/mrds-csv.zip",
@@ -159,7 +185,15 @@ PLEIADES = GzipCsvDataset(
     ),
 )
 
-DATASETS = (MRDS, WIKIDATA, WIKIDATA_ITEMS, PLEIADES)
+REFERENCES = ReferenceCandidates(
+    name="reference_candidates",
+    url="https://api.openalex.org",
+    crossref_url="https://api.crossref.org",
+    license="CC0 1.0 (OpenAlex); Crossref's bibliographic metadata, which has no restrictions (no abstracts are kept)",
+    columns=REFERENCE_COLUMNS,
+)
+
+DATASETS = (MRDS, WIKIDATA, WIKIDATA_ITEMS, PLEIADES, REFERENCES)
 
 
 def fetch(dataset: Dataset, build_dir: Path, url: str | None = None, root: Path | None = None) -> dict:
