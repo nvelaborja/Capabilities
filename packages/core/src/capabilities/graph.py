@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import csv
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -46,6 +47,18 @@ class Document:
     path: Path
     schema: str
     data: dict
+
+
+ORE_CROSSWALK = Path("data") / "crosswalks" / "ore_minerals.csv"
+
+
+def ore_crosswalk_rows(root: Path) -> list[dict]:
+    """The rows of the ore crosswalk (ADR 0045): the minerals that join the graph from upstream, and those rejected."""
+    path = root / ORE_CROSSWALK
+    if not path.is_file():
+        return []
+    with path.open(newline="", encoding="utf-8") as file:
+        return list(csv.DictReader(file))
 
 
 def find_root(start: Path | None = None) -> Path:
