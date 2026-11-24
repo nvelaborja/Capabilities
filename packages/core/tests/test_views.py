@@ -212,7 +212,7 @@ class TestExplain:
     @pytest.mark.parametrize(("node", "route_id", "row_id", "status", "reason"), [
         ("steel", "steel-by-carburizing", "carbon-source", "yes", "Met by charcoal."),
         ("bloom-iron", "bloomery-smelting", "iron-ore", "no", "No member is reachable (hematite, limonite (bog iron ore))."),
-        ("cut:granite", "cut-by-chiseling", "chisel", "no", "Copper chisel: hardness 2.5–3 Mohs; needs ≥ 6–7 Mohs (granite)."),
+        ("cut:granite", "cut-by-chiseling", "chisel", "no", "Copper chisel: hardness 2.5–3 Mohs; needs ≥ 5–7 Mohs (granite)."),
         ("shape:limestone", "shape-by-pounding", "pounder", "maybe",
          "Dolerite pounder: fracture toughness unknown; needs ≥ 0.62–0.68 MPa·√m (limestone)."),
         ("steel", "steel-by-crucible", "heat", "maybe",
@@ -243,7 +243,7 @@ class TestExplain:
     def test_about_says_what_a_thing_is_and_where_it_is_found(self, graph, levels):
         about = explain(graph, levels, context_for(graph, egypt(graph)), "granite")["about"]
         assert about["description"].startswith("A hard, coarse-grained igneous rock")
-        assert {"id": "hardness_mohs", "label": "Hardness", "value": "6–7 Mohs", "source": {"layer": "curated"}} in about["quantities"]
+        assert {"id": "hardness_mohs", "label": "Hardness", "value": "5–7 Mohs", "source": {"layer": "curated"}} in about["quantities"]
         assert about["origin"] == "extracted" and "availability" not in about
         assert about["member_of"] == [{"id": "stone", "label": "Stone"}]
         assert about["references"][0]["doi"] == "10.1007/3-7643-7712-7_2"

@@ -73,8 +73,8 @@ def sample_rows():
     return _sample_rows
 
 
-# Four real Wikidata hardness statements (CC0), retrieved 2026-11-24: hematite agrees with our curated value; granite,
-# limonite and copper don't.
+# Four real Wikidata hardness statements (CC0), retrieved 2026-11-24, for hematite, limonite, granite and copper. Our
+# curated values match them since ADR 0043 was accepted; tests that need a disagreement change a curated value.
 WIKIDATA_SAMPLE = REPO_ROOT / "pipeline" / "tests" / "fixtures" / "wikidata-sample.csv"
 
 

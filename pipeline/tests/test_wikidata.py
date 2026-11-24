@@ -80,10 +80,18 @@ class TestChoosingAValue:
         assert upstream["url"] == "https://www.wikidata.org/wiki/Q41177"
         assert upstream["retrieved_at"].endswith("Z")
 
-    def test_a_curated_value_that_disagrees_is_kept_beside_it(self, wikidata_build):
-        granite, hematite = hardness(wikidata_build, "granite"), hardness(wikidata_build, "hematite")
-        assert (granite["curated_value"], granite["disagrees"]) == ([6, 7], True)
+    def test_a_curated_value_that_agrees_is_not_a_disagreement(self, wikidata_build):
+        hematite = hardness(wikidata_build, "hematite")
         assert (hematite["curated_value"], hematite["disagrees"]) == ([5.5, 6.5], False)
+
+    def test_a_curated_value_that_disagrees_is_kept_beside_it(self, data_copy, tmp_path, wikidata_endpoint):
+        # given: a curated granite hardness that differs from Wikidata's 5–7
+        granite_file = data_copy / "data" / "things" / "materials" / "granite.yaml"
+        granite_file.write_text(granite_file.read_text().replace("hardness_mohs: [5, 7]", "hardness_mohs: [6, 7]"))
+        # when: building with the Wikidata snapshot
+        granite = hardness(build_with_wikidata(data_copy, tmp_path / "build", wikidata_endpoint), "granite")
+        # then: Wikidata's value is used, and ours is kept beside it as a disagreement
+        assert (granite["value"], granite["curated_value"], granite["disagrees"]) == ([5, 7], [6, 7], True)
 
     def test_a_statement_without_bounds_is_a_single_value(self, wikidata_build):
         assert hardness(wikidata_build, "copper")["value"] == 3
@@ -119,7 +127,7 @@ class TestOverridesAndSuppressions:
             suppressions.read_text() + 'wikidata,Q41177,"Test: the item describes granite in general."\n', encoding="utf-8"
         )
         granite = hardness(build_with_wikidata(data_copy, tmp_path / "build", wikidata_endpoint), "granite")
-        assert (granite["layer"], granite["value"]) == ("curated", [6, 7])
+        assert (granite["layer"], granite["value"], granite["upstream"]) == ("curated", [5, 7], None)
 
     def test_an_override_of_a_value_only_the_curated_layer_gives_fails_the_build(
         self, data_copy, tmp_path, wikidata_endpoint, write_override

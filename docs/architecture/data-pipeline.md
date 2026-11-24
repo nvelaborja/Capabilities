@@ -176,7 +176,7 @@ Tests: `record_id` is unique and not null; `first_production_qualifier` is `befo
 
 Suppressed Wikidata items are left out before the choice is made. Tests: `id` unique and not null; `node_id` not null and in `graph_nodes`; `layer` one of the three; `value` not null.
 
-With the 2026-11-24 snapshot there are 23 facts: 11 from Wikidata, 4 of which disagree with the curated value (granite, limonite, copper, tin bronze), and 12 curated.
+With the 2026-11-24 snapshot there are 23 facts: 11 from Wikidata and 12 curated. When ADR 0043 was accepted, the four curated values that disagreed with Wikidata (granite, limonite, copper, tin bronze) were changed to match, so none disagree now.
 
 **`graph_nodes`** (mart, `models/marts/`, written as Parquet). The built graph.
 

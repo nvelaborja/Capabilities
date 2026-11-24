@@ -160,16 +160,17 @@ class TestProvenance:
         about = client.post("/api/explain", json={"profile": "middle-kingdom-egypt", "node": node}).json()["about"]
         return next(quantity for quantity in about["quantities"] if quantity["id"] == "hardness_mohs")
 
-    def test_an_upstream_value_names_its_record_and_the_curated_value_it_differs_from(self, upstream):
+    def test_an_upstream_value_names_its_dataset_and_record(self, upstream):
         granite = self.hardness(upstream, "granite")
         assert granite["value"] == "5–7 Mohs"
         assert granite["source"]["layer"] == "upstream"
         assert granite["source"]["upstream"]["dataset"] == "Wikidata"
         assert granite["source"]["upstream"]["url"] == "https://www.wikidata.org/wiki/Q41177"
-        assert granite["source"]["curated_value"] == "6–7 Mohs"
 
     def test_an_upstream_value_that_agrees_shows_no_curated_value(self, upstream):
-        assert "curated_value" not in self.hardness(upstream, "hematite")["source"]
+        # The curated layer matches Wikidata (ADR 0043), so there is nothing to show beside it; the views' tests cover a
+        # value that disagrees.
+        assert "curated_value" not in self.hardness(upstream, "granite")["source"]
 
     def test_a_curated_value_says_so(self, client):
         assert self.hardness(client, "granite")["source"] == {"layer": "curated"}

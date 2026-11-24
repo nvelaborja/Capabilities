@@ -5,8 +5,9 @@ origin: extracted
 is_a: [iron-ore]
 description: Hydrated iron oxide that forms in bogs and wetlands. Easy to dig and smelt, so it was a major source of iron in northern Europe.
 quantities:
-  hardness_mohs: [4, 5.5]
+  hardness_mohs: [1.5, 6]
 references:
-  - citation: "Klein, C. & Dutrow, B. (2007). Manual of Mineral Science, 23rd ed. Wiley."
-    supports: Mohs hardness value.
-    status: unverified
+  - citation: "Wikidata: limonite (Q193565), Mohs hardness (P1088). Retrieved 2026-11-24."
+    url: https://www.wikidata.org/wiki/Q193565
+    supports: "Mohs hardness 1.5–6 (ADR 0043: the upstream value, used over our own)."
+    status: secondary

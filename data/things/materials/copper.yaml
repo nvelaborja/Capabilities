@@ -5,11 +5,11 @@ origin: produced
 is_a: [metal]
 description: Copper metal, from smelting ore or from native copper. Melts at about 1085 °C. Hammering it cold (work-hardening) makes it harder.
 quantities:
-  hardness_mohs: [2.5, 3]
+  hardness_mohs: 3
 references:
-  - citation: "Mohs scale of mineral hardness: table of common materials. Wikipedia."
-    url: https://en.wikipedia.org/wiki/Mohs_scale
-    supports: Mohs hardness value.
+  - citation: "Wikidata: copper (Q753), Mohs hardness (P1088). Retrieved 2026-11-24."
+    url: https://www.wikidata.org/wiki/Q753
+    supports: "Mohs hardness 3 (ADR 0043: the upstream value, used over our own)."
     status: secondary
   - citation: "Haynes, W. M. (ed.). CRC Handbook of Chemistry and Physics. CRC Press."
     supports: Melting point of copper, 1084.62 °C.
