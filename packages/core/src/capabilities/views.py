@@ -447,7 +447,7 @@ def about(graph: Graph, key: str) -> dict:
                         "source": quantity_source(graph, key, q)}
                        for q, v in thing.get("quantities", {}).items()],
         "member_of": [{"id": c, "label": graph.label(c)} for c in thing.get("is_a", []) if c in graph.things],
-        "references": references(thing),
+        "references": references(graph, thing),
     }
     for field in ("notes", "origin", "availability", "regions", "era"):
         if thing.get(field):
@@ -499,15 +499,46 @@ def quantity_source(graph: Graph, thing_id: str, quantity: str) -> dict:
         source["override"] = {
             "reason": override["reason"],
             "replaces": quantity_value(graph, quantity, override["replaces"]),
-            "references": references(override),
+            "references": references(graph, override),
             "stale": override["stale"],
         }
     return source
 
 
-def references(item: dict) -> list[dict]:
+def references(graph: Graph, item: dict) -> list[dict]:
+    """An item's references, each with what the citation check found for its work (ADR 0047), when the graph is built."""
     fields = ("citation", "doi", "url", "supports", "status")
-    return [{field: ref[field] for field in fields if field in ref} for ref in item.get("references", [])]
+    rows = []
+    for ref in item.get("references", []):
+        row = {field: ref[field] for field in fields if field in ref}
+        if check := graph.reference_checks.get(ref["citation"].strip()):
+            row["check"] = reference_check(check, ref.get("url"))
+        rows.append(row)
+    return rows
+
+
+SERVICE_LABELS = {"openalex": "OpenAlex", "crossref": "Crossref"}
+
+
+def reference_check(check: dict, url: str | None) -> dict:
+    """What the check found for a work: its result and why, the record matched (with a link to it), a free copy, and
+    whether this reference's own link still loads. Never a status: only a person reading the work changes that."""
+    view: dict = {"result": check["result"], "checked_at": check["checked_at"]}
+    if check["note"]:
+        view["note"] = check["note"]
+    if check["match_service"]:
+        record_url = check["match_id"] if check["match_service"] == "openalex" else f"https://doi.org/{check['match_doi']}"
+        view["match"] = {
+            "service": SERVICE_LABELS.get(check["match_service"], check["match_service"]),
+            "url": record_url,
+            "title": check["match_title"],
+            "year": check["match_year"],
+        }
+    if check["free_copy"]:
+        view["free_copy"] = check["free_copy"]
+    if url and (state := check["links"].get(url.strip())):
+        view["link"] = state
+    return view
 
 
 def leads_to(graph: Graph, levels: Levels, context: StatusContext, key: str) -> list[dict]:
@@ -589,7 +620,7 @@ class _Explainer:
             "missing": sum(row["status"] == "no" for row in rows),
             "uncertain": sum(row["status"] == "maybe" for row in rows),
             "requirements": rows,
-            "references": references(route),
+            "references": references(self.g, route),
         }
         byproducts = [{"id": o["thing"], "label": self.g.label(o["thing"])} for o in route.get("outputs", []) if o.get("byproduct")]
         if byproducts:
