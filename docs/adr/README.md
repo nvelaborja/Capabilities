@@ -49,3 +49,4 @@ Each file records one significant design decision: the context, what we decided,
 | [0041](0041-place-sources-with-mrds-deposits-through-a-crosswalk.md) | Place sources with MRDS deposits, matched through a hand-kept crosswalk | Accepted |
 | [0042](0042-show-where-things-are-found-on-a-maplibre-map.md) | Show where things are found on a MapLibre map, over OpenFreeMap tiles | Accepted |
 | [0043](0043-take-quantities-from-wikidata-with-upstream-first-and-overrides.md) | Take quantities from Wikidata, upstream first, with overrides | Accepted |
+| [0044](0044-require-every-upstream-dataset-with-cold-backups-in-git.md) | Require every upstream dataset, with cold backups in git | Proposed |

@@ -13,14 +13,14 @@ Capabilities is a knowledge graph of what it physically takes to make and do thi
   downloaded by Dagster)
 ```
 
-Data flows one way, left to right. People edit the **curated layer**; **upstream datasets** are downloaded as snapshots. The **pipeline** turns them into the **built graph**. The **core library** loads the built graph into memory and reasons over it. The **API server** exposes that reasoning as JSON and hosts the **web app**, which draws the graph.
+Data flows one way, left to right. People edit the **curated layer**; **upstream datasets** are downloaded as snapshots, and every one is required, with a cold backup of each in git. The **pipeline** turns them into the **built graph**. The **core library** loads the built graph into memory and reasons over it. The **API server** exposes that reasoning as JSON and hosts the **web app**, which draws the graph.
 
 ## The parts
 
 | Part | Where | Technology | What it does |
 |---|---|---|---|
 | Curated layer | `data/`, `examples/jobs/`, `schema/` | [YAML and JSON Schema](technologies/yaml-and-json-schema.md), CSV | The facts people write and review: things, routes, verbs, quantities, profiles and example jobs, one file per node, each checked against a schema; crosswalks, CSV tables matching upstream records to our ids; overrides of upstream values we believe are wrong, with the reason and references; and suppressions of upstream records that don't belong. |
-| Upstream datasets | `build/upstream/` (downloaded) | [Parquet](technologies/parquet.md) | Snapshots of public datasets, each recorded with where and when it was retrieved, its hash and its license. Today: USGS MRDS mineral deposits ([ADR 0041](../adr/0041-place-sources-with-mrds-deposits-through-a-crosswalk.md)), and Wikidata's quantity statements for our materials, fetched with one [SPARQL](technologies/wikidata-and-sparql.md) query ([ADR 0043](../adr/0043-take-quantities-from-wikidata-with-upstream-first-and-overrides.md)). |
+| Upstream datasets | `build/upstream/` (downloaded), `snapshots/` (cold backups, in git) | [Parquet](technologies/parquet.md) | Snapshots of public datasets, each recorded with where and when it was retrieved, its hash and its license. Every dataset is required: a build uses the newest copy, the download or the backup, and stops if one has neither ([ADR 0044](../adr/0044-require-every-upstream-dataset-with-cold-backups-in-git.md)). Today: USGS MRDS mineral deposits ([ADR 0041](../adr/0041-place-sources-with-mrds-deposits-through-a-crosswalk.md)), and Wikidata's quantity statements for our materials, fetched with one [SPARQL](technologies/wikidata-and-sparql.md) query ([ADR 0043](../adr/0043-take-quantities-from-wikidata-with-upstream-first-and-overrides.md)). |
 | Pipeline | `pipeline/` | [Python](technologies/python-and-uv.md), [DuckDB](technologies/duckdb.md), [dbt](technologies/dbt.md), [Dagster](technologies/dagster.md) | Builds the graph. A Python loader puts every curated document, crosswalk and upstream snapshot into DuckDB tables; a dbt project transforms and tests them, and writes the results as [Parquet](technologies/parquet.md), using [DuckDB's spatial extension](technologies/duckdb-spatial-and-geoparquet.md) for locations. Dagster downloads the upstream snapshots and runs the same steps as assets, with lineage, checks and run history. |
 | Built graph | `build/graph/` (generated) | [Parquet](technologies/parquet.md), [GeoParquet](technologies/duckdb-spatial-and-geoparquet.md), JSON | The artifact the app reads: one row per node, where each source kind is found (occurrences, with point geometries), and a manifest saying which inputs it was built from ([ADR 0038](../adr/0038-serve-the-app-from-a-built-graph-artifact.md)). |
 | Core library | `packages/core/` | [Python](technologies/python-and-uv.md) | The in-memory graph, the reasoner (Q1–Q3, tech levels, display shapes), where things are found (for the map), the validator, and the `capabilities` command-line tool. |
@@ -47,7 +47,7 @@ The command line takes the same path without the browser and server: `uv run cap
 
 `uv run capabilities build` runs the pipeline. The question commands and the server also run it themselves whenever the inputs changed since the last build. Each build:
 
-1. loads every input into raw tables in a DuckDB file: each curated document, whole; each crosswalk and the suppressions; and each upstream snapshot already downloaded. It records a *fingerprint*: a hash of every input (the data, the schemas, the snapshots, and the pipeline's own code);
+1. loads every input into raw tables in a DuckDB file: each curated document, whole; each crosswalk and the suppressions; and the newest copy of each upstream dataset, downloaded or backed up. It records a *fingerprint*: a hash of every input (the data, the schemas, the snapshots, and the pipeline's own code);
 2. runs `dbt build`: staging views pull typed columns out of each input; one mart chooses each quantity value (an override, else Wikidata's, else the curated one) and writes where it came from to `graph_facts.parquet`; another writes every node, with the chosen values, to `graph_nodes.parquet`; a third matches MRDS deposits to our source kinds through the crosswalk and writes `source_occurrences.parquet`; data tests check the results along the way;
 3. writes `manifest.json` last, with that fingerprint. A build is *current* when its fingerprint matches the inputs on disk.
 
@@ -71,12 +71,14 @@ The [ADRs](../adr/README.md) record every significant decision. The ones that sh
 | MRDS deposits become occurrences of source kinds through a hand-kept crosswalk. | [0041](../adr/0041-place-sources-with-mrds-deposits-through-a-crosswalk.md) |
 | A MapLibre map over OpenFreeMap tiles shows where things are found. | [0042](../adr/0042-show-where-things-are-found-on-a-maplibre-map.md) |
 | Quantity values come from Wikidata where it has them, over our curated ones; overrides say where we disagree, and the app shows where each value came from. | [0043](../adr/0043-take-quantities-from-wikidata-with-upstream-first-and-overrides.md) |
+| Every upstream dataset is required, with a cold backup of each in git; the curated layer doesn't copy upstream values. | [0044](../adr/0044-require-every-upstream-dataset-with-cold-backups-in-git.md) |
 
 ## Repository layout
 
 ```
 schema/              JSON Schemas for every data file type
-data/                the curated layer: quantities, things, verbs, routes, profiles, crosswalks
+data/                the curated layer: quantities, things, verbs, routes, profiles, crosswalks, overrides, suppressions
+snapshots/           cold backups of the upstream datasets (in git)
 examples/            example jobs (Q3) and worked results the tests check
 packages/core/       `capabilities`: graph, reasoner, validator, CLI, and their tests
 packages/api/        `capabilities_api`: the FastAPI server, and its tests

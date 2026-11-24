@@ -42,9 +42,10 @@ The short `wdt:` path is handy but drops the bounds, so a range would come back 
 
 Wikidata gives the graph its quantity values ([ADR 0043](../../adr/0043-take-quantities-from-wikidata-with-upstream-first-and-overrides.md)):
 
-1. `data/crosswalks/wikidata_things.csv` matches our things to Wikidata items, with why. A quantity's `wikidata` field says which property holds it (`hardness_mohs` has `P1088`).
+1. `data/crosswalks/wikidata_things.csv` matches our things to Wikidata items, with why. A quantity's `wikidata` field says which property holds it and the unit its values must be in (`hardness_mohs`: `P1088`, unit `Q199`).
 2. The Dagster asset `upstream/wikidata_quantities` builds one SPARQL query from those two (`quantities_query` in `upstream.py`), POSTs it to `query.wikidata.org/sparql`, asks for CSV, and keeps the result unchanged as Parquet. `snapshot.json` records the query, so a snapshot says exactly what was asked.
-3. dbt types the statements (`stg_wikidata__quantities`) and chooses each thing's value in `graph_facts`: an override, then Wikidata, then our curated value. The detail pane shows where each value came from, with a link to the item.
+3. `uv run capabilities backup` makes the snapshot the cold backup in `snapshots/wikidata_quantities/`, in git, so every build has it ([ADR 0044](../../adr/0044-require-every-upstream-dataset-with-cold-backups-in-git.md)).
+4. dbt types the statements (`stg_wikidata__quantities`), checks their units (`wikidata_units_match`) and chooses each thing's value in `graph_facts`: an override, then Wikidata, then our curated value, which we keep only where Wikidata has none. The detail pane shows where each value came from, with a link to the item.
 
 The query, for the crosswalked items and every property our quantities name:
 
@@ -69,7 +70,8 @@ Why Wikidata: it is CC0, so it fits our non-commercial licensing without conditi
 | What | Where |
 |---|---|
 | The crosswalk | `data/crosswalks/wikidata_things.csv` |
-| Which property each quantity is read from | `wikidata:` in `data/quantities/*.yaml` |
+| Which property each quantity is read from, and in what unit | `wikidata:` in `data/quantities/*.yaml` |
+| The cold backup | `snapshots/wikidata_quantities/` |
 | The query and the download | `WikidataDataset`, `quantities_query` in `pipeline/src/capabilities_pipeline/upstream.py` |
 | The Dagster asset | `wikidata_snapshot` in `pipeline/src/capabilities_pipeline/assets.py` |
 | Typing and choosing values | `pipeline/dbt/models/staging/stg_wikidata__quantities.sql`, `pipeline/dbt/models/marts/graph_facts.sql` |
@@ -87,6 +89,7 @@ To try a query by hand, paste it into [query.wikidata.org](https://query.wikidat
 
 - **Use `p:`/`psv:` for ranges.** `wdt:` returns only the amount; granite would read as 6, not 5–7.
 - **Ask for best rank.** Without `?statement a wikibase:BestRank`, deprecated statements come back too.
+- **Units are checked.** A value in another unit than the quantity's `wikidata.unit` fails the build, rather than be read unconverted.
 - **Several best statements become one range** in `graph_facts`, from the lowest bound to the highest.
 - **Anyone can edit Wikidata.** The snapshot keeps builds reproducible, the detail pane shows where each value came from, and an override is how we disagree. Downloading again is a deliberate step.
 - **Match items carefully.** "Flint" has an item for the rock and another for a mineral; "copper" is the element (whose properties are the metal's) and also a colour. The crosswalk's `notes` say which one and why.

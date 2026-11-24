@@ -39,6 +39,11 @@ model {
       description 'Each upstream dataset as downloaded, every column as text, with its URL, retrieval time, hash and license. Downloaded only by Dagster; not in git.'
     }
 
+    backups = store 'Cold backups' {
+      technology 'Parquet (zstd) and snapshot.json, in git (snapshots/)'
+      description 'A copy of every upstream dataset, so the graph builds offline, in CI and when a download fails. Every dataset is required: a build uses the newest copy, download or backup, and stops if one has neither (ADR 0044).'
+    }
+
     pipeline = container 'Pipeline' {
       technology 'Python, dbt Core, dbt-duckdb, Dagster'
       description 'pipeline/: builds the graph from its inputs, with `capabilities build` or as Dagster assets.'
@@ -79,10 +84,10 @@ model {
         description 'Upstream records left out of the build, with why (data/suppressions/suppressed_records.csv).'
       }
       rawWikidata = table 'raw.wikidata_quantities' {
-        description 'The Wikidata snapshot: item, property, amount, bounds and unit of each best-ranked statement, as text. Empty when nothing has been downloaded.'
+        description 'The Wikidata snapshot: item, property, amount, bounds and unit of each best-ranked statement, as text.'
       }
       rawMrds = table 'raw.mrds_deposits' {
-        description 'The MRDS snapshot, all 46 columns as text. Empty when nothing has been downloaded.'
+        description 'The MRDS snapshot, all 46 columns as text.'
       }
       rawSnapshots = table 'raw.upstream_snapshots' {
         description 'Each snapshot loaded: dataset, URL, retrieval time, hash, rows, license.'
@@ -152,7 +157,7 @@ model {
       }
       cli = component 'CLI' {
         technology 'argparse (`capabilities`)'
-        description 'validate, build, need, explore, check, credits, serve.'
+        description 'validate, build, backup, need, explore, check, credits, serve.'
       }
     }
 
@@ -206,11 +211,15 @@ model {
   capabilities.pipeline.loader -> capabilities.warehouse.rawLoads 'records the inputs fingerprint'
   capabilities.pipeline.loader -> capabilities.warehouse.rawCrosswalk 'loads each crosswalk, as text'
   capabilities.pipeline.loader -> capabilities.snapshots 'reads the snapshots already downloaded'
-  capabilities.pipeline.loader -> capabilities.warehouse.rawMrds 'loads the MRDS snapshot (or an empty table)'
+  capabilities.pipeline.loader -> capabilities.backups 'reads a backup when it is newer than the download, or there is none'
+  capabilities.pipeline.downloader -> capabilities.backups 'falls back to it when the network fails'
+  capabilities.core.cli -> capabilities.backups 'backup: makes newer downloads the backups'
+  capabilities.core.built -> capabilities.backups 'includes each snapshot.json in the fingerprint'
+  capabilities.pipeline.loader -> capabilities.warehouse.rawMrds 'loads the newest copy of MRDS'
   capabilities.pipeline.loader -> capabilities.warehouse.rawSnapshots 'records each snapshot loaded'
   capabilities.pipeline.loader -> capabilities.warehouse.rawWikidataCrosswalk 'loads the crosswalk, as text'
   capabilities.pipeline.loader -> capabilities.warehouse.rawSuppressions 'loads the suppressions, as text'
-  capabilities.pipeline.loader -> capabilities.warehouse.rawWikidata 'loads the Wikidata snapshot (or an empty table)'
+  capabilities.pipeline.loader -> capabilities.warehouse.rawWikidata 'loads the newest copy of the Wikidata snapshot'
   capabilities.pipeline.dagster -> capabilities.pipeline.downloader 'downloads MRDS and Wikidata as assets'
   capabilities.pipeline.downloader -> mrds 'downloads mrds-csv.zip (HTTPS)'
   capabilities.pipeline.downloader -> wikidata 'one SPARQL query for the crosswalked items (HTTPS)'

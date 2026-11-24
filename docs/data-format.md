@@ -44,10 +44,12 @@ unit: mm
 scale: ratio              # or ordinal (Mohs: only comparisons are meaningful)
 bands:                    # optional ballpark bands; min inclusive, max exclusive
   - { id: P2, label: "Fine", min: 0.3, max: 3, typical: "good joinery" }
-wikidata: P1088           # optional: the Wikidata property that holds this quantity (here on hardness_mohs)
+wikidata:                 # optional: where Wikidata holds this quantity (here on hardness_mohs)
+  property: P1088
+  unit: Q199              # the unit its values must be in: Q199 is "1", no unit
 ```
 
-A quantity with `wikidata` is read from Wikidata for every thing in the Wikidata crosswalk, and that value is used over the curated one ([ADR 0043](adr/0043-take-quantities-from-wikidata-with-upstream-first-and-overrides.md); see [Where values come from](#where-values-come-from)).
+A quantity with `wikidata` is read from Wikidata for every thing in the Wikidata crosswalk, and that value is used over the curated one. A Wikidata value in another unit fails the build, rather than be read unconverted ([ADR 0043](adr/0043-take-quantities-from-wikidata-with-upstream-first-and-overrides.md); see [Where values come from](#where-values-come-from)).
 
 Current quantities: `temperature_c`, `hardness_mohs`, `toughness_mpa_sqrt_m`, `tolerance_mm` (bands P0–P5), `duration_h` (bands minutes → geological), `mass_kg` (bands), `force_kn`, `volume_cm3`, `removal_rate_cm3_per_h`.
 
@@ -168,23 +170,27 @@ granite,Q41177,"Wikidata ""granite"": intrusive, felsic, igneous rock."
 
 Match only when the item is the same thing. Our copper and tin are the metals, and Wikidata gives the metals' properties on the elements, so they match the elements. Quartz sand has no item of its own, and the quartz item isn't sand, so it stays unmatched.
 
+After adding or changing a row, query Wikidata again (`cd pipeline && uv run dg launch --assets 'upstream/wikidata_quantities'`, then `uv run capabilities backup` and commit): the snapshot holds only the items that were crosswalked when it was taken, and until then the thing keeps its curated value, if it has one.
+
+Don't keep a curated value that Wikidata gives: remove it, and the references that backed only it. The upstream value is the one used, every build has it ([ADR 0044](adr/0044-require-every-upstream-dataset-with-cold-backups-in-git.md)), and a copy in the curated layer would only go stale.
+
 ### Override (`data/overrides/*.yaml`)
 
 Replaces an upstream value we believe is wrong. Upstream sources are never edited; the build applies the override and the app shows it beside the value it replaces ([ADR 0043](adr/0043-take-quantities-from-wikidata-with-upstream-first-and-overrides.md)).
 
 ```yaml
-id: granite-hardness
+id: <thing>-hardness
 kind: override
-thing: granite
+thing: <thing>
 quantity: hardness_mohs
 value: [6, 7]                                # ours
 replaces: { dataset: wikidata, value: [5, 7] }   # upstream's, when the override was written
-reason: Granite's common minerals, quartz and feldspar, are 6 to 7.
+reason: Why upstream's value is wrong, in a sentence.
 references:                                  # at least one
   - { citation: "...", supports: "...", status: unverified }
 ```
 
-The thing must be in the Wikidata crosswalk: a value only the curated layer gives is corrected in the thing's own file. If upstream changes, the build marks the override stale for review. A value can be overridden once.
+There are none yet. The thing must be in the Wikidata crosswalk and the quantity read from Wikidata: a value only the curated layer gives is corrected in the thing's own file. If upstream changes, the build marks the override stale for review. A value can be overridden once.
 
 ### Suppression (`data/suppressions/suppressed_records.csv`)
 
