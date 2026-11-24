@@ -16,7 +16,7 @@ views {
   view pipeline {
     title 'The data pipeline'
     description 'How `capabilities build`, or Dagster, turns the curated layer and upstream snapshots into the built graph the app reads (docs/architecture/data-pipeline.md).'
-    include mrds
+    include mrds, wikidata
     include capabilities.curated
     include capabilities.snapshots
     include capabilities.pipeline.*

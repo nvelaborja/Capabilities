@@ -23,7 +23,9 @@ data/
   verbs/                 parameterized actions: cut, drill, shape, finish (target), move (load)
   routes/                ways to obtain things, produce effects, or perform verbs
   profiles/              curated starting sets (e.g. Middle Kingdom Egypt)
-  crosswalks/            CSV tables matching upstream records to our ids (MRDS deposits to source kinds)
+  crosswalks/            CSV tables matching upstream records to our ids (MRDS deposits to source kinds, things to Wikidata items)
+  overrides/             replacements for upstream values we believe are wrong, with the reason and references
+  suppressions/          upstream records left out of the build, with why
   LICENSE                CC BY-NC-SA 4.0 (the data); the code is PolyForm Noncommercial 1.0.0
 examples/jobs/           concrete tasks for feasibility checks
 src/capabilities/        the Python reasoner, CLI, and local API server
@@ -42,7 +44,10 @@ unit: mm
 scale: ratio              # or ordinal (Mohs: only comparisons are meaningful)
 bands:                    # optional ballpark bands; min inclusive, max exclusive
   - { id: P2, label: "Fine", min: 0.3, max: 3, typical: "good joinery" }
+wikidata: P1088           # optional: the Wikidata property that holds this quantity (here on hardness_mohs)
 ```
+
+A quantity with `wikidata` is read from Wikidata for every thing in the Wikidata crosswalk, and that value is used over the curated one ([ADR 0043](adr/0043-take-quantities-from-wikidata-with-upstream-first-and-overrides.md); see [Where values come from](#where-values-come-from)).
 
 Current quantities: `temperature_c`, `hardness_mohs`, `toughness_mpa_sqrt_m`, `tolerance_mm` (bands P0–P5), `duration_h` (bands minutes → geological), `mass_kg` (bands), `force_kn`, `volume_cm3`, `removal_rate_cm3_per_h`.
 
@@ -129,7 +134,7 @@ A curated set of things a group is known to have made (`{ id: copper-saw }`) or 
 
 ### Crosswalk (`data/crosswalks/*.csv`)
 
-A hand-kept table that matches records in an upstream dataset to our ids ([ADR 0034](adr/0034-build-the-graph-from-upstream-datasets-and-a-curated-layer.md)). It is CSV rather than YAML because it is a table, and the build loads it as written. There is one so far:
+A hand-kept table that matches records in an upstream dataset to our ids ([ADR 0034](adr/0034-build-the-graph-from-upstream-datasets-and-a-curated-layer.md)). It is CSV rather than YAML because it is a table, and the build loads it as written. There are two:
 
 `mrds_sources.csv` matches USGS MRDS deposits to source kinds, which places each source on the map ([ADR 0041](adr/0041-place-sources-with-mrds-deposits-through-a-crosswalk.md)):
 
@@ -147,6 +152,59 @@ tin-gravel,ore,Cassiterite,placer,"Placers only: tin gravel is stream-sorted cas
 ```
 
 A deposit matching a row is an occurrence of that source kind, and one deposit can be an occurrence of several. Leave a source kind out when no rule fits it well: an unmapped source is curation work, but a wrong match puts false places on the map. The build fails if a row names something that isn't a source, or repeats another row.
+
+`wikidata_things.csv` matches things to Wikidata items, whose quantities the graph then uses ([ADR 0043](adr/0043-take-quantities-from-wikidata-with-upstream-first-and-overrides.md)):
+
+| Column | Meaning |
+|---|---|
+| `id` | One of our things, at most once |
+| `wikidata` | A Wikidata item (`Q41177`), at most once |
+| `notes` | Why it is the same thing, usually the item's own description |
+
+```csv
+id,wikidata,notes
+granite,Q41177,"Wikidata ""granite"": intrusive, felsic, igneous rock."
+```
+
+Match only when the item is the same thing. Our copper and tin are the metals, and Wikidata gives the metals' properties on the elements, so they match the elements. Quartz sand has no item of its own, and the quartz item isn't sand, so it stays unmatched.
+
+### Override (`data/overrides/*.yaml`)
+
+Replaces an upstream value we believe is wrong. Upstream sources are never edited; the build applies the override and the app shows it beside the value it replaces ([ADR 0043](adr/0043-take-quantities-from-wikidata-with-upstream-first-and-overrides.md)).
+
+```yaml
+id: granite-hardness
+kind: override
+thing: granite
+quantity: hardness_mohs
+value: [6, 7]                                # ours
+replaces: { dataset: wikidata, value: [5, 7] }   # upstream's, when the override was written
+reason: Granite's common minerals, quartz and feldspar, are 6 to 7.
+references:                                  # at least one
+  - { citation: "...", supports: "...", status: unverified }
+```
+
+The thing must be in the Wikidata crosswalk: a value only the curated layer gives is corrected in the thing's own file. If upstream changes, the build marks the override stale for review. A value can be overridden once.
+
+### Suppression (`data/suppressions/suppressed_records.csv`)
+
+Upstream records left out of the build: a duplicate, bad coordinates, the wrong mineral. Not for unwelcome history: a deposit found in modern times stays, with its dates ([ADR 0034](adr/0034-build-the-graph-from-upstream-datasets-and-a-curated-layer.md)).
+
+| Column | Meaning |
+|---|---|
+| `dataset` | `mrds` (a deposit, by `dep_id`) or `wikidata` (an item, by Q id) |
+| `record_id` | The record |
+| `reason` | Why it doesn't belong |
+
+### Where values come from
+
+A thing's quantity value comes from, in order:
+
+1. an **override**, if there is one;
+2. the **upstream** value, when the thing is in the Wikidata crosswalk and Wikidata has one (best-ranked statements; a statement with bounds is a range);
+3. the **curated** value in the thing's file.
+
+A curated value that disagrees with upstream isn't lost: the app shows it beside the upstream value, and the build marks the disagreement. The built graph's `graph_facts.parquet` records, for every value, which layer it came from ([data pipeline](architecture/data-pipeline.md)).
 
 ### Job (`examples/jobs/*.yaml`)
 

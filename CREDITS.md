@@ -6,11 +6,11 @@ The project itself is free for non-commercial use: the code under the [PolyForm 
 
 ## Datasets
 
-The upstream datasets the graph is built from ([ADR 0034](docs/adr/0034-build-the-graph-from-upstream-datasets-and-a-curated-layer.md)). USGS MRDS is ingested (since 2026-11-22); the others are not yet, and each row says what it will be used for. Licenses were checked on 2026-11-20. Before a new dataset is ingested, it gets a row here.
+The upstream datasets the graph is built from ([ADR 0034](docs/adr/0034-build-the-graph-from-upstream-datasets-and-a-curated-layer.md)). USGS MRDS (since 2026-11-22) and Wikidata (since 2026-11-24) are ingested; the others are not yet, and each row says what it will be used for. Licenses were checked on 2026-11-20. Before a new dataset is ingested, it gets a row here.
 
 | Dataset | Used for | License | Credit |
 |---|---|---|---|
-| [Wikidata](https://www.wikidata.org/) | Materials and minerals, their properties, and links to other datasets | CC0 1.0 | Wikidata contributors |
+| [Wikidata](https://www.wikidata.org/) | Quantity values of our materials (Mohs hardness), through a crosswalk to Wikidata items ([ADR 0043](docs/adr/0043-take-quantities-from-wikidata-with-upstream-first-and-overrides.md)); later, materials and minerals and links to other datasets | CC0 1.0 | Wikidata contributors. Snapshot of a SPARQL query to `query.wikidata.org`, retrieved 2026-11-24 |
 | [USGS Mineral Resources Data System (MRDS)](https://mrdata.usgs.gov/mrds/) | Mineral deposits and their locations: where our sources (hematite, malachite and native copper deposits, tin and diamond gravels, flint, granite and limestone) are found ([ADR 0041](docs/adr/0041-place-sources-with-mrds-deposits-through-a-crosswalk.md)) | US public domain (its metadata lists no use constraints) | U.S. Geological Survey, 2005, Mineral Resources Data System: U.S. Geological Survey, Reston, Virginia. Snapshot of `mrds-csv.zip` (last changed 2022-08-23) retrieved 2026-11-22 |
 | [Pleiades](https://pleiades.stoa.org/) | Ancient places, and the periods they are attested in | CC BY 3.0 | Pleiades contributors; cite the numbered release used |
 | [Cliopatria](https://github.com/Seshat-Global-History-Databank/cliopatria) | Borders of past polities over time | CC BY 4.0 | Seshat: Global History Databank. Paper: [Scientific Data (2025), doi:10.1038/s41597-025-04516-9](https://doi.org/10.1038/s41597-025-04516-9) |
