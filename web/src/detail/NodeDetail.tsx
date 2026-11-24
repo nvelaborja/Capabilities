@@ -254,7 +254,7 @@ function AboutSection({ about, statusOf, onDrill }: { about: About; statusOf: St
               <dt>{term}</dt>
               <dd>
                 {value}
-                {source && <FactSource source={source} />}
+                {source && <FactSource source={source} hasSources={about.references.length > 0} />}
               </dd>
             </div>
           ))}
@@ -281,10 +281,10 @@ function AboutSection({ about, statusOf, onDrill }: { about: About; statusOf: St
 }
 
 /** Where a value came from, under it (ADR 0043): every fact has provenance, and an override shows what it replaces. */
-function FactSource({ source }: { source: QuantitySource }) {
+function FactSource({ source, hasSources }: { source: QuantitySource; hasSources: boolean }) {
   return (
     <span className={`fact-source fact-source-${source.layer}`}>
-      {sourceLines(source).map((line, index) => (
+      {sourceLines(source, hasSources).map((line, index) => (
         <span key={index}>
           {line.text}
           {line.link && (

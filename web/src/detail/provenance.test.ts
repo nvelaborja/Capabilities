@@ -14,11 +14,11 @@ const record = { href: "https://www.wikidata.org/wiki/Q41177", label: "Wikidata 
 
 describe("sourceLines", () => {
   it("names the upstream record and when it was retrieved", () => {
-    expect(sourceLines({ layer: "upstream", upstream })).toEqual([{ text: "From Wikidata, retrieved 24 Nov 2026:", link: record }]);
+    expect(sourceLines({ layer: "upstream", upstream }, false)).toEqual([{ text: "From Wikidata, retrieved 24 Nov 2026:", link: record }]);
   });
 
   it("keeps a curated value that disagrees in view", () => {
-    const lines = sourceLines({ layer: "upstream", upstream, curated_value: "6–7 Mohs" });
+    const lines = sourceLines({ layer: "upstream", upstream, curated_value: "6–7 Mohs" }, false);
     expect(lines.map((line) => line.text)).toContain("Our curated value was 6–7 Mohs.");
   });
 
@@ -33,16 +33,17 @@ describe("sourceLines", () => {
         stale: false,
       },
     };
-    expect(sourceLines(source)).toEqual([
+    expect(sourceLines(source, false)).toEqual([
       { text: "Overridden. Wikidata says 5–7 Mohs:", link: record },
       { text: "Quartz and feldspar are 6 to 7." },
       { text: "Source: Klein & Dutrow (2007)." },
     ]);
     const stale = { ...source, override: { ...source.override!, stale: true } };
-    expect(sourceLines(stale).at(-1)?.text).toMatch(/needs review/);
+    expect(sourceLines(stale, false).at(-1)?.text).toMatch(/needs review/);
   });
 
-  it("points a curated value at the sources", () => {
-    expect(sourceLines({ layer: "curated" })).toEqual([{ text: "Curated: see the sources below." }]);
+  it("points a curated value at the sources, and says when there are none", () => {
+    expect(sourceLines({ layer: "curated" }, true)).toEqual([{ text: "Curated: see the sources below." }]);
+    expect(sourceLines({ layer: "curated" }, false)).toEqual([{ text: "Curated, with no source yet." }]);
   });
 });
