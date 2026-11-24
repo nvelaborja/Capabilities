@@ -1,6 +1,6 @@
 # Architecture overview
 
-Capabilities is a knowledge graph of what it physically takes to make and do things, plus a reasoner that answers three questions about it: what would it take (Q1), what else could a group do (Q2), and could a job have been done a certain way (Q3). This page explains how the pieces fit together. The diagrams are at `/architecture/` when the app is running (see [README](README.md)); the master diagram is the `index` view.
+Capabilities is a knowledge graph of what it physically takes to make and do things, plus a reasoner that answers three questions about it: what would it take (Q1), what else could a group do (Q2), and could a job have been done a certain way (Q3). This page explains how the pieces fit together. The diagrams are at `/architecture/` when the app is running (see [README](README.md)); the master diagram is the `index` view, and `pipeline_overview` shows the build as a row of stages.
 
 ## The big picture
 

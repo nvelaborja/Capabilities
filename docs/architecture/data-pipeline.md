@@ -1,6 +1,6 @@
 # Data pipeline
 
-Reference for how the graph is built: inputs, stages, tables, outputs, checks and commands. The diagram is the `pipeline` view at `/architecture/`. For background on the tools, see [DuckDB](technologies/duckdb.md), [dbt](technologies/dbt.md), [Parquet](technologies/parquet.md) and [Dagster](technologies/dagster.md). Decisions: [ADR 0034](../adr/0034-build-the-graph-from-upstream-datasets-and-a-curated-layer.md) (a built graph from a curated layer and, later, upstream datasets) [ADR 0038](../adr/0038-serve-the-app-from-a-built-graph-artifact.md) (the artifact the app reads), [ADR 0040](../adr/0040-orchestrate-the-build-with-dagster.md) (Dagster, and the quick build without it), [ADR 0041](../adr/0041-place-sources-with-mrds-deposits-through-a-crosswalk.md) (MRDS deposits as source occurrences) [ADR 0043](../adr/0043-take-quantities-from-wikidata-with-upstream-first-and-overrides.md) (quantities from Wikidata, upstream first, with overrides) [ADR 0044](../adr/0044-require-every-upstream-dataset-with-cold-backups-in-git.md) (every dataset required, with cold backups in git) and [ADR 0045](../adr/0045-bring-ore-minerals-in-from-upstream-roast-sulphides-and-queue-the-gaps.md) (ore minerals from upstream as nodes, and the curation queue). Spatial work uses [DuckDB spatial and GeoParquet](technologies/duckdb-spatial-and-geoparquet.md); Wikidata is queried with [SPARQL](technologies/wikidata-and-sparql.md).
+Reference for how the graph is built: inputs, stages, tables, outputs, checks and commands. The diagrams are at `/architecture/`: `pipeline_overview` shows the build as stages in series (1a curated layer and 1b download, 2 load, 3a transform and 3b test, 4 publish, 5 serve), and `pipeline` shows every input, table and output. For background on the tools, see [DuckDB](technologies/duckdb.md), [dbt](technologies/dbt.md), [Parquet](technologies/parquet.md) and [Dagster](technologies/dagster.md). Decisions: [ADR 0034](../adr/0034-build-the-graph-from-upstream-datasets-and-a-curated-layer.md) (a built graph from a curated layer and, later, upstream datasets) [ADR 0038](../adr/0038-serve-the-app-from-a-built-graph-artifact.md) (the artifact the app reads), [ADR 0040](../adr/0040-orchestrate-the-build-with-dagster.md) (Dagster, and the quick build without it), [ADR 0041](../adr/0041-place-sources-with-mrds-deposits-through-a-crosswalk.md) (MRDS deposits as source occurrences) [ADR 0043](../adr/0043-take-quantities-from-wikidata-with-upstream-first-and-overrides.md) (quantities from Wikidata, upstream first, with overrides) [ADR 0044](../adr/0044-require-every-upstream-dataset-with-cold-backups-in-git.md) (every dataset required, with cold backups in git) and [ADR 0045](../adr/0045-bring-ore-minerals-in-from-upstream-roast-sulphides-and-queue-the-gaps.md) (ore minerals from upstream as nodes, and the curation queue). Spatial work uses [DuckDB spatial and GeoParquet](technologies/duckdb-spatial-and-geoparquet.md); Wikidata is queried with [SPARQL](technologies/wikidata-and-sparql.md).
 
 ## Summary
 
@@ -15,8 +15,10 @@ Reference for how the graph is built: inputs, stages, tables, outputs, checks an
 
 ## Stages
 
+Numbered as in the `pipeline_overview` diagram. 1a and 1b feed 2 side by side; 3a and 3b are a pair, since `dbt build` tests each model right after building it; 5, serving, is under [Who reads what](#who-reads-what).
+
 ```
-                     0. download      1. extract   2. load                       3. transform (dbt)                              4. publish
+                     1b. download     1a. extract  2. load                       3a/3b. transform and test (dbt)                 4. publish
                      (Dagster only)   (Python)     (DuckDB tables)               (views and marts)
 data/**/*.yaml ─────┐
 examples/**/*.yaml ─┼────────────────▶ documents ─▶ raw.curated_documents ──▶ stg_curated__documents ─────────────────▶ graph_nodes ──▶ graph_nodes.parquet
@@ -30,7 +32,7 @@ USGS MRDS ──▶ build/upstream/mrds_deposits/ ─────▶ raw.mrds_de
              (Parquet + snapshot.json)            raw.upstream_snapshots ────────────────────────┘                             manifest.json (last)
 ```
 
-### 0. Download (Dagster only)
+### 1b. Download (Dagster only)
 
 The `upstream/mrds_deposits` asset downloads `https://mrdata.usgs.gov/mrds/mrds-csv.zip` (about 25 MB, last changed by USGS in 2022), and then:
 
@@ -59,7 +61,7 @@ USGS refuses Python's default user agent, so downloads send a generic one (`data
 
 **Cold backups.** `snapshots/<dataset>/` in the repository holds a copy of each dataset, in git: the Parquet, every value unchanged but compressed with zstd (MRDS: 15 MB, down from 32 MB), and the same `snapshot.json` as the download. `uv run capabilities backup` replaces a backup with a newer download (`back_up`); commit the result. Nothing in a build downloads: a build reads the downloads and the backups ([ADR 0044](../adr/0044-require-every-upstream-dataset-with-cold-backups-in-git.md)).
 
-### 1. Extract
+### 1a. Extract
 
 `load_documents(root)` in the core library reads every YAML file under `data/` and `examples/`, in sorted path order, and works out each file's node type from its directory (`routes/` → `route`, `things/` → `thing`, and so on). A YAML syntax error, or a file outside a known directory, stops the build with the file's path. Schema validation is not part of the build: `capabilities validate` does that, and CI runs it before the build.
 
@@ -113,7 +115,7 @@ Every table is replaced on every build. The crosswalks and suppressions are load
 | `fingerprint` | varchar | The fingerprint of the inputs this load read. The manifest copies it, so an edit made while the build runs leaves the graph stale. |
 | `loaded_at` | timestamptz | When the load ran. |
 
-### 3. Transform (dbt)
+### 3a and 3b. Transform and test (dbt)
 
 The build runs `dbt build` on `pipeline/dbt`: `capabilities build` through dbt's Python API, Dagster through dagster-dbt, which runs the dbt command line. `dbt build` runs each model and its tests in dependency order, and stops downstream models when a test fails.
 

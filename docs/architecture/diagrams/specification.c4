@@ -31,6 +31,13 @@ specification {
       color green
     }
   }
+  // A step of the build, for the pipeline-at-a-glance view: what happens, in order, not which part does it.
+  element stage {
+    style {
+      shape rectangle
+      color amber
+    }
+  }
   element external {
     style {
       color muted

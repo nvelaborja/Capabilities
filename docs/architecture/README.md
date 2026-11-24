@@ -22,12 +22,13 @@ The diagrams are written as code in [LikeC4](technologies/likec4.md) (`diagrams/
 | View | Shows |
 |---|---|
 | `index`: Capabilities, the whole project | The master diagram: people, outside systems, every part of the system, and how data flows between them. |
-| `pipeline`: The data pipeline | How `capabilities build`, or Dagster, turns the curated YAML, the crosswalks and upstream snapshots (USGS MRDS) into the built graph the app reads. |
+| `pipeline_overview`: The data pipeline at a glance | The build as stages in series, like a deployment pipeline: 1a curated layer and 1b download upstream, 2 load, 3a transform and 3b test (a pair: dbt tests each model as it builds it), 4 publish, 5 serve. Open a stage for the detailed `pipeline` view. |
+| `pipeline`: The data pipeline | How `capabilities build`, or Dagster, turns the curated YAML, the crosswalks and upstream snapshots (USGS MRDS, Wikidata) into the built graph the app reads: every input, table and output. |
 
 ## Keeping this current
 
 When a pull request changes how the system is built:
 
-1. Update the LikeC4 model (`diagrams/model.c4`) and the views it affects. New parts go into the `index` view.
+1. Update the LikeC4 model (`diagrams/model.c4`) and the views it affects. New parts go into the `index` view. The stages of `pipeline_overview` (element kind `stage`) are steps, not parts: change them only when the build gains or loses a step.
 2. Update the [overview](overview.md) and, if the data flow changes, the [data pipeline](data-pipeline.md) reference.
 3. If it introduces a technology, add a page under [technologies/](technologies/README.md) that teaches it, using the same sections as the existing pages.

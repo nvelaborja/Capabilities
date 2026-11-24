@@ -8,9 +8,37 @@ views {
     include capabilities.*
     include capabilities.core.*, capabilities.pipeline.*
     exclude capabilities.core, capabilities.pipeline
+    exclude element.kind = stage
     style capabilities.artifact, capabilities.warehouse, capabilities.snapshots {
       border dashed
     }
+  }
+
+  view pipeline_overview {
+    title 'The data pipeline at a glance'
+    description 'The build as a series of stages, like a deployment pipeline. `capabilities build` runs stages 2 to 4; Dagster runs 1b to 4. Open a stage for the detailed pipeline.'
+    include stageCurated with {
+      navigateTo pipeline
+    }
+    include stageDownload with {
+      navigateTo pipeline
+    }
+    include stageLoad with {
+      navigateTo pipeline
+    }
+    include stageTransform with {
+      navigateTo pipeline
+    }
+    include stageTest with {
+      navigateTo pipeline
+    }
+    include stagePublish with {
+      navigateTo pipeline
+    }
+    include stageServe with {
+      navigateTo pipeline
+    }
+    autoLayout LeftRight
   }
 
   view pipeline {
