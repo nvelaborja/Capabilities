@@ -29,6 +29,14 @@ model {
     description 'A community-built gazetteer of ancient places, CC BY 3.0. Its daily dump (pleiades-places-latest.csv.gz) holds every place, with its types, tags, location and the periods it is attested in; its mines and quarries place our sources and ore classes (ADR 0046).'
   }
 
+  openalex = external 'OpenAlex' {
+    description 'An open index of scholarly works, CC0. Its API finds each work we cite, by DOI or by searching its title, and knows where free copies are (ADR 0047).'
+  }
+
+  crossref = external 'Crossref' {
+    description 'The DOI registration agency; its REST API serves publishers\' bibliographic metadata, without restrictions. It finds each work we cite by DOI, or from the whole citation (query.bibliographic) (ADR 0047).'
+  }
+
   capabilities = system 'Capabilities' {
     description 'A free, non-commercial knowledge graph of what it physically takes to make and do things, with a reasoner that answers three questions.'
 
@@ -102,6 +110,9 @@ model {
       rawPleiades = table 'raw.pleiades_places' {
         description 'The Pleiades snapshot, all 26 columns as text.'
       }
+      rawReferenceCandidates = table 'raw.reference_candidates' {
+        description 'What OpenAlex and Crossref answered for each cited work (a few candidates per lookup), and the HTTP status of each cited link, as text.'
+      }
       rawPleiadesRules = table 'raw.pleiades_sources' {
         description 'Rules placing Pleiades mines and quarries (data/crosswalks/pleiades_sources.csv): a target source or ore class, a kind of place and a word.'
       }
@@ -131,6 +142,10 @@ model {
         technology 'dbt view'
         description 'MRDS deposits typed: coordinates as numbers, ore minerals and commodities as lists, first production year and qualifier.'
       }
+      stgReferences = table 'stg_references__cited, __candidates' {
+        technology 'dbt views'
+        description 'Every reference in the graph, one row per use (found anywhere in each document with json_tree); and the candidates typed, with their titles reduced to words for comparing.'
+      }
       stgPleiades = table 'stg_pleiades__workings' {
         technology 'dbt view'
         description 'Pleiades mines and quarries: the kinds of place, the materials they name (tags) and their text, location and precision, attested years and periods.'
@@ -152,7 +167,11 @@ model {
       }
       queue = file 'curation_queue.parquet' {
         technology 'dbt mart, external materialization'
-        description 'The gaps the build found, most valuable first: ore candidates from MRDS, extracted materials with no route, sources with no places, routes with only unverified references, disagreements and stale overrides (ADR 0045).'
+        description 'The gaps the build found, most valuable first: ore candidates from MRDS, extracted materials with no route, sources with no places, routes with only unverified references, disagreements and stale overrides (ADR 0045), the works not yet read (ADR 0047), and unmatched Pleiades places (ADR 0046).'
+      }
+      checks = file 'reference_checks.parquet' {
+        technology 'dbt mart, external materialization'
+        description 'Every cited work checked: found, only a review found, possible, not found, a DOI leading elsewhere, not searched (a web page) or not checked yet; the record matched, a free copy, and whether each cited link loads. Never changes a status (ADR 0047).'
       }
       occurrences = file 'source_occurrences.parquet' {
         technology 'dbt mart, external materialization, GeoParquet'
@@ -254,13 +273,23 @@ model {
   capabilities.pipeline.downloader -> mrds 'downloads mrds-csv.zip (HTTPS)'
   capabilities.pipeline.downloader -> wikidata 'one SPARQL query for the crosswalked items (HTTPS)'
   capabilities.pipeline.downloader -> pleiades 'downloads the daily dump of places (HTTPS)'
+  capabilities.pipeline.downloader -> openalex 'looks up each cited work, by DOI or title (HTTPS)'
+  capabilities.pipeline.downloader -> crossref 'looks up each cited work, by DOI or citation (HTTPS)'
+  capabilities.pipeline.loader -> capabilities.warehouse.rawReferenceCandidates 'loads the newest copy of the reference candidates'
+  capabilities.warehouse.rawReferenceCandidates -> capabilities.warehouse.stgReferences 'candidates, typed'
+  capabilities.warehouse.stgDocuments -> capabilities.warehouse.stgReferences 'every reference cited'
+  capabilities.warehouse.stgOreNodes -> capabilities.warehouse.stgReferences 'references of upstream nodes'
+  capabilities.warehouse.stgReferences -> capabilities.artifact.checks 'the best candidate for each work'
+  capabilities.artifact.checks -> capabilities.artifact.queue 'works not yet read'
+  capabilities.pipeline.dbt -> capabilities.artifact.checks 'writes the mart as Parquet, with data tests'
+  capabilities.core.built -> capabilities.artifact.checks 'reads each work\'s check, for the detail pane'
   capabilities.pipeline.loader -> capabilities.warehouse.rawPleiades 'loads the newest copy of Pleiades'
   capabilities.pipeline.loader -> capabilities.warehouse.rawPleiadesRules 'loads the rules, as text'
   capabilities.warehouse.rawPleiades -> capabilities.warehouse.stgPleiades 'mines and quarries, typed'
   capabilities.warehouse.stgPleiades -> capabilities.artifact.occurrences 'ancient mines and quarries, as points'
   capabilities.warehouse.rawPleiadesRules -> capabilities.artifact.occurrences 'match rules'
   capabilities.warehouse.stgPleiades -> capabilities.artifact.queue 'unmatched mines and quarries'
-  capabilities.pipeline.downloader -> capabilities.curated 'reads the crosswalk and quantities to build the query'
+  capabilities.pipeline.downloader -> capabilities.curated 'reads the crosswalks, quantities and references to build the queries'
   capabilities.pipeline.downloader -> capabilities.snapshots 'writes Parquet, then snapshot.json'
   capabilities.pipeline.dagster -> capabilities.pipeline.loader 'runs the load and manifest as assets'
   capabilities.pipeline.dagster -> capabilities.pipeline.dbt 'runs every model as an asset, tests as checks'
@@ -299,6 +328,12 @@ model {
   mrds -[lineage]-> capabilities.snapshots 'mrds-csv.zip, as Parquet'
   wikidata -[lineage]-> capabilities.snapshots 'two query results, as Parquet'
   pleiades -[lineage]-> capabilities.snapshots 'the daily dump, as Parquet'
+  openalex -[lineage]-> capabilities.snapshots 'works found, as Parquet'
+  crossref -[lineage]-> capabilities.snapshots 'works found, as Parquet'
+  capabilities.snapshots -[lineage]-> capabilities.warehouse.rawReferenceCandidates 'the download, if newest'
+  capabilities.backups -[lineage]-> capabilities.warehouse.rawReferenceCandidates 'the backup, if newest'
+  capabilities.artifact.checks -[lineage]-> capabilities.artifact.manifest 'its row count'
+  capabilities.artifact.checks -[lineage]-> capabilities.core.built 'each work\'s check'
   capabilities.curated -[lineage]-> capabilities.warehouse.rawPleiadesRules 'pleiades_sources.csv'
   capabilities.snapshots -[lineage]-> capabilities.warehouse.rawPleiades 'the download, if newest'
   capabilities.backups -[lineage]-> capabilities.warehouse.rawPleiades 'the backup, if newest'
@@ -336,7 +371,7 @@ model {
   }
   stageDownload = stage '1b Download upstream' {
     technology 'Dagster'
-    description 'Dagster only: downloads MRDS, the two Wikidata queries and Pleiades (Downloader). If the network fails, it uses the cold backup instead.'
+    description 'Dagster only: downloads MRDS, the two Wikidata queries and Pleiades, and looks up every cited work in OpenAlex and Crossref (Downloader). If the network fails, it uses the cold backup instead.'
   }
   stageLoad = stage '2 Load' {
     technology 'Python, DuckDB'
@@ -344,7 +379,7 @@ model {
   }
   stageTransform = stage '3a Transform' {
     technology 'dbt'
-    description 'dbt builds the staging views and the marts: graph nodes, quantity facts, source occurrences and the curation queue, written as Parquet. Paired with 3b: dbt runs each model\'s tests right after it.'
+    description 'dbt builds the staging views and the marts: graph nodes, quantity facts, source occurrences, reference checks and the curation queue, written as Parquet. Paired with 3b: dbt runs each model\'s tests right after it.'
   }
   stageTest = stage '3b Test' {
     technology 'dbt data tests, Dagster asset checks'
