@@ -53,4 +53,4 @@ Each file records one significant design decision: the context, what we decided,
 | [0045](0045-bring-ore-minerals-in-from-upstream-roast-sulphides-and-queue-the-gaps.md) | Bring ore minerals in from upstream, roast copper sulphides, and queue the gaps | Accepted |
 | [0046](0046-place-ancient-mines-and-quarries-from-pleiades.md) | Place ancient mines and quarries from Pleiades | Accepted |
 | [0047](0047-check-citations-against-openalex-and-crossref.md) | Check citations against OpenAlex and Crossref | Accepted |
-| [0048](0048-run-agents-through-claude-code-on-a-claude-subscription.md) | Run curation agents through Claude Code on a Claude subscription, and start with ore candidates | Proposed |
+| [0048](0048-run-agents-through-claude-code-on-a-claude-subscription.md) | Run curation agents through Claude Code on a Claude subscription, and start with ore candidates | Accepted |
