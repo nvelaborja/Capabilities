@@ -25,3 +25,7 @@ node_modules/
 
 # Dagster: the temporary instance `dg dev` makes when DAGSTER_HOME is unset
 .tmp_dagster_home_*/
+
+# Agent runs: the append-only audit log and every run's summary (ADR 0048). Kept out of git; each pull request
+# carries its own run's summary in data/agent_runs/.
+audit/

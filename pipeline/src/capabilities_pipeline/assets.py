@@ -3,6 +3,9 @@ asset checks), and the manifest.
 
 `capabilities build` runs the same load, dbt and manifest steps without Dagster (build.py), using whatever upstream
 snapshots were downloaded before. definitions.py is what Dagster loads.
+
+Agent runs (ADR 0048) are a job, `agent_curation`, not an asset: a run is started by hand with its size, never by
+materializing everything.
 """
 
 # No `from __future__ import annotations`: Dagster inspects the `context` annotation at definition time.
@@ -14,11 +17,15 @@ from dagster import (
     AssetExecutionContext,
     AssetKey,
     AssetSpec,
+    Config,
     ConfigurableResource,
     Definitions,
     MaterializeResult,
+    OpExecutionContext,
     asset,
+    job,
     multi_asset,
+    op,
 )
 from dagster_dbt import (
     DagsterDbtTranslator,
@@ -30,6 +37,9 @@ from dagster_dbt import (
     get_asset_keys_by_output_name_for_source,
 )
 
+from .agents.branch import Downloads
+from .agents.curate import Settings
+from .agents.run import run_ore_candidates
 from .build import DBT_PROJECT, dbt_environment, dbt_target_path, load_inputs, write_manifest
 from .upstream import MRDS, PLEIADES, REFERENCES, WIKIDATA, WIKIDATA_ITEMS, Dataset, fetch_or_fall_back
 
@@ -42,6 +52,24 @@ class UpstreamDownloads(ConfigurableResource):
     pleiades_url: str = PLEIADES.url
     openalex_url: str = REFERENCES.url
     crossref_url: str = REFERENCES.crossref_url
+
+
+class AgentRunConfig(Config):
+    """One agent run's size and settings (ADR 0048). Launched by hand:
+
+        cd pipeline && uv run dg launch --job agent_curation --config-json \\
+            '{"ops": {"curate_ore_candidates": {"config": {"items": 5}}}}'
+    """
+
+    items: int = 5  # how many queue items to work through, most widely listed first
+    evaluate: bool = False  # ask again about the minerals a person decided, score the answers, open no pull request
+    proposer_model: str = "opus"
+    reviewer_model: str = "opus"
+    # Stop before the next item once the plan's five-hour or weekly usage reaches this share.
+    stop_at_five_hour: float = 0.8
+    stop_at_seven_day: float = 0.9
+    pull_request: bool = True
+    base: str = "origin/main"
 
 
 def definitions(root: Path, build_dir: Path) -> Definitions:
@@ -193,8 +221,38 @@ def definitions(root: Path, build_dir: Path) -> Definitions:
             }
         )
 
+    @op(description="Agents propose ore crosswalk rows for the top ore candidates in the curation queue; code and a "
+        "reviewer agent check them; what passes becomes a draft pull request (ADR 0035, ADR 0048). Uses Claude Code on "
+        "your Claude login, so it draws on your plan's usage limits.")
+    def curate_ore_candidates(context: OpExecutionContext, config: AgentRunConfig, downloads: UpstreamDownloads) -> dict:
+        report = run_ore_candidates(
+            root, build_dir, Settings(**config.model_dump()),
+            Downloads(downloads.wikidata_url, downloads.openalex_url, downloads.crossref_url),
+            on_progress=context.log.info,
+        )
+        usage = report.summary["usage"]
+        metadata = {
+            "run": report.run_id,
+            "outcomes": report.summary["outcomes"],
+            "stopped_because": report.stopped_because or "",
+            "pull_request": report.pull_request or "",
+            "calls": usage["calls"],
+            "five_hour_usage": f"{usage['first_limits'].get('five_hour')} → {usage['limits'].get('five_hour')}",
+            "seven_day_usage": f"{usage['first_limits'].get('seven_day')} → {usage['limits'].get('seven_day')}",
+        }
+        if "score" in report.summary:
+            metadata["score"] = report.summary["score"]
+        context.add_output_metadata(metadata)
+        return report.summary
+
+    @job(description="Started by hand only, with a size: agents work through the curation queue's ore candidates "
+         "(ADR 0048).")
+    def agent_curation():
+        curate_ore_candidates()
+
     return Definitions(
         assets=[mrds_snapshot, wikidata_snapshot, wikidata_items_snapshot, pleiades_snapshot, reference_candidates_snapshot,
                 raw_tables, graph_models, graph_manifest],
+        jobs=[agent_curation],
         resources={"dbt": DbtCliResource(project_dir=project), "downloads": UpstreamDownloads()},
     )
