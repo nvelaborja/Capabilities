@@ -112,7 +112,11 @@ class Run:
 
     def _items(self, build_dir: Path) -> tuple[list[Candidate], Context]:
         if self.settings.evaluate:
-            chosen = evaluation_set()[: self.settings.items]
+            chosen = evaluation_set()
+            if self.settings.minerals:
+                wanted = {name.casefold() for name in self.settings.minerals}
+                chosen = [(candidate, answer) for candidate, answer in chosen if candidate.name.casefold() in wanted]
+            chosen = chosen[: self.settings.items]
             self.answers = {candidate.name: answer for candidate, answer in chosen}
             # The person's rows are left out of what's taken, and their sources out of the library, as if undecided:
             # the agents decide them again.
@@ -121,7 +125,9 @@ class Run:
             return [candidate for candidate, _ in chosen], Context.of(self.root, leaving_out=leaving_out)
         current_graph(self.root, build_dir)  # the queue is only as current as the build
         self.library = Library(self.web, known_sources(self.root))
-        return queue_candidates(load_queue(build_dir), self.settings.items), Context.of(self.root)
+        queue = queue_candidates(load_queue(build_dir), None)
+        candidates = named(queue, self.settings.minerals) if self.settings.minerals else queue
+        return candidates[: self.settings.items], Context.of(self.root)
 
     def _curate(self, candidates: list[Candidate]) -> None:
         for candidate in candidates:
@@ -222,6 +228,13 @@ class Run:
         if self.answers:
             summary["score"] = score(self.results, self.answers)
         return summary
+
+
+def named(queue: list[Candidate], names: tuple[str, ...]) -> list[Candidate]:
+    """The minerals named, in the order named: as the queue lists them, or with no queue detail if it doesn't."""
+    listed = {candidate.name.casefold(): candidate for candidate in queue}
+    return [listed.get(name.casefold()) or Candidate(name, "Named for this run; the curation queue doesn't list it.")
+            for name in names]
 
 
 def score(results: list[ItemResult], answers: dict[str, dict]) -> dict:

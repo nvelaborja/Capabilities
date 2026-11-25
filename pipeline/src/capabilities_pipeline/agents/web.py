@@ -30,7 +30,7 @@ SAME_CHARACTER = str.maketrans({
     "‐": "-", "‑": "-", "‒": "-", "–": "-", "—": "-", "―": "-", "−": "-",
 })
 # Wikidata's "instance of", and the class every mineral species is an instance of.
-INSTANCE_OF, MINERAL_SPECIES = "P31", "Q12089225"
+INSTANCE_OF, SUBCLASS_OF, MINERAL_SPECIES = "P31", "P279", "Q12089225"
 OPENALEX_FIELDS = "id,doi,type,display_name,publication_year,authorships,primary_location,best_oa_location,open_access"
 # Where a quote leaves words out: "…", "...", "[...]" or "[…]".
 ELISION = re.compile(r"\[?(?:\.\s?\.\s?\.|…)\]?")
@@ -56,6 +56,7 @@ class WikidataItem:
     description: str | None
     aliases: tuple[str, ...] = ()
     instance_of: tuple[str, ...] = ()  # the classes it is an instance of (P31)
+    subclass_of: tuple[str, ...] = ()  # the classes it is a subclass of (P279): how a kind of mineral, like limonite, is described
 
     def is_called(self, name: str) -> bool:
         return name.casefold() in {n.casefold() for n in (self.label, *self.aliases) if n}
@@ -134,11 +135,8 @@ class Web:
             label=english("labels").get("value"),
             description=english("descriptions").get("value"),
             aliases=tuple(alias["value"] for alias in (entity.get("aliases") or {}).get("en") or []),
-            instance_of=tuple(
-                claim["mainsnak"]["datavalue"]["value"]["id"]
-                for claim in (entity.get("claims") or {}).get(INSTANCE_OF) or []
-                if (claim.get("mainsnak") or {}).get("datavalue")
-            ),
+            instance_of=_claimed(entity, INSTANCE_OF),
+            subclass_of=_claimed(entity, SUBCLASS_OF),
         )
 
 
@@ -177,6 +175,12 @@ def _system_trust() -> ssl.SSLContext:
 
 
 _PUBLIC_ONLY = urllib.request.build_opener(urllib.request.HTTPSHandler(context=_system_trust()), _PublicRedirects)
+
+
+def _claimed(entity: dict, prop: str) -> tuple[str, ...]:
+    """The items a property's statements point to (an item's classes, for P31 and P279)."""
+    return tuple(claim["mainsnak"]["datavalue"]["value"]["id"] for claim in (entity.get("claims") or {}).get(prop) or []
+                 if (claim.get("mainsnak") or {}).get("datavalue"))
 
 
 def read(url: str, status: str, body: bytes, content_type: str, charset: str) -> Page:

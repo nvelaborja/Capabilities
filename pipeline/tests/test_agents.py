@@ -171,7 +171,13 @@ def settings(fake: FakeClaude, **changes) -> Settings:
     return Settings(claude_command=str(fake.command), pull_request=False, **changes)
 
 
+# The minerals the test runs name, in order, so no test depends on what the repository's queue holds: a pull request that
+# decides Galena moves the queue on (PR #24, 2026-11-25). Gold has no item in the fake web, so it is skipped.
+MINERALS = ("Galena", "Sphalerite", "Gold", "Chrysocolla", "Limonite")
+
+
 def run(root, build_dir, fake, web=None, audit_dir=None, **changes):
+    changes.setdefault("minerals", MINERALS)
     return run_ore_candidates(root, build_dir, settings(fake, **changes), web=web or FakeWeb(),
                               on_progress=lambda message: None, audit_dir=audit_dir)
 
@@ -470,8 +476,43 @@ class TestFindingSources:
     def test_the_item_is_the_mineral_species_called_exactly_its_name(self):
         town = WikidataItem("Q99999920", "Galena", "town in Kansas", instance_of=("Q3957",))
         web = FakeWeb(items={town.id: town})
-        assert Library(web, []).item_for("Galena").id == GALENA_ITEM.id
-        assert Library(FakeWeb(items={GALENA_ITEM.id: None}), []).item_for("Galena") is None
+        assert Library(web, []).item_for("Galena").item.id == GALENA_ITEM.id
+        # with no mineral of that name, there's no item, and each hit is recorded with why it wasn't taken
+        lookup = Library(FakeWeb(items={GALENA_ITEM.id: None, town.id: town}), []).item_for("Galena")
+        assert lookup.item is None and lookup.seen == (
+            "Q99999920 'Galena' (town in Kansas; instance of Q3957; subclass of nothing): neither a mineral species nor "
+            "a subclass of a class of minerals",)
+
+    def test_a_kind_of_mineral_filed_as_a_subclass_of_a_class_of_minerals_is_a_mineral(self):
+        # Wikidata files limonite and native gold under a class of minerals, not as instances of mineral species
+        oxides = WikidataItem("Q99999930", "oxide class of minerals", None, instance_of=("Q1",))
+        brown = WikidataItem("Q99999931", "brownite", "hydrated iron oxide mineral", instance_of=("Q2",),
+                             subclass_of=(oxides.id,))
+        assert Library(FakeWeb(items={oxides.id: oxides, brown.id: brown}), []).item_for("Brownite").item.id == brown.id
+
+    def test_a_native_metal_is_found_as_native_when_its_name_finds_only_the_element(self):
+        element = WikidataItem("Q99999940", "silver", "chemical element", instance_of=("Q11344",))
+        native = WikidataItem("Q99999941", "native silver", "mineral")
+        lookup = Library(FakeWeb(items={element.id: element, native.id: native}), []).item_for("Silver")
+        assert lookup.item.id == native.id and any(s.startswith("Q99999940 'silver'") for s in lookup.seen)
+
+    def test_a_mineral_already_in_the_graph_is_left_to_a_person(self, repo_root, built_dir, fake_claude, tmp_path):
+        # given: Limonite's item is a curated thing's (wikidata_things.csv), as the real one is
+        limonite = WikidataItem("Q193565", "limonite", "hydrated iron oxide mineral")
+        fake_claude.script()
+        report = run(repo_root, built_dir, fake_claude, web=FakeWeb(items={limonite.id: limonite}),
+                     audit_dir=tmp_path / "audit", items=1, minerals=("Limonite",))
+        assert report.results[0].outcome == "skipped" and "a person decides" in report.results[0].reason
+        assert fake_claude.calls() == []
+
+    def test_named_minerals_run_in_the_order_named_whether_or_not_the_queue_lists_them(self, repo_root, built_dir,
+                                                                                    fake_claude, tmp_path):
+        fake_claude.script()
+        report = run(repo_root, built_dir, fake_claude, audit_dir=tmp_path / "audit", items=5, find_only=True,
+                     minerals=("Sphalerite", "Unobtanium", "Galena"))
+        assert [(r.candidate.name, r.outcome) for r in report.results] == [
+            ("Sphalerite", "found"), ("Unobtanium", "skipped"), ("Galena", "found")]
+        assert report.results[1].candidate.detail == "Named for this run; the curation queue doesn't list it."
 
     def test_passages_name_the_mineral_and_speak_of_ore_with_the_sentences_around_them(self):
         text = ("Galena is grey. It was mined near the river. Galena was roasted in heaps be-\nfore it was smelted for "
@@ -756,7 +797,8 @@ def published(repo_root, tmp_path_factory, wikidata_endpoint, scholarly_endpoint
         try:
             report = run_ore_candidates(
                 repo, directory / "build",
-                replace(settings(fake, items=3), pull_request=True, gh_command=str(gh)),
+                replace(settings(fake, items=3, minerals=("Galena", "Sphalerite", "Gold")), pull_request=True,
+                        gh_command=str(gh)),
                 Downloads(wikidata_endpoint.url, scholarly_endpoint.openalex_url, scholarly_endpoint.crossref_url),
                 web=FakeWeb(pages=pages, items=items, works=works), on_progress=lambda message: None, audit_dir=directory / "audit",
             )
@@ -917,7 +959,7 @@ class TestTheDagsterJob:
         # (Wikidata's site and OpenAlex pointed at a local port with nothing on it: the item can't be found, so the run
         # skips it without asking a model, and nothing reaches the network)
         result = defs.get_job_def("agent_curation").execute_in_process(run_config={
-            "ops": {"curate_ore_candidates": {"config": {"items": 1, "pull_request": False}}},
+            "ops": {"curate_ore_candidates": {"config": {"items": 1, "pull_request": False, "minerals": ["Galena"]}}},
             "resources": {"downloads": {"config": {"wikidata_site_url": "http://127.0.0.1:9",
                                                    "openalex_url": "http://127.0.0.1:9"}}}})
         # then: the run's outcome is in its output and in the audit log

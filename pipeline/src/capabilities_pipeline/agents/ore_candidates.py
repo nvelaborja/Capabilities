@@ -339,8 +339,8 @@ def evaluation_set() -> list[tuple[Candidate, dict]]:
         return [(Candidate(row["mrds_ore"], row["detail"]), row) for row in csv.DictReader(file)]
 
 
-def queue_candidates(queue: list[dict], count: int) -> list[Candidate]:
-    """The first `count` ore candidates in the curation queue: the most widely listed first."""
+def queue_candidates(queue: list[dict], count: int | None) -> list[Candidate]:
+    """The first `count` ore candidates in the curation queue (all of them for None): the most widely listed first."""
     candidates = [item for item in queue if item["kind"] == "ore_candidate"]
     return [Candidate(item["label"], item["detail"].split(". Review it")[0] + ".") for item in candidates[:count]]
 

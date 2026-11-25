@@ -55,6 +55,9 @@ class Settings:
     stop_at_five_hour: float = 0.8
     stop_at_seven_day: float = 0.9
     pull_request: bool = True
+    # Run these minerals (by MRDS name), in this order, instead of the top of the queue; one the queue doesn't list is
+    # run all the same. For re-running chosen minerals, and for tests that mustn't depend on what the queue holds.
+    minerals: tuple[str, ...] = ()
     # Find the items and passages, record them, and ask no model: what a run would offer, for nothing of the plan.
     find_only: bool = False
     base: str = "origin/main"  # what the proposals' branch starts from
@@ -182,14 +185,19 @@ class Curator:
         """The item and the passages for a mineral, found in code; or why the item is skipped, with no model asked."""
         self.on_progress(f"{candidate.name}: finding its Wikidata item and sources")
         try:
-            item = self.library.item_for(candidate.name)
+            lookup = self.library.item_for(candidate.name)
         except NETWORK_ERRORS as error:
             return self._skipped(candidate, "wikidata_item_found", f"Wikidata couldn't be searched: {error}")
+        item = lookup.item
         if item is None:
             return self._skipped(candidate, "wikidata_item_found",
-                                 f"no Wikidata item is called {candidate.name!r} and is a mineral species")
+                                 f"no Wikidata item is called {candidate.name!r} and is a mineral. The search found: "
+                                 + ("; ".join(lookup.seen) or "nothing"))
         if item.id in self.context.taken_items:
-            return self._skipped(candidate, "wikidata_item_found", f"{item.id} is already in a crosswalk")
+            # Already in the graph (a curated thing, or another row): how MRDS's name maps to it is a person's call.
+            return self._skipped(candidate, "wikidata_item_found",
+                                 f"{item.id} ({item.label}) is already in a crosswalk (wikidata_things.csv or "
+                                 "ore_minerals.csv): a person decides how MRDS's name maps to it")
         found = self.library.passages(item, candidate.name)
         self.audit.check(self.run_id, candidate.name, 0, "wikidata_item_found", True, f"{item.id} ({item.label})")
         if not found.passages:
