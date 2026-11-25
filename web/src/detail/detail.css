@@ -422,6 +422,14 @@
   color: var(--text-muted);
 }
 
+/* The passage that supports it, word for word (ADR 0048): set apart from our own words by a rule and italics. */
+.references .quote {
+  padding-left: 0.5rem;
+  border-left: 2px solid var(--border);
+  color: var(--text-muted);
+  font-style: italic;
+}
+
 .reference-meta {
   display: flex;
   flex-wrap: wrap;

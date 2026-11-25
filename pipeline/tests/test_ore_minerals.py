@@ -3,6 +3,8 @@
 `graph` and `built_dir` (conftest) are the repository's graph built from the cold backups: real MRDS and Wikidata data.
 """
 
+import csv
+
 import pytest
 
 from capabilities.built import load_queue
@@ -53,7 +55,7 @@ class TestOreMineralNodes:
     def test_a_crosswalked_item_missing_from_the_wikidata_snapshot_stops_the_build(self, data_copy, tmp_path):
         # given: a row added after the last download, so Wikidata's copy has no name or description for it
         crosswalk = data_copy / "data" / "crosswalks" / "ore_minerals.csv"
-        row = 'covellite,Q99999999,Covellite,copper-sulphide-ore,mine-malachite,"A citation.",,"What it supports.",,\n'
+        row = 'covellite,Q99999999,Covellite,copper-sulphide-ore,mine-malachite,"A citation.",,"What it supports.",,,,\n'
         crosswalk.write_text(crosswalk.read_text() + row, encoding="utf-8")
         # then: the build stops rather than build the node without its Wikidata data
         with pytest.raises(BuildError, match="crosswalked_items_are_in_the_wikidata_items_snapshot"):
@@ -145,6 +147,26 @@ class TestProvenanceInTheApp:
             "dataset": "MRDS", "record": "deposits listing Azurite as an ore mineral", "crosswalk": crosswalk,
         }
         assert "upstream" not in about(graph, "malachite")
+
+    def test_a_row_an_agent_proposed_says_so_and_quotes_its_source(self, data_copy, tmp_path):
+        from capabilities.built import load_built
+        from capabilities.views import about, node_source
+        from capabilities_pipeline.agents.ore_candidates import write_crosswalk
+
+        # given: azurite's row as an agent would have proposed it, with the passage it rests on (made up for the test)
+        crosswalk = data_copy / "data" / "crosswalks" / "ore_minerals.csv"
+        rows = {row["mrds_ore"]: row for row in csv.DictReader(crosswalk.open(newline="", encoding="utf-8"))}
+        quote = "Azurite was smelted with the other carbonates."
+        write_crosswalk(data_copy, [rows["Azurite"] | {"quote": quote, "proposed_by": "ore-20261125-090000"}])
+        # when: the graph is built
+        build(data_copy, tmp_path / "build")
+        graph = load_built(data_copy, tmp_path / "build")
+        # then: the mineral, its deposit and its route name the run, and its reference carries the quote
+        proposed = {"run": "ore-20261125-090000", "summary": "data/agent_runs/ore-20261125-090000.json"}
+        assert all(node_source(graph, node)["proposed_by"] == proposed
+                   for node in ("azurite", "azurite-deposit", "mine-azurite"))
+        assert about(graph, "azurite")["references"][0]["quote"] == quote
+        assert "proposed_by" not in node_source(graph, "cuprite") and "quote" not in about(graph, "cuprite")["references"][0]
 
     def test_a_copied_route_names_the_route_it_copies(self, graph):
         from capabilities.views import node_source

@@ -19,6 +19,7 @@ export function References({ references }: { references: readonly Reference[] })
           <li key={ref.citation}>
             <span className="citation">{ref.citation}</span>
             {ref.supports && <span className="supports">{ref.supports}</span>}
+            {ref.quote && <q className="quote">{ref.quote}</q>}
             <span className="reference-meta">
               {ref.status && <span className={`source-status source-${ref.status}`}>{STATUS_TEXT[ref.status]}</span>}
               {ref.doi && (
