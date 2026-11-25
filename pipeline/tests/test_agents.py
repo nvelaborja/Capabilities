@@ -44,7 +44,17 @@ from capabilities_pipeline.agents.ore_candidates import (
     write_crosswalk,
 )
 from capabilities_pipeline.agents.run import pull_request_body, run_ore_candidates, score
-from capabilities_pipeline.agents.web import Page, Web, WikidataItem, html_text, locate, not_public, read
+from capabilities_pipeline.agents.sources import Library, Source, known_sources, openalex_citation
+from capabilities_pipeline.agents.web import (
+    MINERAL_SPECIES,
+    Page,
+    Web,
+    WikidataItem,
+    html_text,
+    locate,
+    not_public,
+    read,
+)
 
 FAKE_CLAUDE = Path(__file__).parent / "fixtures" / "agents" / "fake_claude.py"
 COVELLITE = Candidate("Covellite", "Listed as an ore mineral on 816 MRDS deposits of copper, iron, tin.")
@@ -52,22 +62,51 @@ COVELLITE_ITEM = WikidataItem("Q99999901", "covellite", "copper sulfide mineral"
 PAGE_URL = "https://example.org/sulphide-ores"
 QUOTE = "Covellite and chalcocite were roasted with the other copper sulphides before smelting."
 PAGE = Page(PAGE_URL, "200", "Sulphide ores\nAt the site, " + QUOTE + " The slag shows it.", "Sulphide ores", "html")
-GOOD = {
-    "decision": "propose", "wikidata": "Q99999901", "class": "copper-sulphide-ore",
-    "citation": "Example, A. (2020). Sulphide ores at an example site. Example Journal 1, 1–10.", "url": PAGE_URL,
-    "quote": QUOTE, "supports": "Covellite was roasted and smelted for copper.", "notes": "A copper sulphide.",
-    "unsure_why": "",
-}
+CITATION = "Example, A. (2020). Sulphide ores at an example site. Example Journal 1, 1–10."
+# A proposal as code makes it from the proposer's choice, for the mechanical checks.
+PROPOSED = {"wikidata": "Q99999901", "class": "copper-sulphide-ore", "citation": CITATION, "url": PAGE_URL,
+            "quote": QUOTE, "supports": "Covellite was roasted and smelted for copper.", "notes": "A copper sulphide."}
+# The top of the repository's queue, Galena, and the made-up page and OpenAlex work a run finds for it.
+GALENA_ITEM = WikidataItem("Q99999910", "galena", "lead sulfide mineral")
+GALENA_URL = "https://example.org/galena.pdf"
+GALENA_SENTENCE = "Galena was roasted with the other sulphides before smelting it for silver."
+GALENA_PAGE = Page(GALENA_URL, "200", "Notes on ores. " + GALENA_SENTENCE + " More notes.", None, "pdf")
+GALENA_WORK = {"id": "W1", "display_name": "Lead ores at an example site", "publication_year": 2021,
+               "authorships": [{"author": {"display_name": "Ada Example"}}],
+               "primary_location": {"source": {"display_name": "Example Journal"}},
+               "best_oa_location": {"pdf_url": GALENA_URL}}
+# The queue's second item, Sphalerite, for runs of more than one item.
+SPHALERITE_ITEM = WikidataItem("Q99999911", "sphalerite", "zinc sulfide mineral")
+SPHALERITE_URL = "https://example.org/sphalerite.pdf"
+SPHALERITE_PAGE = Page(SPHALERITE_URL, "200", "Sphalerite was roasted with the copper sulphides at the example mine.",
+                       None, "pdf")
+SPHALERITE_WORK = GALENA_WORK | {"id": "W4", "best_oa_location": {"pdf_url": SPHALERITE_URL}}
+# The proposer's choice: a class and passage 1, which is the Galena sentence when nothing else is found.
+GOOD = {"decision": "propose", "class": "copper-sulphide-ore", "passage": 1,
+        "supports": "Galena was roasted before smelting.", "notes": "A lead sulphide.", "unsure_why": ""}
+UNSURE = {"decision": "unsure", "class": "", "passage": 0, "supports": "", "notes": "", "unsure_why": "No source says."}
 ACCEPT = {"verdict": "accept", "objections": [], "summary": "The quote supports the class."}
 
 
-class FakeWeb:
-    """Pages and Wikidata items by URL and id; anything else isn't there."""
+def proposed(**changes) -> Proposal:
+    fields = PROPOSED | changes
+    return Proposal("propose", fields["wikidata"], fields["class"], fields["citation"], fields["url"], fields["quote"],
+                    fields["supports"], fields["notes"])
 
-    def __init__(self, pages=None, items=None):
-        self.pages = {PAGE_URL: PAGE, **(pages or {})}
-        self.items = {COVELLITE_ITEM.id: COVELLITE_ITEM, **(items or {})}
+
+class FakeWeb:
+    """Pages, Wikidata items and OpenAlex works, by URL, id and mineral; anything else isn't there. Every item is a
+    mineral species unless it says otherwise."""
+
+    def __init__(self, pages=None, items=None, works=None):
+        self.pages = {PAGE_URL: PAGE, GALENA_URL: GALENA_PAGE, SPHALERITE_URL: SPHALERITE_PAGE, **(pages or {})}
+        items = {COVELLITE_ITEM.id: COVELLITE_ITEM, GALENA_ITEM.id: GALENA_ITEM, SPHALERITE_ITEM.id: SPHALERITE_ITEM,
+                 **(items or {})}
+        self.items = {key: item if item is None or item.instance_of else replace(item, instance_of=(MINERAL_SPECIES,))
+                      for key, item in items.items()}
+        self.works = {"galena": [GALENA_WORK], "sphalerite": [SPHALERITE_WORK], **(works or {})}
         self.asked: list[str] = []
+        self.searched: list[str] = []
 
     def page(self, url: str) -> Page:
         self.asked.append(url)
@@ -75,6 +114,13 @@ class FakeWeb:
 
     def wikidata_item(self, item: str) -> WikidataItem | None:
         return self.items.get(item)
+
+    def wikidata_search(self, name: str) -> list[str]:
+        return [key for key, item in self.items.items() if item and item.is_called(name)]
+
+    def openalex_works(self, search: str, count: int) -> list[dict]:
+        self.searched.append(search)
+        return self.works.get(search.split()[0].lower(), [])[:count]
 
 
 class FakeClaude:
@@ -152,7 +198,7 @@ class TestCallingClaudeCode:
 
     def test_a_reviewer_gets_no_tools(self, fake_claude):
         fake_claude.script(reviewer=[answer(ACCEPT)])
-        ClaudeCode("opus", (), 3, str(fake_claude.command)).ask("Review.", "The role.", {})
+        ClaudeCode("opus", (), 3, str(fake_claude.command)).ask("Review.", "You review.", {})
         argv = fake_claude.calls()[0]["argv"]
         assert argv[argv.index("--tools") + 1] == "" and "--allowedTools" not in argv
 
@@ -274,9 +320,9 @@ def _pdf(text: str) -> bytes:
 
 class TestMechanicalChecks:
     def test_a_good_proposal_passes_every_check_and_the_reviewer_reads_the_page_around_the_quote(self, context):
-        checks, evidence = check(COVELLITE, Proposal.from_output(GOOD), context, FakeWeb())
+        checks, evidence = check(COVELLITE, proposed(), context, FakeWeb())
         assert [c.name for c in checks if not c.passed] == []
-        assert QUOTE in evidence.excerpt and evidence.item == COVELLITE_ITEM
+        assert QUOTE in evidence.excerpt and evidence.item.id == COVELLITE_ITEM.id
 
     @pytest.mark.parametrize("change, failed", [
         pytest.param({"class": "tin-ore"}, "class_is_known", id="a class no row has shown how to mine yet"),
@@ -299,11 +345,11 @@ class TestMechanicalChecks:
         })
         page = Page(PAGE_URL, "200", "At the site, the slag shows it. " + PAGE.text, "Sulphide ores", "html")
         web.pages[PAGE_URL] = page
-        checks, _ = check(COVELLITE, Proposal.from_output(GOOD | change), context, web)
+        checks, _ = check(COVELLITE, proposed(**change), context, web)
         assert failed in [c.name for c in checks if not c.passed]
 
     def test_an_id_already_in_the_graph_is_refused(self, context):
-        checks, _ = check(Candidate("Malachite"), Proposal.from_output(GOOD), context, FakeWeb())
+        checks, _ = check(Candidate("Malachite"), proposed(), context, FakeWeb())
         assert "id_is_new" in [c.name for c in checks if not c.passed]
 
 
@@ -311,47 +357,40 @@ class TestCurating:
     """Whole runs over the repository's queue, with nothing accepted: nothing reaches git."""
 
     def test_an_unsure_proposer_ends_the_item_with_no_review(self, repo_root, built_dir, fake_claude, tmp_path):
-        fake_claude.script(proposer=[answer(GOOD | {"decision": "unsure", "unsure_why": "No source says."})])
+        fake_claude.script(proposer=[answer(UNSURE)])
         report = run(repo_root, built_dir, fake_claude, audit_dir=tmp_path / "audit", items=1)
         assert [(r.candidate.name, r.outcome, r.reason) for r in report.results] == [("Galena", "unsure", "No source says.")]
         assert fake_claude.calls("reviewer") == []
 
     def test_a_failed_check_goes_back_to_the_proposer_with_the_reasons(self, repo_root, built_dir, fake_claude, tmp_path):
-        # given: a paraphrase first, then a proposal the reviewer rejects (Galena isn't covellite, but this is a test)
-        galena = GOOD | {"quote": QUOTE.replace("Covellite", "Galena")}
-        fake_claude.script(proposer=[answer(galena), answer(GOOD | {"decision": "unsure", "unsure_why": "Gave up."})])
+        # given: a class no row has shown how to mine yet, then "unsure"
+        fake_claude.script(proposer=[answer(GOOD | {"class": "tin-ore"}), answer(UNSURE | {"unsure_why": "Gave up."})])
         report = run(repo_root, built_dir, fake_claude, audit_dir=tmp_path / "audit", items=1)
         second = fake_claude.calls("proposer")[1]["prompt"]
-        assert "Your last proposal for this mineral was sent back" in second and "quote_is_on_the_page" in second
+        assert "Your last proposal for this mineral was sent back" in second and "class_is_known" in second
         assert report.results[0].outcome == "unsure"
 
-    def test_the_reviewer_sees_the_downloaded_page_but_not_how_the_proposer_found_it(self, repo_root, built_dir,
-                                                                                      fake_claude, tmp_path):
-        galena = GOOD | {"quote": "Galena was roasted with the other sulphides before smelting it for silver."}
-        page = Page(PAGE_URL, "200", "Notes. " + galena["quote"] + " More notes.", "Ores", "html")
-        web = FakeWeb(pages={PAGE_URL: page}, items={"Q99999901": WikidataItem("Q99999901", "galena", "lead sulfide")})
-        fake_claude.script(proposer=[answer(galena, searches=["galena smelting secret query"], fetches=[PAGE_URL])],
-                           reviewer=[{"output": {"verdict": "reject", "objections": [
-                               {"about": "class", "objection": "Galena is a lead ore."}], "summary": "Wrong class."}}])
-        report = run(repo_root, built_dir, fake_claude, web=web, audit_dir=tmp_path / "audit", items=1)
-        review = fake_claude.calls("reviewer")[0]["prompt"]
-        assert "Notes. Galena was roasted" in review and "secret query" not in review
+    def test_the_reviewer_sees_the_downloaded_page_but_not_what_the_proposer_was_offered(self, repo_root, built_dir,
+                                                                                        fake_claude, tmp_path):
+        fake_claude.script(proposer=[answer(GOOD)], reviewer=[{"output": {"verdict": "reject", "objections": [
+            {"about": "class", "objection": "Galena is a lead ore."}], "summary": "Wrong class."}}])
+        report = run(repo_root, built_dir, fake_claude, audit_dir=tmp_path / "audit", items=1)
+        proposer, review = fake_claude.calls("proposer")[0]["prompt"], fake_claude.calls("reviewer")[0]["prompt"]
+        assert "[1] From: Example, A. (2021). Lead ores at an example site. Example Journal. (OpenAlex" in proposer
+        assert "Notes on ores. " + GALENA_SENTENCE in review and "[1] From:" not in review
         assert (report.results[0].outcome, report.results[0].attempts) == ("rejected", 1)
         assert "Galena is a lead ore." in report.results[0].reason
 
     def test_revisions_are_bounded(self, repo_root, built_dir, fake_claude, tmp_path):
-        galena = GOOD | {"quote": "Galena was roasted with the other sulphides before smelting it for silver."}
-        web = FakeWeb(pages={PAGE_URL: Page(PAGE_URL, "200", galena["quote"], None, "text")},
-                      items={"Q99999901": WikidataItem("Q99999901", "galena", "lead sulfide")})
         revise = {"output": {"verdict": "revise", "objections": [{"about": "supports", "objection": "Too broad."}],
                              "summary": "Narrow it."}}
-        fake_claude.script(proposer=[answer(galena), answer(galena)], reviewer=[revise, revise])
-        report = run(repo_root, built_dir, fake_claude, web=web, audit_dir=tmp_path / "audit", items=1)
+        fake_claude.script(proposer=[answer(GOOD), answer(GOOD)], reviewer=[revise, revise])
+        report = run(repo_root, built_dir, fake_claude, audit_dir=tmp_path / "audit", items=1)
         assert (report.results[0].outcome, report.results[0].attempts) == ("sent_back", 2)
         assert "supports: Too broad." in fake_claude.calls("proposer")[1]["prompt"]
 
     def test_an_agent_failure_costs_one_item_not_the_run(self, repo_root, built_dir, fake_claude, tmp_path):
-        fake_claude.script(proposer=[{"error": "max_turns"}, answer(GOOD | {"decision": "unsure"})])
+        fake_claude.script(proposer=[{"error": "max_turns"}, answer(UNSURE)])
         report = run(repo_root, built_dir, fake_claude, audit_dir=tmp_path / "audit", items=2)
         assert [r.outcome for r in report.results] == ["failed", "unsure"]
 
@@ -366,7 +405,7 @@ class TestCurating:
                                               "from calls") == [("0.85", True)]
 
     def test_reaching_the_plans_limit_stops_the_run_and_leaves_the_rest(self, repo_root, built_dir, fake_claude, tmp_path):
-        fake_claude.script(proposer=[answer(GOOD | {"decision": "unsure"}), {"limit": True}])
+        fake_claude.script(proposer=[answer(UNSURE), {"limit": True}])
         report = run(repo_root, built_dir, fake_claude, audit_dir=tmp_path / "audit", items=5)
         assert [r.candidate.name for r in report.results] == ["Galena"]
         assert "usage limit was reached" in report.stopped_because
@@ -374,27 +413,31 @@ class TestCurating:
 
     def test_a_run_stops_before_the_next_item_once_usage_passes_its_threshold(self, repo_root, built_dir, fake_claude,
                                                                               tmp_path):
-        fake_claude.script(proposer=[answer(GOOD | {"decision": "unsure"}, five_hour=0.85)])
+        fake_claude.script(proposer=[answer(UNSURE, five_hour=0.85)])
         report = run(repo_root, built_dir, fake_claude, audit_dir=tmp_path / "audit", items=5, stop_at_five_hour=0.8)
         assert len(report.results) == 1 and "five-hour usage reached 85%" in report.stopped_because
 
     def test_every_call_check_and_outcome_is_in_the_audit_log(self, repo_root, built_dir, fake_claude, tmp_path):
-        galena = GOOD | {"quote": QUOTE.replace("Covellite", "Galena")}
-        fake_claude.script(proposer=[answer(galena, searches=["galena"]), answer(GOOD | {"decision": "unsure"})])
+        fake_claude.script(proposer=[answer(GOOD | {"class": "tin-ore"}), answer(UNSURE)])
         report = run(repo_root, built_dir, fake_claude, audit_dir=tmp_path / "audit", items=1)
         audit = tmp_path / "audit"
-        calls = audit_rows(audit, "select role, attempt, json_extract_string(tool_calls, '$[0].input.query'), "
-                                  "json_extract_string(settings, '$.model'), json_extract_string(settings, '$.model_id') "
+        calls = audit_rows(audit, "select role, attempt, json_extract_string(settings, '$.model'), "
+                                  "json_extract_string(settings, '$.effort'), json_extract_string(settings, '$.model_id') "
                                   "from calls order by attempt")
-        assert calls == [("proposer", 1, "galena", "opus", "claude-opus-5-5"),
-                         ("proposer", 2, None, "opus", "claude-opus-5-5")]
-        assert ("quote_is_on_the_page", False) in audit_rows(audit, "select name, passed from checks")
+        assert calls == [("proposer", 1, "sonnet", "medium", "claude-opus-5-5"),
+                         ("proposer", 2, "sonnet", "medium", "claude-opus-5-5")]
+        checks = audit_rows(audit, "select name, passed, detail from checks order by recorded_at")
+        assert checks[:2] == [("wikidata_item_found", True, "Q99999910 (galena)"),
+                              ("passages_found", True, "1 passages from 1 sources (1 read) (OpenAlex)")]
+        assert ("class_is_known", False) in [(name, passed) for name, passed, _ in checks]
         assert audit_rows(audit, "select item, outcome from outcomes") == [("Galena", "unsure")]
         assert audit_rows(audit, "select run_id, mode, json_extract_string(login, '$.plan') from run_starts") == [
             (report.run_id, "propose", "pro")]
         assert audit_rows(audit, "select count(*) from run_ends") == [(1,)]
         summary = json.loads((audit / "runs" / f"{report.run_id}.json").read_text())
-        assert summary["usage"]["calls"] == 2 and summary["usage"]["web_searches"] == 1
+        assert summary["usage"]["calls"] == 2
+        # Code made the searches: two OpenAlex searches for the one item, and every page read once
+        assert summary["sources"]["openalex_searches"] == 2 and summary["sources"]["pages_downloaded"] >= 1
         assert summary["model_ids"] == {"proposer": "claude-opus-5-5"} and summary["failed_because"] is None
 
     def test_a_run_that_breaks_still_records_its_end_and_its_summary(self, repo_root, built_dir, fake_claude, tmp_path):
@@ -408,7 +451,7 @@ class TestCurating:
         ends = audit_rows(tmp_path / "audit", "select run_id, stopped_because from run_ends")
         assert len(ends) == 1 and ends[0][1] == "RuntimeError: a bug in reading pages"
         summary = json.loads((tmp_path / "audit" / "runs" / f"{ends[0][0]}.json").read_text())
-        assert summary["failed_because"] == "RuntimeError: a bug in reading pages" and summary["usage"]["calls"] == 1
+        assert summary["failed_because"] == "RuntimeError: a bug in reading pages" and summary["usage"]["calls"] == 0
 
     @pytest.mark.parametrize("changes", [
         pytest.param({"stop_at_five_hour": 80}, id="a five-hour threshold given as a percentage"),
@@ -419,6 +462,102 @@ class TestCurating:
     def test_settings_that_would_never_stop_or_never_start_are_refused(self, fake_claude, changes):
         with pytest.raises(ValueError):
             settings(fake_claude, **changes)
+
+
+class TestFindingSources:
+    """Code finds the item and the passages; a model only chooses among them."""
+
+    def test_the_item_is_the_mineral_species_called_exactly_its_name(self):
+        town = WikidataItem("Q99999920", "Galena", "town in Kansas", instance_of=("Q3957",))
+        web = FakeWeb(items={town.id: town})
+        assert Library(web, []).item_for("Galena").id == GALENA_ITEM.id
+        assert Library(FakeWeb(items={GALENA_ITEM.id: None}), []).item_for("Galena") is None
+
+    def test_passages_name_the_mineral_and_speak_of_ore_with_the_sentences_around_them(self):
+        text = ("Galena is grey. It was mined near the river. Galena was roasted in heaps be-\nfore it was smelted for "
+                "silver and lead. The slag was dumped nearby.")
+        web = FakeWeb(pages={GALENA_URL: Page(GALENA_URL, "200", text, None, "pdf")})
+        found = Library(web, []).passages(GALENA_ITEM, "Galena")
+        [passage] = found.passages  # "Galena is grey." names it but says nothing of ore
+        assert passage.sentence == "Galena was roasted in heaps before it was smelted for silver and lead."
+        assert (passage.before, passage.after) == ("It was mined near the river.", "The slag was dumped nearby.")
+        # and the sentence, mended where the PDF broke a word, is still found on the page word for word
+        assert locate(passage.sentence, text) is not None
+
+    def test_the_repositorys_own_sources_come_first_and_each_page_is_read_once(self):
+        known = Source("Known, K. (2000). A page we cite.", "https://example.org/known", "cited in the repository")
+        page = Page(known.url, "200", "Galena was smelted for lead at the example site.", None, "text")
+        web = FakeWeb(pages={known.url: page})
+        library = Library(web, [known])
+        found = library.passages(GALENA_ITEM, "Galena")
+        library.page(GALENA_URL)  # as the checks read it again
+        assert [(p.number, p.source.origin) for p in found.passages] == [(1, "cited in the repository"), (2, "OpenAlex")]
+        assert web.asked.count(GALENA_URL) == 1 and web.searched == ["Galena archaeometallurgy", "Galena ancient smelting"]
+
+    @pytest.mark.parametrize("line", [
+        pytest.param("Journal of Ores 12:1114–1127 https://doi.org/10.1/x Galena smelting at the example site.", id="a header"),
+        pytest.param("Keywords: galena, smelting, lead, slag, furnace, roasting, silver, cupellation.", id="keywords"),
+        pytest.param("Smith J, Jones K (2001) Galena ores and their smelting in the example valley.", id="a reference"),
+    ])
+    def test_a_line_that_isnt_prose_isnt_offered(self, line):
+        text = line + "\n" + "In antiquity galena was roasted and then smelted in small furnaces for its lead."
+        web = FakeWeb(pages={GALENA_URL: Page(GALENA_URL, "200", text, None, "html")})
+        found = Library(web, []).passages(GALENA_ITEM, "Galena")
+        assert [p.sentence for p in found.passages] == [
+            "In antiquity galena was roasted and then smelted in small furnaces for its lead."]
+
+    @pytest.mark.parametrize("authors, citation", [
+        pytest.param(["Ada Example"], "Example, A. (2021). Lead ores. Example Journal.", id="one author"),
+        pytest.param(["Ada Example", "Bo Sample"], "Example, A. & Sample, B. (2021). Lead ores. Example Journal.",
+                     id="two"),
+        pytest.param(["Ada Example", "Bo Sample", "Cy Test", "Di Trial"], "Example, A. et al. (2021). Lead ores. "
+                     "Example Journal.", id="more than three"),
+    ])
+    def test_a_citation_is_made_from_openalexs_record_not_written_by_a_model(self, authors, citation):
+        work = {"display_name": "Lead ores", "publication_year": 2021, "primary_location": {
+            "source": {"display_name": "Example Journal"}}, "authorships": [{"author": {"display_name": a}} for a in authors]}
+        assert openalex_citation(work) == citation
+
+    def test_the_proposal_takes_its_quote_citation_and_url_from_the_chosen_passage(self):
+        found = Library(FakeWeb(), []).passages(GALENA_ITEM, "Galena")
+        proposal = Proposal.from_choice(GOOD, GALENA_ITEM, found.passages)
+        assert (proposal.wikidata, proposal.quote, proposal.url) == (GALENA_ITEM.id, GALENA_SENTENCE, GALENA_URL)
+        assert proposal.citation == "Example, A. (2021). Lead ores at an example site. Example Journal."
+
+    @pytest.mark.parametrize("web, reason", [
+        pytest.param(FakeWeb(items={GALENA_ITEM.id: None}), "no Wikidata item is called 'Galena'", id="no item"),
+        pytest.param(FakeWeb(works={"galena": []}), "no source found speaks of it as an ore", id="no passages"),
+    ])
+    def test_a_mineral_with_nothing_to_judge_is_skipped_without_asking_a_model(self, repo_root, built_dir, fake_claude,
+                                                                             tmp_path, web, reason):
+        fake_claude.script()
+        report = run(repo_root, built_dir, fake_claude, web=web, audit_dir=tmp_path / "audit", items=1)
+        assert report.results[0].outcome == "skipped" and report.results[0].reason.startswith(reason)
+        assert fake_claude.calls() == []
+
+    def test_a_find_only_run_records_what_it_would_offer_and_asks_no_model(self, repo_root, built_dir, fake_claude,
+                                                                           tmp_path):
+        fake_claude.script()
+        report = run(repo_root, built_dir, fake_claude, audit_dir=tmp_path / "audit", items=2, find_only=True)
+        assert [r.outcome for r in report.results] == ["found", "found"] and fake_claude.calls() == []
+        assert GALENA_SENTENCE in report.results[0].reason
+
+    def test_openalex_refusing_searches_stops_the_run_rather_than_skipping_items(self, repo_root, built_dir, fake_claude,
+                                                                                tmp_path):
+        import urllib.error
+
+        class Spent(FakeWeb):
+            def openalex_works(self, search, count):
+                raise urllib.error.HTTPError("https://api.openalex.org/works", 429, "Too Many Requests", {}, None)
+
+        fake_claude.script()
+        report = run(repo_root, built_dir, fake_claude, web=Spent(), audit_dir=tmp_path / "audit", items=3)
+        assert report.results == [] and "OpenAlex refused a search" in report.stopped_because
+
+    def test_an_evaluation_doesnt_offer_a_source_only_the_persons_rows_cite(self, repo_root):
+        penn = "https://www.penn.museum/sites/expedition/adventures-in-experimental-smelting/"
+        assert penn in {s.url for s in known_sources(repo_root)}
+        assert penn not in {s.url for s in known_sources(repo_root, frozenset({"Magnetite", "Goethite"}))}
 
 
 class TestEvaluating:
@@ -453,7 +592,8 @@ class TestThePullRequestText:
         summary = {
             "run": "ore-1", "models": {"proposer": "opus", "reviewer": "opus"}, "model_ids": {"proposer": "claude-opus-5-5"},
             "prompts": {"proposer": "a", "reviewer": "b"},
-            "usage": {"calls": 2, "web_searches": 1, "web_fetches": 1, "first_limits": {}, "limits": {}},
+            "usage": {"calls": 2, "web_searches": 0, "web_fetches": 0, "first_limits": {}, "limits": {}},
+            "sources": {"openalex_searches": 4, "pages_downloaded": 3},
             "items": [{"mineral": "Covellite", "outcome": "accepted", "reason": "", "row": row},
                       {"mineral": "Galena", "outcome": "rejected", "reason": "@reviewer said no", "row": None}],
         }
@@ -500,7 +640,13 @@ class TestTheRepository:
 
 # Wikidata's labels for the made-up items, as the stand-in answers them.
 NEW_ITEMS = [("Q99999911", "sphalerite", "zinc sulfide mineral", "ZnS"), ("Q99999912", "gold", "native gold", None)]
-WEB_PAGE_CITATION = "Example Museum. Ores of the example valley (web page)."
+# OpenAlex's made-up records for the made-up sources, and the citations code makes of them.
+WEB_PAGE_WORK = {"id": "W2", "display_name": "Ores of the example valley (web page)", "authorships": [],
+                 "primary_location": {"source": {"display_name": "Example Museum"}}}
+BOOK_WORK = {"id": "W3", "display_name": "A book no index lists", "publication_year": 1999,
+             "authorships": [{"author": {"display_name": "A Nobody"}}],
+             "primary_location": {"source": {"display_name": "Nowhere Press"}}}
+WEB_PAGE_CITATION = "Ores of the example valley (web page). Example Museum."
 UNLISTED_BOOK = "Nobody, A. (1999). A book no index lists. Nowhere Press."
 
 
@@ -562,16 +708,12 @@ def published(repo_root, tmp_path_factory, wikidata_endpoint, scholarly_endpoint
     items = {"Q99999910": WikidataItem("Q99999910", "galena", "lead sulfide mineral"),
              "Q99999911": WikidataItem("Q99999911", "sphalerite", "zinc sulfide mineral"),
              "Q99999912": WikidataItem("Q99999912", "gold", "native gold")}
-    proposal = lambda item, ore_class, citation, slug, quote: answer(GOOD | {  # noqa: E731
-        "wikidata": item, "class": ore_class, "citation": citation, "url": f"https://example.org/{slug}",
-        "quote": quote, "supports": f"What the {slug} page says."})
+    works = {"galena": [WEB_PAGE_WORK | {"best_oa_location": {"landing_page_url": "https://example.org/galena"}}],
+             "sphalerite": [WEB_PAGE_WORK | {"best_oa_location": {"landing_page_url": "https://example.org/sphalerite"}}],
+             "gold": [BOOK_WORK | {"best_oa_location": {"landing_page_url": "https://example.org/gold"}}]}
+    choice = lambda ore_class, slug: answer(GOOD | {"class": ore_class, "supports": f"What the {slug} page says."})  # noqa: E731
     fake.script(
-        proposer=[
-            proposal("Q99999910", "none", WEB_PAGE_CITATION, "galena", "Galena is the chief ore of lead, not of copper."),
-            proposal("Q99999911", "copper-sulphide-ore", WEB_PAGE_CITATION, "sphalerite",
-                     "Sphalerite was roasted with the copper sulphides at the example mine."),
-            proposal("Q99999912", "iron-ore", UNLISTED_BOOK, "gold", "Gold was smelted with the iron ores of the example valley."),
-        ],
+        proposer=[choice("none", "galena"), choice("copper-sulphide-ore", "sphalerite"), choice("iron-ore", "gold")],
         reviewer=[answer(ACCEPT)] * 3,
     )
     gh = _fake_gh(directory)
@@ -586,7 +728,7 @@ def published(repo_root, tmp_path_factory, wikidata_endpoint, scholarly_endpoint
                 repo, directory / "build",
                 replace(settings(fake, items=3), pull_request=True, gh_command=str(gh)),
                 Downloads(wikidata_endpoint.url, scholarly_endpoint.openalex_url, scholarly_endpoint.crossref_url),
-                web=FakeWeb(pages=pages, items=items), on_progress=lambda message: None, audit_dir=directory / "audit",
+                web=FakeWeb(pages=pages, items=items, works=works), on_progress=lambda message: None, audit_dir=directory / "audit",
             )
             build_dir_setting = os.environ.get("CAPABILITIES_BUILD_DIR")
         finally:
@@ -677,7 +819,7 @@ class TestWhenTheWebFails:
 
                 raise urllib.error.URLError("connection refused")
 
-        checks, _ = check(COVELLITE, Proposal.from_output(GOOD), context, Down())
+        checks, _ = check(COVELLITE, proposed(), context, Down())
         failed = {c.name: c.detail for c in checks if not c.passed}
         assert failed == {"wikidata_item_is_the_mineral": "Wikidata couldn't be reached: <urlopen error connection refused>"}
 
@@ -737,14 +879,19 @@ class TestTheDagsterJob:
         monkeypatch.setenv("CAPABILITIES_AUDIT_DIR", str(tmp_path / "audit"))
         for name in ("CAPABILITIES_BUILD_DIR", "DBT_LOG_PATH", "DBT_TARGET_PATH", "DO_NOT_TRACK"):
             monkeypatch.delenv(name, raising=False)
-        fake_claude.script(proposer=[answer(GOOD | {"decision": "unsure", "unsure_why": "No source says."})])
+        fake_claude.script(proposer=[answer(UNSURE)])
         defs = definitions(repo_root, built_dir)
         # then: it is a job, not an asset, so materializing every asset never starts one
         assert "curate_ore_candidates" not in {key.to_user_string() for key in defs.resolve_asset_graph().get_all_asset_keys()}
         # when: launched for one item, with no pull request
+        # (Wikidata's site and OpenAlex pointed at a local port with nothing on it: the item can't be found, so the run
+        # skips it without asking a model, and nothing reaches the network)
         result = defs.get_job_def("agent_curation").execute_in_process(run_config={
-            "ops": {"curate_ore_candidates": {"config": {"items": 1, "pull_request": False}}}})
+            "ops": {"curate_ore_candidates": {"config": {"items": 1, "pull_request": False}}},
+            "resources": {"downloads": {"config": {"wikidata_site_url": "http://127.0.0.1:9",
+                                                   "openalex_url": "http://127.0.0.1:9"}}}})
         # then: the run's outcome is in its output and in the audit log
         summary = result.output_for_node("curate_ore_candidates")
-        assert summary["outcomes"] == {"unsure": 1} and summary["items"][0]["mineral"] == "Galena"
-        assert audit_rows(tmp_path / "audit", "select outcome from outcomes") == [("unsure",)]
+        assert summary["outcomes"] == {"skipped": 1} and summary["items"][0]["mineral"] == "Galena"
+        assert audit_rows(tmp_path / "audit", "select outcome from outcomes") == [("skipped",)]
+        assert fake_claude.calls() == []

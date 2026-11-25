@@ -52,6 +52,7 @@ class UpstreamDownloads(ConfigurableResource):
     pleiades_url: str = PLEIADES.url
     openalex_url: str = REFERENCES.url
     crossref_url: str = REFERENCES.crossref_url
+    wikidata_site_url: str = "https://www.wikidata.org"  # Wikidata's items and search, where agents' runs find minerals
 
 
 class AgentRunConfig(Config):
@@ -63,15 +64,16 @@ class AgentRunConfig(Config):
 
     items: int = 5  # how many queue items to work through, most widely listed first
     evaluate: bool = False  # ask again about the minerals a person decided, score the answers, open no pull request
-    proposer_model: str = "opus"
+    proposer_model: str = "sonnet"  # chooses among passages code found (ADR 0048)
     reviewer_model: str = "opus"
-    proposer_effort: str | None = None  # low, medium, high, xhigh or max; unset is Claude Code's default
+    proposer_effort: str | None = "medium"  # low, medium, high, xhigh or max; unset is Claude Code's default
     reviewer_effort: str | None = None
     # Stop before the next item once the plan's five-hour or weekly usage reaches this share.
     stop_at_five_hour: float = 0.8
     stop_at_seven_day: float = 0.9
     pull_request: bool = True
     base: str = "origin/main"
+    find_only: bool = False  # find the items and passages, ask no model: what a run would offer, for none of the plan
 
 
 def definitions(root: Path, build_dir: Path) -> Definitions:
@@ -229,7 +231,8 @@ def definitions(root: Path, build_dir: Path) -> Definitions:
     def curate_ore_candidates(context: OpExecutionContext, config: AgentRunConfig, downloads: UpstreamDownloads) -> dict:
         report = run_ore_candidates(
             root, build_dir, Settings(**config.model_dump()),
-            Downloads(downloads.wikidata_url, downloads.openalex_url, downloads.crossref_url),
+            Downloads(downloads.wikidata_url, downloads.openalex_url, downloads.crossref_url,
+                      downloads.wikidata_site_url),
             on_progress=context.log.info,
         )
         usage = report.summary["usage"]

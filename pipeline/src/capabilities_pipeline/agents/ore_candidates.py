@@ -2,8 +2,9 @@
 the ore crosswalk hasn't decided yet (ADR 0045, ADR 0048).
 
 A proposal is a crosswalk row: the mineral's Wikidata item, its ore class (or none), and a source with the passage that
-supports it. The agent decides those; code fills in the rest (the id, and the route it is mined like, from the rows
-already in the crosswalk) and checks everything it can before a reviewer agent sees it.
+supports it. Code finds the item and the candidate passages (sources.py); the proposer, with no tools, chooses the class
+and the passage that supports it, and says what it supports. Code fills in the rest (the quote, citation and URL from
+the passage, the id, and the route it is mined like) and checks everything it can before a reviewer agent sees it.
 """
 
 from __future__ import annotations
@@ -21,6 +22,7 @@ from string import Template
 
 from capabilities.graph import ORE_CROSSWALK, Graph, ore_crosswalk_rows
 
+from .sources import Passage
 from .web import Page, Web, WikidataItem, excerpt, locate
 
 PROMPTS = Path(__file__).parent / "prompts"
@@ -62,10 +64,14 @@ class Proposal:
     unsure_why: str = ""
 
     @classmethod
-    def from_output(cls, output: dict) -> Proposal:
+    def from_choice(cls, output: dict, item: WikidataItem, passages: list[Passage]) -> Proposal:
+        """The proposer's choice made a proposal: the passage it chose gives the quote, citation and URL."""
         text = lambda key: " ".join(str(output.get(key) or "").split())  # noqa: E731
-        return cls(text("decision"), text("wikidata").upper(), text("class"), text("citation"), text("url"),
-                   str(output.get("quote") or "").strip(), text("supports"), text("notes"), text("unsure_why"))
+        if text("decision") != "propose":
+            return cls(text("decision") or "unsure", unsure_why=text("unsure_why"))
+        passage = next(p for p in passages if p.number == output["passage"])
+        return cls("propose", item.id, text("class"), passage.source.citation, passage.source.url, passage.sentence,
+                   text("supports"), text("notes"))
 
 
 @dataclass(frozen=True)
@@ -84,22 +90,22 @@ class Evidence:
     excerpt: str | None = None
 
 
-PROPOSAL_SCHEMA = {
-    "type": "object",
-    "additionalProperties": False,
-    "required": ["decision", "wikidata", "class", "citation", "url", "quote", "supports", "notes", "unsure_why"],
-    "properties": {
-        "decision": {"enum": ["propose", "unsure"]},
-        "wikidata": {"type": "string"},
-        "class": {"enum": [*ORE_CLASSES, ""]},
-        "citation": {"type": "string"},
-        "url": {"type": "string"},
-        "quote": {"type": "string"},
-        "supports": {"type": "string"},
-        "notes": {"type": "string"},
-        "unsure_why": {"type": "string"},
-    },
-}
+def proposal_schema(passages: int) -> dict:
+    """The proposer's answer: a decision, and for a proposal, a class and the number of one of the passages offered (0
+    for none, with "unsure")."""
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["decision", "class", "passage", "supports", "notes", "unsure_why"],
+        "properties": {
+            "decision": {"enum": ["propose", "unsure"]},
+            "class": {"enum": [*ORE_CLASSES, ""]},
+            "passage": {"enum": list(range(passages + 1))},
+            "supports": {"type": "string"},
+            "notes": {"type": "string"},
+            "unsure_why": {"type": "string"},
+        },
+    }
 
 REVIEW_SCHEMA = {
     "type": "object",
@@ -194,10 +200,21 @@ def _wikidata_things(root: Path) -> list[str]:
         return [row["wikidata"].strip() for row in csv.DictReader(file) if row.get("wikidata", "").strip()]
 
 
-def proposer_task(prompt: Prompt, candidate: Candidate, context: Context, feedback: str | None) -> str:
+def proposer_task(prompt: Prompt, candidate: Candidate, item: WikidataItem, passages: list[Passage], context: Context,
+                  feedback: str | None) -> str:
     classes = "\n".join(f"- {name}: {meaning}" for name, meaning in context.classes.items())
-    return prompt.render(name=candidate.name, detail=candidate.detail, classes=classes,
-                         feedback=f"\nYour last proposal for this mineral was sent back:\n{feedback}" if feedback else "")
+    return prompt.render(
+        name=candidate.name, detail=candidate.detail, wikidata=item.id, wikidata_label=item.label or "",
+        wikidata_description=item.description or "no description", classes=classes,
+        passages="\n\n".join(_offered(passage) for passage in passages),
+        feedback=f"\nYour last proposal for this mineral was sent back:\n{feedback}" if feedback else "",
+    )
+
+
+def _offered(passage: Passage) -> str:
+    context = " ".join(part for part in (passage.before, f"«{passage.sentence}»", passage.after) if part)
+    return (f"[{passage.number}] From: {passage.source.citation} ({passage.source.origin}; {passage.source.url})\n"
+            f"{context}")
 
 
 def reviewer_task(prompt: Prompt, candidate: Candidate, proposal: Proposal, evidence: Evidence, context: Context) -> str:
