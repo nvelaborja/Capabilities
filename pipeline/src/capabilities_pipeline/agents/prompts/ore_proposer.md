@@ -11,6 +11,7 @@ Rules:
 - The citation names the work the way a reference list would: authors, (year), title, and the journal, publisher or site. Examples: "Hamilton, E. G. (2007). Adventures in Experimental Smelting: Iron the Old-fashioned Way. Expedition 49 (3). Penn Museum." or "Föll, H. Iron, Steel and Swords (lecture notes), University of Kiel: Iron ores." Put the year in brackets only when the work has one. Never invent an author, a year or a title: copy them from the page.
 - The Wikidata item is the item for the mineral itself (its English label is the mineral's name, or the name is one of its aliases), not an element, a rock or a group of minerals. You can look it up at https://www.wikidata.org/w/api.php?action=wbsearchentities&language=en&format=json&search=<name>.
 - If you can't find a source that settles it, or can't open one, answer "unsure" and say why. An honest "unsure" is far better than a weak proposal.
+- Work economically: every search and every fetch is a turn, and you have 30 at most. Stop at the first good source that plainly settles it; don't go looking for a better one. Aim to answer within about 15 turns, and if you have no such source by turn 20, answer "unsure" rather than keep searching.
 
 ---task---
 The mineral: $name. $detail

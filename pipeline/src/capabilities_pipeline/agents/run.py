@@ -191,6 +191,7 @@ class Run:
             "started_at": self.started_at,
             "finished_at": _now(),
             "models": {"proposer": self.settings.proposer_model, "reviewer": self.settings.reviewer_model},
+            "efforts": {"proposer": self.settings.proposer_effort, "reviewer": self.settings.reviewer_effort},
             # What the aliases above meant on the day: the models the calls actually ran on.
             "model_ids": dict(self.curator.model_ids),
             "prompts": self.curator.prompt_versions(),
@@ -268,8 +269,8 @@ def _cell(text: str) -> str:
 
 
 def _model(summary: dict, role: str) -> str:
-    ran = summary.get("model_ids", {}).get(role)
-    return f"`{summary['models'][role]}`" + (f" (`{ran}`)" if ran else "")
+    ran, effort = summary.get("model_ids", {}).get(role), summary.get("efforts", {}).get(role)
+    return f"`{summary['models'][role]}`" + (f" (`{ran}`)" if ran else "") + (f" at {effort} effort" if effort else "")
 
 
 def _share(value: float | None) -> str:

@@ -30,9 +30,10 @@ log = logging.getLogger(__name__)
 RUNS_DIR = Path("data") / "agent_runs"
 # What a build sets in the environment for dbt (build.dbt_environment).
 DBT_ENVIRONMENT = ("CAPABILITIES_BUILD_DIR", "DBT_LOG_PATH", "DBT_TARGET_PATH", "DO_NOT_TRACK")
-# A cited work passes when OpenAlex or Crossref lists it (or a review of it), or when it is a web page, which neither
-# lists, and its link works (ADR 0047). "Possible", "not found" and a DOI that leads elsewhere don't pass.
-FOUND = ("found", "review_found")
+# What the citation check can say that makes a row wrong: the DOI it cites leads to another work. Anything else (found,
+# possible, not found, not searched) is noted, not held against it: the row's own page was downloaded and the quote
+# found on it, and many books, reports and web pages are in neither index (ADR 0047, ADR 0048).
+WRONG = ("doi_disagrees",)
 
 
 class BranchError(Exception):
@@ -139,16 +140,15 @@ def work_check(row: dict, checks: dict[str, dict]) -> Check:
     if row["class"] == "none":
         # A row rejecting a mineral builds nothing, so its reference isn't looked up (ADR 0047). Its page and quote
         # were still checked, and the reviewer read them.
-        return Check("cited_work_is_found", True, "not looked up: a rejected mineral's reference builds nothing")
+        return Check("citation_check_passes", True, "not looked up: a rejected mineral's reference builds nothing")
     found = checks.get(row["citation"].strip())
     if found is None:
-        return Check("cited_work_is_found", False, "the citation wasn't checked")
-    result, links = found["result"], found["links"]
-    if result in FOUND:
-        return Check("cited_work_is_found", True, f"{result} in {found['match_service']}")
-    if result == "not_searched" and links and all(link.get("state") == "works" for link in links):
-        return Check("cited_work_is_found", True, "a web page, not searched; its link works")
-    return Check("cited_work_is_found", False, f"{result}: {found['note'] or 'not found in OpenAlex or Crossref'}")
+        return Check("citation_check_passes", False, "the citation wasn't checked")
+    result, service = found["result"], found["match_service"]
+    if result in WRONG:
+        return Check("citation_check_passes", False, f"{result}: {found['note']}")
+    where = f" in {'OpenAlex' if service == 'openalex' else 'Crossref'}" if service else ""
+    return Check("citation_check_passes", True, f"{result}{where}; its page loaded and the quote is on it")
 
 
 def publish(worktree: Worktree, build_dir: Path, run_id: str, summary: dict, proposals: Proposals, gh: str) -> str:

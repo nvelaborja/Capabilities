@@ -65,6 +65,8 @@ class AgentRunConfig(Config):
     evaluate: bool = False  # ask again about the minerals a person decided, score the answers, open no pull request
     proposer_model: str = "opus"
     reviewer_model: str = "opus"
+    proposer_effort: str | None = None  # low, medium, high, xhigh or max; unset is Claude Code's default
+    reviewer_effort: str | None = None
     # Stop before the next item once the plan's five-hour or weekly usage reaches this share.
     stop_at_five_hour: float = 0.8
     stop_at_seven_day: float = 0.9

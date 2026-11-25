@@ -47,7 +47,7 @@ The Dagster job `agent_curation` ([ADR 0048](../../adr/0048-run-agents-through-c
 2. **Propose:** the proposer (web search and fetch, 30 turns) answers with a Wikidata item, an ore class or `none`, a citation, a URL, a quote and what it supports, or `unsure`.
 3. **Check:** code reads the Wikidata item and downloads the cited page (HTML, PDF via pypdf, or text) if it is on the public web, and looks for the quote word for word.
 4. **Challenge:** the reviewer (no tools, 3 turns) gets the proposal and the downloaded text around the quote, never the proposer's searches, and accepts, asks for a revision, or rejects.
-5. **Gate and pull request:** accepted rows are written into a temporary worktree, the downloads they need are made and the graph built; rows whose cited work isn't found are dropped; the rest become a draft pull request.
+5. **Gate and pull request:** accepted rows are written into a temporary worktree, the downloads they need are made and the graph built; a row is dropped only if the DOI it cites leads to another work; the rest become a draft pull request.
 
 Every call, check and outcome is appended to `audit/agents.duckdb`. A run stops before its next item once the plan's five-hour usage passes 80% (or weekly 90%), and at once if the limit is reached.
 
@@ -77,6 +77,8 @@ cd .. && python3 -c "import duckdb; duckdb.sql(\"select item, outcome, reason fr
 
 - **An API key in the environment changes who pays.** The run refuses to start with one set, rather than unset it silently.
 - **Your own Claude use and the agents share the limits.** A run that stops at 80% leaves you the rest of the window.
+- **Model and effort are what a call uses up.** Each role's `--model` and `--effort` (low to max) are settings of the run. The first evaluation, on Opus at its default effort, used about 6–7 points of a Pro plan's five-hour window per item (ADR 0048, *Evaluation*).
+- **A failed call still costs.** A call that runs out of turns prints its usage and the plan's limits all the same; the pipeline counts them, so the stop thresholds see them.
 - **`opus` is an alias.** It moves to newer models; the model a call actually ran on is in its `system` `init` event, and the audit log and run summary keep both.
 - **The agent chooses what the pipeline downloads.** A page could tell it what to cite, so the download refuses anything off the public web (this machine, its network, a cloud's metadata address), redirects included.
 - **Each call starts clean.** No saved session, no CLAUDE.md, no plugins: what the agent knows is its system prompt and the task. That keeps results reproducible from the prompt version.
@@ -95,5 +97,6 @@ cd .. && python3 -c "import duckdb; duckdb.sql(\"select item, outcome, reason fr
 5. [Use Claude Code with your Pro, Max, or Ultra plan](https://support.claude.com/en/articles/11145838-use-claude-code-with-your-pro-max-or-ultra-plan): usage limits on a subscription.
 6. [Agent SDK overview](https://code.claude.com/docs/en/agent-sdk/overview): the same loop as a library, and its terms on claude.ai login.
 7. [pypdf](https://pypdf.readthedocs.io/en/stable/): reading the text of a cited PDF.
-8. [Wikidata: data access](https://www.wikidata.org/wiki/Wikidata:Data_access): `Special:EntityData`, how an item's label, aliases and description are read.
-9. [git worktree](https://git-scm.com/docs/git-worktree) and [gh pr create](https://cli.github.com/manual/gh_pr_create): the branch and the draft pull request.
+8. [truststore](https://truststore.readthedocs.io/en/latest/): checking a cited site's certificate against the operating system's trusted roots.
+9. [Wikidata: data access](https://www.wikidata.org/wiki/Wikidata:Data_access): `Special:EntityData`, how an item's label, aliases and description are read.
+10. [git worktree](https://git-scm.com/docs/git-worktree) and [gh pr create](https://cli.github.com/manual/gh_pr_create): the branch and the draft pull request.
