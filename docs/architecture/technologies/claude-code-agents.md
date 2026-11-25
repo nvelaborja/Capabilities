@@ -14,8 +14,8 @@ An **agent** here is one such run with one job: the *proposer* researches a mine
 
 ```bash
 echo "The task…" | claude -p --safe-mode --strict-mcp-config --no-session-persistence \
-  --model opus --max-turns 30 --tools WebSearch,WebFetch --allowedTools WebSearch,WebFetch \
-  --system-prompt "You research minerals…" --json-schema '{"type": "object", …}' \
+  --model sonnet --effort medium --max-turns 3 --tools "" \
+  --system-prompt "You classify minerals…" --json-schema '{"type": "object", …}' \
   --output-format stream-json --verbose
 ```
 
@@ -37,17 +37,18 @@ echo "The task…" | claude -p --safe-mode --strict-mcp-config --no-session-pers
 
 **Usage limits.** A plan has a five-hour window and a weekly one, shared by claude.ai, Claude Code and anything scripted with it. Anthropic doesn't publish the limits as numbers; the `rate_limit_event` says how much of each window is used. When a window is full, calls fail ("You've hit your limit") until it resets.
 
-**Web fetch reads for the model.** Claude Code's `WebFetch` gives the page to a small model with the agent's question and returns that model's answer, not the page. It is good for finding things and bad for quoting them exactly, which is why the pipeline downloads every cited page itself.
+**Web fetch reads for the model.** (Why our agents have no web tools.) Claude Code's `WebFetch` gives the page to a small model with the agent's question and returns that model's answer, not the page. It is good for finding things and bad for quoting them exactly. A first version of our proposer searched and fetched for itself; it used far too much of the plan (ADR 0048, *Evaluation*), so the pipeline now finds and reads the pages, and the model only judges them.
 
 ## How we use it
 
-The Dagster job `agent_curation` ([ADR 0048](../../adr/0048-run-agents-through-claude-code-on-a-claude-subscription.md)), started by hand with a size, works through the curation queue's ore candidates one at a time:
+The Dagster job `agent_curation` ([ADR 0048](../../adr/0048-run-agents-through-claude-code-on-a-claude-subscription.md)), started by hand with a size, works through the curation queue's ore candidates one at a time. **Code does everything that can be done the same way every time; a model only judges.** Neither role has tools.
 
 1. **Before anything:** `claude auth status` must say `claude.ai`, no API key may be set, and `gh` must be logged in.
-2. **Propose:** the proposer (web search and fetch, 30 turns) answers with a Wikidata item, an ore class or `none`, a citation, a URL, a quote and what it supports, or `unsure`.
-3. **Check:** code reads the Wikidata item and downloads the cited page (HTML, PDF via pypdf, or text) if it is on the public web, and looks for the quote word for word.
-4. **Challenge:** the reviewer (no tools, 3 turns) gets the proposal and the downloaded text around the quote, never the proposer's searches, and accepts, asks for a revision, or rejects.
-5. **Gate and pull request:** accepted rows are written into a temporary worktree, the downloads they need are made and the graph built; a row is dropped only if the DOI it cites leads to another work; the rest become a draft pull request.
+2. **Find, in code:** the mineral's Wikidata item (search, then the item called exactly its name that is a mineral species); the sources (pages the repository already cites, then OpenAlex's open-access works); and the passages: sentences naming the mineral and ore or smelting, word for word. Nothing found: the item is skipped, and no model is asked.
+3. **Choose:** the proposer (Sonnet at medium effort, 3 turns) gets the numbered passages and answers with a class or `none` and the passage that supports it, or `unsure`. Code fills in the quote, citation and URL from the passage.
+4. **Check:** code checks the class, the item, the id, the site and the quote on the page.
+5. **Challenge:** the reviewer (Opus, 3 turns) gets the proposal and the page around the quote, never what else the proposer was offered, and accepts, asks for a revision, or rejects.
+6. **Gate and pull request:** accepted rows are written into a temporary worktree, the downloads they need are made and the graph built; a row is dropped only if the DOI it cites leads to another work; the rest become a draft pull request.
 
 Every call, check and outcome is appended to `audit/agents.duckdb`. A run stops before its next item once the plan's five-hour usage passes 80% (or weekly 90%), and at once if the limit is reached.
 
@@ -57,6 +58,7 @@ Every call, check and outcome is appended to `audit/agents.duckdb`. A run stops 
 |---|---|
 | Calling Claude Code, reading its events, the login check | `pipeline/src/capabilities_pipeline/agents/claude.py` |
 | The prompts (versioned by their hash) | `pipeline/src/capabilities_pipeline/agents/prompts/` |
+| Finding the item, the sources and the passages | `pipeline/src/capabilities_pipeline/agents/sources.py` |
 | The ore candidate task: schemas, checks, the crosswalk row | `pipeline/src/capabilities_pipeline/agents/ore_candidates.py` |
 | Reading pages and Wikidata items, finding quotes | `pipeline/src/capabilities_pipeline/agents/web.py` |
 | One item's loop; a whole run; the worktree, gate and pull request | `agents/curate.py`, `agents/run.py`, `agents/branch.py` |
@@ -80,7 +82,7 @@ cd .. && python3 -c "import duckdb; duckdb.sql(\"select item, outcome, reason fr
 - **Model and effort are what a call uses up.** Each role's `--model` and `--effort` (low to max) are settings of the run. The first evaluation, on Opus at its default effort, used about 6–7 points of a Pro plan's five-hour window per item (ADR 0048, *Evaluation*).
 - **A failed call still costs.** A call that runs out of turns prints its usage and the plan's limits all the same; the pipeline counts them, so the stop thresholds see them.
 - **`opus` is an alias.** It moves to newer models; the model a call actually ran on is in its `system` `init` event, and the audit log and run summary keep both.
-- **The agent chooses what the pipeline downloads.** A page could tell it what to cite, so the download refuses anything off the public web (this machine, its network, a cloud's metadata address), redirects included.
+- **Records from outside choose what the pipeline downloads.** An OpenAlex record or a page could point anywhere, so the download refuses anything off the public web (this machine, its network, a cloud's metadata address), redirects included.
 - **Each call starts clean.** No saved session, no CLAUDE.md, no plugins: what the agent knows is its system prompt and the task. That keeps results reproducible from the prompt version.
 - **`total_cost_usd` is what the tokens would cost on the API.** A subscription doesn't charge it. It is recorded to compare prompts and models, not as a bill.
 - **Structured output takes a turn.** A role with no tools still needs two turns: its answer, and the `StructuredOutput` call.

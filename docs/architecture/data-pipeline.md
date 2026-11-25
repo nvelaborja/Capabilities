@@ -355,7 +355,12 @@ Agents work through the curation queue's ore candidates and propose rows for the
 
 ```
 curation_queue.parquet ──▶ ore candidates, top N ──▶ for each, one at a time:
-                                                     proposer (claude -p: web search and fetch) ──▶ a crosswalk row and a quote
+                                                     find, in code: Wikidata item (search, mineral species),
+                                                     sources (pages the repository cites, OpenAlex open-access works),
+                                                     passages (sentences naming the mineral and ore or smelting)
+                                                       ▼ (no item or no passages: skipped, no model asked)
+                                                     proposer (claude -p: no tools) chooses a class and a passage
+                                                     ──▶ code makes the row: quote, citation and URL from the passage
                                                        ▼
                                                      mechanical checks: class and template, Wikidata item, id, site,
                                                      page downloaded by us (HTML, PDF, text), quote on it word for word
@@ -363,7 +368,7 @@ curation_queue.parquet ──▶ ore candidates, top N ──▶ for each, one a
                                                      reviewer (claude -p: no tools) reads the downloaded page ──▶ accept / revise / reject
 accepted rows ──▶ temporary worktree, branch agents/<run>, from origin/main:
                   write the crosswalk ─▶ download Wikidata items and quantities, OpenAlex and Crossref ─▶ build and test
-                  ─▶ drop rows whose cited work isn't found, and check the rest again
+                  ─▶ drop a row whose cited DOI leads to another work, and check the rest again
                   ─▶ back up the three snapshots, regenerate CREDITS.md, write data/agent_runs/<run>.json
                   ─▶ commit, push, gh pr create --draft
 every call, check and outcome ──▶ audit/agents.duckdb (append-only), and the run's summary to audit/runs/<run>.json
@@ -373,11 +378,16 @@ every call, check and outcome ──▶ audit/agents.duckdb (append-only), and t
 |---|---|---|
 | Preflight | `claude.check_login`, `branch.check_gh` | `claude auth status` says `claude.ai` and no API key is set; `gh` is logged in. Before anything is spent. |
 | Items | `ore_candidates.queue_candidates`, `evaluation_set` | The first N `ore_candidate` items of the current build's queue, most widely listed first. An evaluation takes the minerals a person decided instead, treating their rows as undecided. |
-| Propose | `curate.Curator`, `prompts/ore_proposer.md` | Opus 5.5 by default (`proposer_model`, `proposer_effort`) with web search and fetch, 30 turns (the prompt asks for an answer within about 15, and "unsure" by 20), answering to `PROPOSAL_SCHEMA`: Wikidata item, class or `none`, citation, URL, quote, supports, notes; or `unsure`. |
+| Find | `sources.Library`, `sources.known_sources`, `web.py` | The Wikidata item: `wbsearchentities` for the name, keeping the item called exactly that that is an instance of *mineral species* (Q12089225) and in no crosswalk. The sources: pages the repository cites (crosswalk rows and the curated layer's references; an evaluation leaves out pages only the evaluated rows cite), then OpenAlex's open-access works for "<mineral> smelting" and "<mineral> ore" (five each), each downloaded once a run. The passages: sentences of 40 to 1,000 characters naming the mineral and ore, smelting, roasting or a metal, with the sentence either side; three a source, twelve in all. No item or no passages: the item is `skipped`, and no model is asked. |
+| Choose | `curate.Curator`, `prompts/ore_proposer.md` | Sonnet 5.5 at medium effort by default (`proposer_model`, `proposer_effort`), no tools, 3 turns, answering to `proposal_schema`: decision, class or `none`, the passage's number, supports, notes; or `unsure`. Code makes the proposal: the quote is the chosen sentence, the citation and URL its source's (the repository's own citation, or one made from OpenAlex's record). |
 | Check | `ore_candidates.check`, `web.py` | The class has a route to be mined like (the one its rows use); the Wikidata item exists, wasn't merged, is called the mineral's name, and is in no crosswalk; the id is new; the site may be cited (not Mindat); the page is on the public web (never this machine or its network, nor a redirect there) and loads; the quote (40 to 1,000 characters) is on it word for word, ignoring case and typography, and names the mineral. |
 | Challenge | `prompts/ore_reviewer.md` | Opus 5.5 by default (`reviewer_model`, `reviewer_effort`) with no tools, 3 turns: the proposal, the Wikidata item and 2,500 characters each side of the quote, as downloaded. `REVIEW_SCHEMA`: accept, revise or reject, with objections. |
 | Gate | `branch.gate`, `branch.work_check` | Downloads `wikidata_items`, `wikidata_quantities` and `reference_candidates` for the worktree, and builds it. The citation check's result is noted on each row; only `doi_disagrees` (the DOI cited leads to another work) drops one, since the row's own page was downloaded and its quote found. A rejected mineral's (`none`) isn't looked up. |
 | Publish | `branch.publish` | The crosswalk, the three refreshed backups, `CREDITS.md` and `data/agent_runs/<run>.json`, in one commit on `agents/<run>` (`feat(data): agent proposals for …`); a draft pull request titled "Agent proposals: …". Text from pages and agents in its body can't mention anyone on GitHub. |
+
+If OpenAlex refuses a search (429: its free daily allowance is spent), the run stops there, as it does at the plan's limit, rather than skip items as if nothing spoke of them; `OPENALEX_API_KEY` raises the allowance. Other failed searches are listed in the summary (`sources.openalex_failures`), with how every page download answered (`sources.page_statuses`).
+
+`find_only: true` runs the *Find* step alone and records what each item would be offered, asking no model: it uses none of the plan, only OpenAlex searches and downloads.
 
 A run stops before its next item when the plan's five-hour usage, as Claude Code last reported it, reaches `stop_at_five_hour` (0.8) or the weekly reaches `stop_at_seven_day` (0.9), and at once if a call says the limit is reached. A call that fails still reports what it used, and that counts. The thresholds are shares (0.8, not 80): a run refuses anything outside 0 to 1, which would never stop it. What was accepted before it stopped still goes through the gate.
 

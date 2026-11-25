@@ -1,8 +1,6 @@
-"""Reading what an agent cites, ourselves (ADR 0048).
-
-An agent's web fetch hands it a model's account of a page, not the page, so nothing an agent says a page says is taken
-on trust: the pipeline downloads the page (HTML, PDF or plain text), reads its text, and looks for the quoted passage
-word for word. It also reads the Wikidata item an agent names, to check it is the mineral it says.
+"""Reading the web for the agents, in code (ADR 0048): Wikidata's items, OpenAlex's open-access works, and the pages
+they lead to, as text (HTML, PDF or plain text). Code finds and reads every source; a model only judges what code
+found, so nothing a model says a page says is taken on trust.
 """
 
 from __future__ import annotations
@@ -11,6 +9,7 @@ import http.client
 import io
 import ipaddress
 import json
+import os
 import re
 import socket
 import ssl
@@ -21,7 +20,7 @@ import urllib.request
 from dataclasses import dataclass
 from html.parser import HTMLParser
 
-from ..upstream import USER_AGENT
+from ..upstream import REFERENCES, USER_AGENT
 
 TIMEOUT_S = 60
 MAX_BYTES = 30 * 1024 * 1024  # a long PDF; anything bigger isn't a page someone would cite for one sentence
@@ -30,6 +29,9 @@ SAME_CHARACTER = str.maketrans({
     "‘": "'", "’": "'", "‚": "'", "‛": "'", "“": '"', "”": '"', "„": '"', "‟": '"',
     "‐": "-", "‑": "-", "‒": "-", "–": "-", "—": "-", "―": "-", "−": "-",
 })
+# Wikidata's "instance of", and the class every mineral species is an instance of.
+INSTANCE_OF, MINERAL_SPECIES = "P31", "Q12089225"
+OPENALEX_FIELDS = "id,doi,type,display_name,publication_year,authorships,primary_location,best_oa_location,open_access"
 # Where a quote leaves words out: "…", "...", "[...]" or "[…]".
 ELISION = re.compile(r"\[?(?:\.\s?\.\s?\.|…)\]?")
 
@@ -53,15 +55,39 @@ class WikidataItem:
     label: str | None
     description: str | None
     aliases: tuple[str, ...] = ()
+    instance_of: tuple[str, ...] = ()  # the classes it is an instance of (P31)
 
     def is_called(self, name: str) -> bool:
         return name.casefold() in {n.casefold() for n in (self.label, *self.aliases) if n}
+
+    @property
+    def is_a_mineral(self) -> bool:
+        return MINERAL_SPECIES in self.instance_of
 
 
 @dataclass(frozen=True)
 class Web:
     user_agent: str = USER_AGENT
     wikidata_url: str = "https://www.wikidata.org"
+    openalex_url: str = REFERENCES.url
+
+    def wikidata_search(self, name: str) -> list[str]:
+        """The ids of the items whose English label or alias matches `name`, as Wikidata's own search ranks them."""
+        query = urllib.parse.urlencode({"action": "wbsearchentities", "search": name, "language": "en", "type": "item",
+                                        "limit": 10, "format": "json"})
+        return [hit["id"] for hit in self._json(f"{self.wikidata_url}/w/api.php?{query}").get("search") or []]
+
+    def openalex_works(self, search: str, count: int) -> list[dict]:
+        """Open-access works OpenAlex finds for `search` (in titles, abstracts and full texts), best first."""
+        params = {"search": search, "filter": "is_oa:true", "per_page": count, "select": OPENALEX_FIELDS}
+        if key := os.environ.get("OPENALEX_API_KEY"):  # optional: a free key raises the daily allowance (ADR 0047)
+            params["api_key"] = key
+        return self._json(f"{self.openalex_url}/works?{urllib.parse.urlencode(params)}").get("results") or []
+
+    def _json(self, url: str) -> dict:
+        request = urllib.request.Request(url, headers={"User-Agent": self.user_agent, "Accept": "application/json"})
+        with _PUBLIC_ONLY.open(request, timeout=TIMEOUT_S) as response:
+            return json.loads(response.read())
 
     def page(self, url: str) -> Page:
         """The page at `url` as text. Only web addresses: a citation has no business pointing at a file or FTP server."""
@@ -108,6 +134,11 @@ class Web:
             label=english("labels").get("value"),
             description=english("descriptions").get("value"),
             aliases=tuple(alias["value"] for alias in (entity.get("aliases") or {}).get("en") or []),
+            instance_of=tuple(
+                claim["mainsnak"]["datavalue"]["value"]["id"]
+                for claim in (entity.get("claims") or {}).get(INSTANCE_OF) or []
+                if (claim.get("mainsnak") or {}).get("datavalue")
+            ),
         )
 
 

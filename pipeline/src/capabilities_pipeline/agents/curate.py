@@ -1,11 +1,12 @@
-"""One agent run over ore candidates: propose, check, challenge, and gather what passed for a pull request (ADR 0035,
-ADR 0048).
+"""One agent run over ore candidates: find, choose, check, challenge, and gather what passed for a pull request
+(ADR 0035, ADR 0048).
 
-Per item: a proposer agent researches the mineral and proposes a crosswalk row; code checks it; a reviewer agent, with
-no tools and none of the proposer's reasoning, challenges it with the pages the pipeline downloaded. A failed check or
-a "revise" sends it back to the proposer with the reasons, a bounded number of times. Items run one at a time, and the
-run stops before the next item once the plan's usage passes a threshold, or at once if the limit is reached: the item
-in progress is lost, and the rest stay in the queue.
+Per item: code finds the mineral's Wikidata item and candidate passages from sources (sources.py); a proposer agent, with
+no tools, chooses the class and the passage that supports it; code checks the proposal; a reviewer agent, with no tools
+and none of the proposer's reasoning, challenges it with the page around the passage. A failed check or a "revise" sends
+it back to the proposer with the reasons, a bounded number of times. An item with no item or no passages is skipped
+without asking a model anything. Items run one at a time, and the run stops before the next item once the plan's usage
+passes a threshold, or at once if the limit is reached: the item in progress is lost, and the rest stay in the queue.
 """
 
 from __future__ import annotations
@@ -17,7 +18,6 @@ from typing import Callable
 from .audit import AuditLog
 from .claude import EFFORTS, AgentError, Answer, ClaudeCode, UsageLimitReached
 from .ore_candidates import (
-    PROPOSAL_SCHEMA,
     REVIEW_SCHEMA,
     Candidate,
     Check,
@@ -26,14 +26,15 @@ from .ore_candidates import (
     Proposal,
     check,
     crosswalk_row,
+    proposal_schema,
     proposer_task,
     reviewer_task,
 )
-from .web import Web
+from .sources import NETWORK_ERRORS, Found, Library
+from .web import WikidataItem
 
-# The proposer searches and reads; each search or page is a turn.
-PROPOSER_TURNS = 30
-# The reviewer only answers: one turn for the answer, one for the structured output.
+# Neither role has tools: one turn for the answer, one for the structured output, and one to spare.
+PROPOSER_TURNS = 3
 REVIEWER_TURNS = 3
 
 
@@ -41,16 +42,20 @@ REVIEWER_TURNS = 3
 class Settings:
     items: int = 5
     evaluate: bool = False
-    proposer_model: str = "opus"
+    # The proposer only chooses among passages code found: Sonnet at medium effort. The reviewer is the last check
+    # before a person, and uses little of the plan: Opus (ADR 0048, Evaluation).
+    proposer_model: str = "sonnet"
     reviewer_model: str = "opus"
     # How hard each role thinks (claude.EFFORTS); None is Claude Code's default for the model.
-    proposer_effort: str | None = None
+    proposer_effort: str | None = "medium"
     reviewer_effort: str | None = None
     attempts: int = 2  # proposals per item: the first, and one more after being sent back
     # Stop before the next item once this share of the plan's five-hour or weekly usage is used.
     stop_at_five_hour: float = 0.8
     stop_at_seven_day: float = 0.9
     pull_request: bool = True
+    # Find the items and passages, record them, and ask no model: what a run would offer, for nothing of the plan.
+    find_only: bool = False
     base: str = "origin/main"  # what the proposals' branch starts from
     claude_command: str = "claude"
     gh_command: str = "gh"
@@ -72,7 +77,8 @@ class Settings:
 @dataclass
 class ItemResult:
     candidate: Candidate
-    outcome: str  # accepted, rejected, sent_back (attempts used up), unsure, failed
+    outcome: str  # accepted, rejected, sent_back (attempts used up), unsure, skipped (nothing to ask about), failed,
+    # or found (a find-only run)
     reason: str
     attempts: int = 0
     proposal: Proposal | None = None
@@ -124,12 +130,12 @@ class Usage:
 class Curator:
     """Works through ore candidates for one run, recording everything in the audit log."""
 
-    def __init__(self, run_id: str, settings: Settings, context: Context, audit: AuditLog, web: Web,
+    def __init__(self, run_id: str, settings: Settings, context: Context, audit: AuditLog, library: Library,
                  on_progress: Callable[[str], None] = lambda message: None):
-        self.run_id, self.settings, self.context, self.audit, self.web = run_id, settings, context, audit, web
+        self.run_id, self.settings, self.context, self.audit, self.library = run_id, settings, context, audit, library
         self.on_progress = on_progress
-        self.proposer = ClaudeCode(settings.proposer_model, ("WebSearch", "WebFetch"), PROPOSER_TURNS,
-                                   settings.claude_command, effort=settings.proposer_effort)
+        self.proposer = ClaudeCode(settings.proposer_model, (), PROPOSER_TURNS, settings.claude_command,
+                                   effort=settings.proposer_effort)
         self.reviewer = ClaudeCode(settings.reviewer_model, (), REVIEWER_TURNS, settings.claude_command,
                                    effort=settings.reviewer_effort)
         self.proposer_prompt = Prompt.load("ore_proposer")
@@ -151,10 +157,17 @@ class Curator:
 
     def curate(self, candidate: Candidate) -> ItemResult:
         """One item, to an outcome. A usage limit reached mid-item is raised: the run stops there."""
+        found = self._find(candidate)
+        if isinstance(found, ItemResult):
+            return self._finish(found)
+        item, passages = found
+        if self.settings.find_only:
+            offered = "\n".join(f"[{p.number}] {p.source.citation}: {p.sentence}" for p in passages.passages)
+            return self._finish(ItemResult(candidate, "found", f"{item.id}; {passages.detail()}\n{offered}", 0))
         feedback, last = None, None
         for attempt in range(1, self.settings.attempts + 1):
             try:
-                last = self._attempt(candidate, attempt, feedback)
+                last = self._attempt(candidate, item, passages, attempt, feedback)
             except UsageLimitReached:
                 raise
             except AgentError as error:
@@ -164,13 +177,41 @@ class Curator:
             feedback = last.reason
         return self._finish(last)
 
-    def _attempt(self, candidate: Candidate, attempt: int, feedback: str | None) -> ItemResult:
-        task = proposer_task(self.proposer_prompt, candidate, self.context, feedback)
-        answer = self._ask("proposer", candidate, attempt, self.proposer, self.proposer_prompt, task, PROPOSAL_SCHEMA)
-        proposal = Proposal.from_output(answer.output)
+    def _find(self, candidate: Candidate) -> tuple[WikidataItem, Found] | ItemResult:
+        """The item and the passages for a mineral, found in code; or why the item is skipped, with no model asked."""
+        self.on_progress(f"{candidate.name}: finding its Wikidata item and sources")
+        try:
+            item = self.library.item_for(candidate.name)
+        except NETWORK_ERRORS as error:
+            return self._skipped(candidate, "wikidata_item_found", f"Wikidata couldn't be searched: {error}")
+        if item is None:
+            return self._skipped(candidate, "wikidata_item_found",
+                                 f"no Wikidata item is called {candidate.name!r} and is a mineral species")
+        if item.id in self.context.taken_items:
+            return self._skipped(candidate, "wikidata_item_found", f"{item.id} is already in a crosswalk")
+        found = self.library.passages(item, candidate.name)
+        self.audit.check(self.run_id, candidate.name, 0, "wikidata_item_found", True, f"{item.id} ({item.label})")
+        if not found.passages:
+            return self._skipped(candidate, "passages_found", "no source found speaks of it as an ore: " + found.detail())
+        self.audit.check(self.run_id, candidate.name, 0, "passages_found", True, found.detail())
+        return item, found
+
+    def _skipped(self, candidate: Candidate, check_name: str, reason: str) -> ItemResult:
+        self.audit.check(self.run_id, candidate.name, 0, check_name, False, reason)
+        return ItemResult(candidate, "skipped", reason, 0)
+
+    def _attempt(self, candidate: Candidate, item: WikidataItem, found: Found, attempt: int,
+                 feedback: str | None) -> ItemResult:
+        passages = found.passages
+        task = proposer_task(self.proposer_prompt, candidate, item, passages, self.context, feedback)
+        answer = self._ask("proposer", candidate, attempt, self.proposer, self.proposer_prompt, task,
+                           proposal_schema(len(passages)))
+        if answer.output.get("decision") == "propose" and not answer.output.get("passage"):
+            return ItemResult(candidate, "sent_back", "It proposed a class without choosing a passage.", attempt)
+        proposal = Proposal.from_choice(answer.output, item, passages)
         if proposal.decision != "propose":
             return ItemResult(candidate, "unsure", proposal.unsure_why or "the proposer couldn't decide", attempt, proposal)
-        checks, evidence = check(candidate, proposal, self.context, self.web)
+        checks, evidence = check(candidate, proposal, self.context, self.library)
         for c in checks:
             self.audit.check(self.run_id, candidate.name, attempt, c.name, c.passed, c.detail)
         failed = [c for c in checks if not c.passed]
