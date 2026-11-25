@@ -38,11 +38,11 @@ model {
   }
 
   claude = external 'Claude, through Claude Code' {
-    description 'Anthropic\'s Claude models, reached through the Claude Code CLI in print mode (claude -p) on the owner\'s Claude subscription, so agent runs draw on the plan\'s usage limits rather than an API bill. Each call starts clean, with only its role\'s tools (ADR 0048).'
+    description 'Anthropic\'s Claude models, reached through the Claude Code CLI in print mode (claude -p) on the owner\'s Claude subscription, so agent runs draw on the plan\'s usage limits rather than an API bill. Each call starts clean, with no tools: it only judges what the pipeline found (ADR 0048).'
   }
 
   theWeb = external 'The web' {
-    description 'The pages agents search and cite: papers, museum, university and survey pages. The pipeline downloads every cited page itself to check its quote.'
+    description 'The pages agents\' proposals cite: papers, museum, university and survey pages. The pipeline finds and downloads them itself (ADR 0048); no model reads the web.'
   }
 
   capabilities = system 'Capabilities' {
@@ -344,10 +344,10 @@ model {
   contributor -> capabilities.pipeline.agents 'launches an agent run by hand, and merges or closes its pull request'
   capabilities.pipeline.dagster -> capabilities.pipeline.agents 'runs the agent_curation job'
   capabilities.pipeline.agents -> capabilities.artifact.queue 'takes the top ore candidates'
-  capabilities.pipeline.agents -> claude 'asks the proposer and the reviewer (claude -p, stream-json)'
-  claude -> theWeb 'searches and fetches (the proposer only)'
-  capabilities.pipeline.agents -> theWeb 'downloads each cited page, to find the quote word for word'
-  capabilities.pipeline.agents -> wikidata 'reads the item each proposal names'
+  capabilities.pipeline.agents -> claude 'asks the proposer to choose and the reviewer to challenge (claude -p, no tools)'
+  capabilities.pipeline.agents -> theWeb 'downloads each source once, and finds the passages naming the mineral'
+  capabilities.pipeline.agents -> wikidata 'searches for the mineral\'s item, and reads it'
+  capabilities.pipeline.agents -> openalex 'searches open-access works on the mineral and smelting'
   capabilities.pipeline.agents -> capabilities.pipeline.downloader 'gate: downloads what the new rows need'
   capabilities.pipeline.agents -> capabilities.pipeline.loader 'gate: builds and tests the worktree'
   capabilities.pipeline.agents -> capabilities.audit 'appends every call, check and outcome'
