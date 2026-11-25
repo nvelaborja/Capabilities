@@ -160,6 +160,7 @@ class Context:
     templates: dict[str, str]
     taken_ids: frozenset[str]
     taken_items: frozenset[str]
+    decided_items: frozenset[str] = frozenset()  # the ore crosswalk's own items: minerals already decided
 
     @classmethod
     def of(cls, root: Path, leaving_out: frozenset[str] = frozenset()) -> Context:
@@ -180,6 +181,7 @@ class Context:
             templates=templates,
             taken_ids=frozenset(graph.things) | frozenset(graph.routes) | {row["id"] for row in kept if row["id"]},
             taken_items=frozenset(row["wikidata"] for row in kept) | frozenset(_wikidata_things(root)),
+            decided_items=frozenset(row["wikidata"] for row in kept),
         )
 
 

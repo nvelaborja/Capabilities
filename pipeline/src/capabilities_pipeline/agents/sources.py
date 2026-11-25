@@ -58,7 +58,7 @@ OPENALEX_WORKS = 5  # per search
 PASSAGES_PER_SOURCE = 3
 PASSAGES = 12
 # Names for the Wikidata classes a lookup reports, where we know them; others are shown by id.
-CLASS_NAMES = {MINERAL_SPECIES: "mineral species"}
+CLASS_NAMES = {MINERAL_SPECIES: "mineral species", "Q11344": "chemical element"}
 NETWORK_ERRORS = (urllib.error.URLError, TimeoutError, ConnectionError, http.client.HTTPException, ValueError)
 
 
@@ -140,7 +140,7 @@ class Library:
             for found in self.web.wikidata_search(wanted):
                 item = self.wikidata_item(found)
                 why_not = self._why_not(item, found, wanted)
-                seen.append(self._described(found, item) + (f": {why_not}" if why_not else ": taken"))
+                seen.append(self._described(found, item, wanted) + (f": {why_not}" if why_not else ": taken"))
                 if not why_not:
                     return Lookup(item, tuple(seen))
         return Lookup(None, tuple(seen))
@@ -157,18 +157,25 @@ class Library:
         return None
 
     def _in_a_class_of_minerals(self, item: WikidataItem) -> bool:
+        # A heuristic on English labels: a subclass of anything whose label says "mineral" ("oxide class of minerals",
+        # a mineral group). It could also match, say, "mineral resource"; the item must still be called exactly the
+        # MRDS name, and every item taken is recorded, so a wrong one shows in the audit log and the pull request.
         return any("mineral" in (self._label(parent) or "").lower() for parent in item.subclass_of)
 
-    def _described(self, found: str, item: WikidataItem | None) -> str:
-        """An item the search returned, for the audit log. Its classes are named only for an item called the name:
-        naming every search hit's classes would cost a request each."""
+    def _described(self, found: str, item: WikidataItem | None, wanted: str) -> str:
+        """An item the search returned, for the audit log. Only what the decision already read is named: the parents
+        of an item called the name searched for (read to tell a class of minerals), and the few classes in
+        CLASS_NAMES. Naming every hit's classes (albums, bands, colours) would cost a request each."""
         if item is None:
             return found
-        def name(c: str) -> str:
-            label = self._label(c) if item.label else None
+        called = item.is_called(wanted)
+
+        def name(c: str, read: bool) -> str:
+            label = CLASS_NAMES.get(c) or (self._label(c) if read else None)
             return f"{c} {label!r}" if label else c
-        kinds = ", ".join(name(c) for c in item.instance_of) or "nothing"
-        parents = ", ".join(name(c) for c in item.subclass_of) or "nothing"
+
+        kinds = ", ".join(name(c, False) for c in item.instance_of) or "nothing"
+        parents = ", ".join(name(c, called and not item.is_a_mineral) for c in item.subclass_of) or "nothing"
         return f"{found} {item.label!r} ({item.description or 'no description'}; instance of {kinds}; subclass of {parents})"
 
     def _label(self, item_id: str) -> str | None:

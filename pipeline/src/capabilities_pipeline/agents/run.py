@@ -63,6 +63,7 @@ class Run:
         self.stopped: str | None = None
         self.unpublished: str | None = None  # why accepted rows weren't checked together or published, if they weren't
         self.failed: str | None = None  # the error that ended the run early, if one did
+        self.not_evaluated: list[str] = []  # minerals named for an evaluation that it has no answer for
         self.answers: dict[str, dict] = {}
 
     @property
@@ -116,6 +117,12 @@ class Run:
             if self.settings.minerals:
                 wanted = {name.casefold() for name in self.settings.minerals}
                 chosen = [(candidate, answer) for candidate, answer in chosen if candidate.name.casefold() in wanted]
+                evaluated = {candidate.name.casefold() for candidate, _ in chosen}
+                # A name the evaluation set doesn't have has no answer to score against: say so, so a typo can't
+                # quietly shrink the run.
+                self.not_evaluated = [name for name in self.settings.minerals if name.casefold() not in evaluated]
+                if self.not_evaluated:
+                    self.on_progress(f"Not in the evaluation set, so left out: {', '.join(self.not_evaluated)}")
             chosen = chosen[: self.settings.items]
             self.answers = {candidate.name: answer for candidate, answer in chosen}
             # The person's rows are left out of what's taken, and their sources out of the library, as if undecided:
@@ -227,6 +234,8 @@ class Run:
         }
         if self.answers:
             summary["score"] = score(self.results, self.answers)
+        if self.not_evaluated:
+            summary["not_evaluated"] = self.not_evaluated
         return summary
 
 

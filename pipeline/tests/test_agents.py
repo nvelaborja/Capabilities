@@ -107,12 +107,14 @@ class FakeWeb:
         self.works = {"galena": [GALENA_WORK], "sphalerite": [SPHALERITE_WORK], **(works or {})}
         self.asked: list[str] = []
         self.searched: list[str] = []
+        self.items_asked: list[str] = []
 
     def page(self, url: str) -> Page:
         self.asked.append(url)
         return self.pages.get(url, Page(url, "404"))
 
     def wikidata_item(self, item: str) -> WikidataItem | None:
+        self.items_asked.append(item)
         return self.items.get(item)
 
     def wikidata_search(self, name: str) -> list[str]:
@@ -433,7 +435,9 @@ class TestCurating:
         assert calls == [("proposer", 1, "sonnet", "medium", "claude-opus-5-5"),
                          ("proposer", 2, "sonnet", "medium", "claude-opus-5-5")]
         checks = audit_rows(audit, "select name, passed, detail from checks order by recorded_at")
-        assert checks[:2] == [("wikidata_item_found", True, "Q99999910 (galena)"),
+        assert checks[:2] == [("wikidata_item_found", True, "Q99999910 (galena). The search found: Q99999910 'galena' "
+                                                            "(lead sulfide mineral; instance of Q12089225 'mineral species'; "
+                                                            "subclass of nothing): taken"),
                               ("passages_found", True, "1 passages from 1 sources (1 read) (OpenAlex)")]
         assert ("class_is_known", False) in [(name, passed) for name, passed, _ in checks]
         assert audit_rows(audit, "select item, outcome from outcomes") == [("Galena", "unsure")]
@@ -490,6 +494,18 @@ class TestFindingSources:
                              subclass_of=(oxides.id,))
         assert Library(FakeWeb(items={oxides.id: oxides, brown.id: brown}), []).item_for("Brownite").item.id == brown.id
 
+    def test_a_lookup_reads_only_the_classes_its_decision_needs(self):
+        # given: what a search for "Gold" returns: an album called Gold, and the element, a subclass of noble metals
+        album = WikidataItem("Q99999950", "Gold", "studio album", instance_of=("Q99999951",))
+        element = WikidataItem("Q99999952", "gold", "chemical element", instance_of=("Q11344",), subclass_of=("Q99999953",))
+        web = FakeWeb(items={album.id: album, element.id: element})
+        lookup = Library(web, []).item_for("Gold")
+        # then: the element's parent was read, to see whether it is a class of minerals, and nothing else was
+        assert lookup.item is None
+        assert set(web.items_asked) == {album.id, element.id, "Q99999953"}
+        assert "Q99999952 'gold' (chemical element; instance of Q11344 'chemical element'; subclass of Q99999953): " \
+               "neither a mineral species nor a subclass of a class of minerals" in lookup.seen
+
     def test_a_native_metal_is_found_as_native_when_its_name_finds_only_the_element(self):
         element = WikidataItem("Q99999940", "silver", "chemical element", instance_of=("Q11344",))
         native = WikidataItem("Q99999941", "native silver", "mineral")
@@ -502,8 +518,24 @@ class TestFindingSources:
         fake_claude.script()
         report = run(repo_root, built_dir, fake_claude, web=FakeWeb(items={limonite.id: limonite}),
                      audit_dir=tmp_path / "audit", items=1, minerals=("Limonite",))
-        assert report.results[0].outcome == "skipped" and "a person decides" in report.results[0].reason
+        assert report.results[0].outcome == "skipped" and "a curated thing's item" in report.results[0].reason
         assert fake_claude.calls() == []
+
+    def test_a_mineral_already_decided_is_skipped_as_decided(self, repo_root, built_dir, fake_claude, tmp_path):
+        # given: azurite's real item, which the crosswalk already has a row for
+        azurite = WikidataItem("Q108212", "azurite", "copper carbonate mineral")
+        fake_claude.script()
+        report = run(repo_root, built_dir, fake_claude, web=FakeWeb(items={azurite.id: azurite}),
+                     audit_dir=tmp_path / "audit", items=1, minerals=("Azurite",))
+        assert report.results[0].reason == "Q108212 (azurite) is already decided: ore_minerals.csv has a row for it"
+
+    def test_an_evaluation_says_which_named_minerals_it_has_no_answer_for(self, repo_root, built_dir, fake_claude,
+                                                                          tmp_path):
+        fake_claude.script()
+        report = run(repo_root, built_dir, fake_claude, audit_dir=tmp_path / "audit", items=5, evaluate=True,
+                     find_only=True, minerals=("Pyrite", "Pyrrite"))
+        assert [r.candidate.name for r in report.results] == ["Pyrite"]
+        assert report.summary["not_evaluated"] == ["Pyrrite"]
 
     def test_named_minerals_run_in_the_order_named_whether_or_not_the_queue_lists_them(self, repo_root, built_dir,
                                                                                     fake_claude, tmp_path):

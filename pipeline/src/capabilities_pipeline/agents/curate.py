@@ -193,13 +193,18 @@ class Curator:
             return self._skipped(candidate, "wikidata_item_found",
                                  f"no Wikidata item is called {candidate.name!r} and is a mineral. The search found: "
                                  + ("; ".join(lookup.seen) or "nothing"))
-        if item.id in self.context.taken_items:
-            # Already in the graph (a curated thing, or another row): how MRDS's name maps to it is a person's call.
+        if item.id in self.context.decided_items:
             return self._skipped(candidate, "wikidata_item_found",
-                                 f"{item.id} ({item.label}) is already in a crosswalk (wikidata_things.csv or "
-                                 "ore_minerals.csv): a person decides how MRDS's name maps to it")
+                                 f"{item.id} ({item.label}) is already decided: ore_minerals.csv has a row for it")
+        if item.id in self.context.taken_items:
+            # A curated thing's item (limonite): how MRDS's name maps onto that node is a person's call, not an agent's.
+            return self._skipped(candidate, "wikidata_item_found",
+                                 f"{item.id} ({item.label}) is a curated thing's item (wikidata_things.csv): a person "
+                                 "decides how MRDS's name maps to it")
         found = self.library.passages(item, candidate.name)
-        self.audit.check(self.run_id, candidate.name, 0, "wikidata_item_found", True, f"{item.id} ({item.label})")
+        # 5. the hits are recorded on success too: what else was there is part of why this one was taken
+        self.audit.check(self.run_id, candidate.name, 0, "wikidata_item_found", True,
+                         f"{item.id} ({item.label}). The search found: " + "; ".join(lookup.seen))
         if not found.passages:
             return self._skipped(candidate, "passages_found", "no source found speaks of it as an ore: " + found.detail())
         self.audit.check(self.run_id, candidate.name, 0, "passages_found", True, found.detail())
