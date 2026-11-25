@@ -1,6 +1,6 @@
 # 0048. Run curation agents through Claude Code on a Claude subscription, and start with ore candidates
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-25
 - **Supersedes:** in part [0035](0035-propose-curated-facts-with-audited-agents.md): its models and interfaces, its spending caps and API rate limits, and where the audit log lives
 
