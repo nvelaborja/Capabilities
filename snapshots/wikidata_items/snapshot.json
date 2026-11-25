@@ -1,10 +1,10 @@
 {
   "dataset": "wikidata_items",
   "url": "https://query.wikidata.org/sparql",
-  "retrieved_at": "2026-11-24T01:56:25Z",
-  "sha256": "f6b4b24d5b6a435f3a6c53825b1151a3d566eeeeafd20d7272ca7c674aade8d0",
-  "rows": 24,
+  "retrieved_at": "2026-11-25T22:32:21Z",
+  "sha256": "186e7da5dab7b12faf96e398ee14e89f879c6b61d030ebe579fcb3963208d94d",
+  "rows": 26,
   "license": "CC0 1.0 (Wikidata's structured data)",
-  "query": "SELECT (STRAFTER(STR(?entity), \"/entity/\") AS ?item) ?label ?description ?formula\nWHERE {\n  VALUES ?entity { wd:Q103223 wd:Q108212 wd:Q108694 wd:Q1096 wd:Q111044 wd:Q11427 wd:Q1235463 wd:Q163577 wd:Q164411 wd:Q181395 wd:Q189703 wd:Q191222 wd:Q192669 wd:Q193565 wd:Q23757 wd:Q278106 wd:Q34095 wd:Q407335 wd:Q41177 wd:Q5283 wd:Q583353 wd:Q753 wd:Q83087 wd:Q860451 }\n  OPTIONAL { ?entity rdfs:label ?label . FILTER(LANG(?label) = \"en\") }\n  OPTIONAL { ?entity schema:description ?description . FILTER(LANG(?description) = \"en\") }\n  OPTIONAL { ?entity wdt:P274 ?formula }\n}\nORDER BY ?item ?formula",
-  "items": 24
+  "query": "SELECT (STRAFTER(STR(?entity), \"/entity/\") AS ?item) ?label ?description ?formula\nWHERE {\n  VALUES ?entity { wd:Q103223 wd:Q108212 wd:Q108694 wd:Q1096 wd:Q111044 wd:Q11427 wd:Q1235463 wd:Q163577 wd:Q164411 wd:Q181395 wd:Q189703 wd:Q191222 wd:Q192669 wd:Q193565 wd:Q23757 wd:Q278106 wd:Q34095 wd:Q407335 wd:Q407485 wd:Q41177 wd:Q424282 wd:Q5283 wd:Q583353 wd:Q753 wd:Q83087 wd:Q860451 }\n  OPTIONAL { ?entity rdfs:label ?label . FILTER(LANG(?label) = \"en\") }\n  OPTIONAL { ?entity schema:description ?description . FILTER(LANG(?description) = \"en\") }\n  OPTIONAL { ?entity wdt:P274 ?formula }\n}\nORDER BY ?item ?formula",
+  "items": 26
 }

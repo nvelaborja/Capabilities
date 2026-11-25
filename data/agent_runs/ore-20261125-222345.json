@@ -1,0 +1,518 @@
+{
+  "run": "ore-20261125-222345",
+  "task": "ore_candidates",
+  "mode": "propose",
+  "started_at": "2026-11-25T22:23:45Z",
+  "finished_at": "2026-11-25T22:33:41Z",
+  "models": {
+    "proposer": "sonnet",
+    "reviewer": "sonnet"
+  },
+  "efforts": {
+    "proposer": "medium",
+    "reviewer": "high"
+  },
+  "model_ids": {
+    "proposer": "claude-sonnet-5-5",
+    "reviewer": "claude-sonnet-5-5"
+  },
+  "prompts": {
+    "proposer": "33bfca60bef2",
+    "reviewer": "5a5673fbbf3b"
+  },
+  "plan": "pro",
+  "stopped_because": null,
+  "not_published_because": null,
+  "failed_because": null,
+  "outcomes": {
+    "accepted": 6,
+    "skipped": 3,
+    "unsure": 1
+  },
+  "usage": {
+    "calls": 15,
+    "input_tokens": 30,
+    "output_tokens": 23654,
+    "cache_read_tokens": 10117,
+    "cache_creation_tokens": 56109,
+    "web_searches": 0,
+    "web_fetches": 0,
+    "api_equivalent_usd": 0.46204769999999995,
+    "first_limits": {
+      "five_hour": 0.3,
+      "seven_day": 0.41
+    },
+    "limits": {
+      "five_hour": 0.33,
+      "seven_day": 0.41
+    }
+  },
+  "sources": {
+    "openalex_searches": 14,
+    "openalex_failures": [],
+    "pages_downloaded": 86,
+    "page_statuses": {
+      "200": 71,
+      "403": 8,
+      "400": 1,
+      "404": 4,
+      "503": 1,
+      "unreachable": 1
+    }
+  },
+  "items": [
+    {
+      "mineral": "Galena",
+      "outcome": "accepted",
+      "reason": "The class holds. The quoted sentence says the smelted ore was predominantly galena, and the running header inside the quote, the page's discussion of lead metal and lead sulphide, and the cited title all show this was lead smelting. That makes galena an ore of another metal. The zinc and iron mentioned come from minor sphalerite and pyrite and don't suggest galena was smelted for iron. The citation matches the page's running header (Anguilano et al., HM 44(2) 2010), the journal is a suitable source, and Q37559 is the mineral itself. The notes' remarks that galena is the main lead ore and often silver-bearing are general background not drawn from this passage (silver at this site was low), but they don't affect the class.",
+      "attempts": 1,
+      "row": {
+        "id": "",
+        "wikidata": "Q37559",
+        "mrds_ore": "Galena",
+        "class": "none",
+        "mined_like": "",
+        "citation": "Lorna Anguilano, Simon Timberlake & Thilo Rehren (2010). An early medieval lead-smelting bole from Banc Tynddol, Cwmystwyth, Ceredigion. Historical Metallurgy.",
+        "url": "https://hmsjournal.org/index.php/home/article/download/150/146",
+        "supports": "The ore smelted at the early medieval Banc Tynddol bole was mainly galena with quartz gangue, so galena was smelted for lead, not for copper, iron or tin.",
+        "quote": "96 ANGUILANO ET AL: LEAD SMELTING AT CYMYSTWYTH HM 44(2) 2010 Interpretation and discussion The ore smelted was predominantly galena with quartz gangue; some sphalerite and minor pyrite were also present, as indicated by small concentrations of zinc and iron in the slags.",
+        "status": "",
+        "proposed_by": "ore-20261125-222345",
+        "notes": "A lead sulfide: the main ore of lead, and often silver-bearing, but not an ore of copper, iron or tin."
+      },
+      "checks": [
+        {
+          "name": "class_is_known",
+          "passed": true,
+          "detail": "none"
+        },
+        {
+          "name": "wikidata_item_is_the_mineral",
+          "passed": true,
+          "detail": "Q37559 is 'galena' (rocksalt group, sulfide mineral)"
+        },
+        {
+          "name": "wikidata_item_is_new",
+          "passed": true,
+          "detail": "Q37559 isn't in a crosswalk yet"
+        },
+        {
+          "name": "source_may_be_used",
+          "passed": true,
+          "detail": "the site may be cited"
+        },
+        {
+          "name": "cited_page_loads",
+          "passed": true,
+          "detail": "200, pdf, 70399 characters of text"
+        },
+        {
+          "name": "quote_is_on_the_page",
+          "passed": true,
+          "detail": "found word for word in the pdf page"
+        },
+        {
+          "name": "quote_names_the_mineral",
+          "passed": true,
+          "detail": "the quote names the mineral"
+        },
+        {
+          "name": "citation_check_passes",
+          "passed": true,
+          "detail": "not looked up: a rejected mineral's reference builds nothing"
+        }
+      ],
+      "review": {
+        "verdict": "accept",
+        "objections": [
+          {
+            "about": "supports",
+            "objection": "Minor, not blocking: the quote and page show what was smelted at one lead-smelting bole. The words \"not for copper, iron or tin\" are the proposer's inference from galena being used as a lead ore, not something the source states. The inference is enough for the class, which covers ores of another metal."
+          }
+        ],
+        "summary": "The class holds. The quoted sentence says the smelted ore was predominantly galena, and the running header inside the quote, the page's discussion of lead metal and lead sulphide, and the cited title all show this was lead smelting. That makes galena an ore of another metal. The zinc and iron mentioned come from minor sphalerite and pyrite and don't suggest galena was smelted for iron. The citation matches the page's running header (Anguilano et al., HM 44(2) 2010), the journal is a suitable source, and Q37559 is the mineral itself. The notes' remarks that galena is the main lead ore and often silver-bearing are general background not drawn from this passage (silver at this site was low), but they don't affect the class."
+      }
+    },
+    {
+      "mineral": "Sphalerite",
+      "outcome": "accepted",
+      "reason": "Accept. By itself, the quote identifies sphalerite as zinc sulfide and a zinc mineral, which places it in the \"none\" class as an ore of another metal. It doesn't say in so many words that sphalerite isn't smelted for copper, iron or tin, but nothing on the page says it was. The nearby mention of adding sphalerite to melted copper concerns making brass, not winning copper from it, so it doesn't contradict the class. \"Supports\" restates the quote without going beyond it, the citation's title and author match the page, and Q105006 is the mineral itself. The \"zinc-iron\" wording in the notes matches the Wikidata description, not the quoted sentence.\n\nMinor point for the reviewer, not affecting the class: the source's remark that sphalerite \"could not be melted before the 18th century\" is, from background knowledge, doubtful as a general history of zinc smelting (earlier production at Zawar in India is usually cited). It shouldn't be reused as an independent fact.",
+      "attempts": 1,
+      "row": {
+        "id": "",
+        "wikidata": "Q105006",
+        "mrds_ore": "Sphalerite",
+        "class": "none",
+        "mined_like": "",
+        "citation": "Hans Lohmann (2023). Laurion – The present state and future scope of research. Der Anschnitt. Beiheft.",
+        "url": "https://omp.ub.rub.de/index.php/DBM/catalog/download/264/241/1498?inline=1",
+        "supports": "The sentence identifies sphalerite as zinc sulfide, recognised as a zinc mineral only in 1735, and says it could not be melted before the 18th century.",
+        "quote": "Zinc sulfide (sphalerite, from Greek σφαλερός), which was recognized as zinc mineral only in 1735 (Lüschen, 1979, p.191) and could not be melted before the 18th century seemingly prevails in the Laurion.",
+        "status": "",
+        "proposed_by": "ore-20261125-222345",
+        "notes": "A zinc-iron sulphide: a zinc mineral, not an ore smelted for copper, iron or tin."
+      },
+      "checks": [
+        {
+          "name": "class_is_known",
+          "passed": true,
+          "detail": "none"
+        },
+        {
+          "name": "wikidata_item_is_the_mineral",
+          "passed": true,
+          "detail": "Q105006 is 'sphalerite' (zinc-iron sulfide mineral)"
+        },
+        {
+          "name": "wikidata_item_is_new",
+          "passed": true,
+          "detail": "Q105006 isn't in a crosswalk yet"
+        },
+        {
+          "name": "source_may_be_used",
+          "passed": true,
+          "detail": "the site may be cited"
+        },
+        {
+          "name": "cited_page_loads",
+          "passed": true,
+          "detail": "200, pdf, 99588 characters of text"
+        },
+        {
+          "name": "quote_is_on_the_page",
+          "passed": true,
+          "detail": "found word for word in the pdf page"
+        },
+        {
+          "name": "quote_names_the_mineral",
+          "passed": true,
+          "detail": "the quote names the mineral"
+        },
+        {
+          "name": "citation_check_passes",
+          "passed": true,
+          "detail": "not looked up: a rejected mineral's reference builds nothing"
+        }
+      ],
+      "review": {
+        "verdict": "accept",
+        "objections": [],
+        "summary": "Accept. By itself, the quote identifies sphalerite as zinc sulfide and a zinc mineral, which places it in the \"none\" class as an ore of another metal. It doesn't say in so many words that sphalerite isn't smelted for copper, iron or tin, but nothing on the page says it was. The nearby mention of adding sphalerite to melted copper concerns making brass, not winning copper from it, so it doesn't contradict the class. \"Supports\" restates the quote without going beyond it, the citation's title and author match the page, and Q105006 is the mineral itself. The \"zinc-iron\" wording in the notes matches the Wikidata description, not the quoted sentence.\n\nMinor point for the reviewer, not affecting the class: the source's remark that sphalerite \"could not be melted before the 18th century\" is, from background knowledge, doubtful as a general history of zinc smelting (earlier production at Zawar in India is usually cited). It shouldn't be reused as an independent fact."
+      }
+    },
+    {
+      "mineral": "Gold",
+      "outcome": "skipped",
+      "reason": "no Wikidata item is called 'Gold' and is a mineral species",
+      "attempts": 0,
+      "row": null,
+      "checks": [],
+      "review": null
+    },
+    {
+      "mineral": "Chrysocolla",
+      "outcome": "accepted",
+      "reason": "I found nothing wrong that matters.\n\n- **Class:** Chrysocolla is treated as a non-sulphide copper mineral, so copper-ore is the right class rather than copper-sulphide-ore.\n- **Quote:** It names chrysocolla among the copper oxide minerals in samples from the surficial parts of ore deposits. The surrounding abstract confirms these are copper ore samples from ancient Sierra Morena copper mines, so the quote is not taken out of context.\n- **Supports:** The sentence stays within the quote and openly says that smelting is not reported there. The quote therefore shows that chrysocolla is a copper ore mineral, not that this study observed it being smelted.\n- **Item, citation and notes:** The Wikidata item is the mineral itself, and the cited title and authors match the page. The \"copper silicate\" note agrees with the item's description as a phyllosilicate, and the grouping with oxide ores follows the source.",
+      "attempts": 2,
+      "row": {
+        "id": "chrysocolla",
+        "wikidata": "Q407485",
+        "mrds_ore": "Chrysocolla",
+        "class": "copper-ore",
+        "mined_like": "mine-malachite",
+        "citation": "Sabine Klein et al. (2009). The lead and copper isotopic composition of copper ores from the Sierra Morena (Spain). Journal of Iberian Geology.",
+        "url": "https://revistas.ucm.es/index.php/JIGE/article/download/JIGE0909120059A/32737",
+        "supports": "The sentence names chrysocolla as one of the copper oxide minerals that make up most of the samples, which come from the surficial sections of the ore deposits, though it does not itself report smelting.",
+        "quote": "Most samples consist of copper oxide minerals such as malachite, azurite and chrysocolla and stem from the surﬁcial sections of the ore deposits.",
+        "status": "",
+        "proposed_by": "ore-20261125-222345",
+        "notes": "A copper silicate mineral, grouped with the oxide ores of copper."
+      },
+      "checks": [
+        {
+          "name": "class_is_known",
+          "passed": true,
+          "detail": "copper-ore, mined like mine-malachite"
+        },
+        {
+          "name": "wikidata_item_is_the_mineral",
+          "passed": true,
+          "detail": "Q407485 is 'chrysocolla' (phyllosilicate mineral)"
+        },
+        {
+          "name": "wikidata_item_is_new",
+          "passed": true,
+          "detail": "Q407485 isn't in a crosswalk yet"
+        },
+        {
+          "name": "id_is_new",
+          "passed": true,
+          "detail": "the mineral's id will be 'chrysocolla'"
+        },
+        {
+          "name": "source_may_be_used",
+          "passed": true,
+          "detail": "the site may be cited"
+        },
+        {
+          "name": "cited_page_loads",
+          "passed": true,
+          "detail": "200, pdf, 40414 characters of text"
+        },
+        {
+          "name": "quote_is_on_the_page",
+          "passed": true,
+          "detail": "found word for word in the pdf page"
+        },
+        {
+          "name": "quote_names_the_mineral",
+          "passed": true,
+          "detail": "the quote names the mineral"
+        },
+        {
+          "name": "citation_check_passes",
+          "passed": true,
+          "detail": "possible in OpenAlex; its page loaded and the quote is on it"
+        }
+      ],
+      "review": {
+        "verdict": "accept",
+        "objections": [],
+        "summary": "I found nothing wrong that matters.\n\n- **Class:** Chrysocolla is treated as a non-sulphide copper mineral, so copper-ore is the right class rather than copper-sulphide-ore.\n- **Quote:** It names chrysocolla among the copper oxide minerals in samples from the surficial parts of ore deposits. The surrounding abstract confirms these are copper ore samples from ancient Sierra Morena copper mines, so the quote is not taken out of context.\n- **Supports:** The sentence stays within the quote and openly says that smelting is not reported there. The quote therefore shows that chrysocolla is a copper ore mineral, not that this study observed it being smelted.\n- **Item, citation and notes:** The Wikidata item is the mineral itself, and the cited title and authors match the page. The \"copper silicate\" note agrees with the item's description as a phyllosilicate, and the grouping with oxide ores follows the source."
+      }
+    },
+    {
+      "mineral": "Limonite",
+      "outcome": "skipped",
+      "reason": "no Wikidata item is called 'Limonite' and is a mineral species",
+      "attempts": 0,
+      "row": null,
+      "checks": [],
+      "review": null
+    },
+    {
+      "mineral": "Tetrahedrite",
+      "outcome": "accepted",
+      "reason": "I found nothing that matters. The quote stands on its own: it calls tetrahedrite a natural copper ore, mentions smelting it, and gives the formula Cu12Sb4S13, which shows both copper and sulphur. That meets the class's membership test, \"copper minerals that carry sulphur\".\n\nThe surrounding text agrees. \"Such an unusual chemical composition\" refers to Cu-Sb, as \"supports\" says, and nothing nearby contradicts the sentence or shifts it to another mineral. The page header and article number match the cited Frontiers in Earth Science paper. The Wikidata series item is a reasonable match for the name \"Tetrahedrite\" as a deposit list would use it.\n\nTwo limits for the person reviewing, neither needing a revision:\n- The passage says nothing about roasting before smelting, so it supports membership as a sulphur-bearing copper ore, not the processing route in the class description.\n- The authors attribute the point about smelting tetrahedrite to Li and Min (2016), which \"supports\" states openly.",
+      "attempts": 1,
+      "row": {
+        "id": "tetrahedrite",
+        "wikidata": "Q424282",
+        "mrds_ore": "Tetrahedrite",
+        "class": "copper-sulphide-ore",
+        "mined_like": "mine-malachite",
+        "citation": "Ruiliang Liu et al. (2021). Two Sides of the Same Coin: A Combination of Archaeometallurgy and Environmental Archaeology to Re-Examine the Hypothesis of Yunnan as the Source of Highly Radiogenic Lead in Early Dynastic China. Frontiers in Earth Science.",
+        "url": "https://www.frontiersin.org/articles/10.3389/feart.2021.662172/pdf",
+        "supports": "Citing Li and Min (2016), the sentence names tetrahedrite (Cu12Sb4S13, a sulphur-bearing formula) as an example of a natural mixed copper ore whose smelting could produce the unusual (Cu-Sb) composition under discussion.",
+        "quote": "As Li and Min (2016) pointed out, smelting of some natural mixed copper ores such as tetrahedrite Cu12Sb4S13 could also result in such an unusual chemical composition.",
+        "status": "",
+        "proposed_by": "ore-20261125-222345",
+        "notes": "A copper antimony sulphide (fahlore): a sulphur-bearing copper ore."
+      },
+      "checks": [
+        {
+          "name": "class_is_known",
+          "passed": true,
+          "detail": "copper-sulphide-ore, mined like mine-malachite"
+        },
+        {
+          "name": "wikidata_item_is_the_mineral",
+          "passed": true,
+          "detail": "Q424282 is 'tetrahedrite series' (sulfosalt series)"
+        },
+        {
+          "name": "wikidata_item_is_new",
+          "passed": true,
+          "detail": "Q424282 isn't in a crosswalk yet"
+        },
+        {
+          "name": "id_is_new",
+          "passed": true,
+          "detail": "the mineral's id will be 'tetrahedrite'"
+        },
+        {
+          "name": "source_may_be_used",
+          "passed": true,
+          "detail": "the site may be cited"
+        },
+        {
+          "name": "cited_page_loads",
+          "passed": true,
+          "detail": "200, pdf, 56527 characters of text"
+        },
+        {
+          "name": "quote_is_on_the_page",
+          "passed": true,
+          "detail": "found word for word in the pdf page"
+        },
+        {
+          "name": "quote_names_the_mineral",
+          "passed": true,
+          "detail": "the quote names the mineral"
+        },
+        {
+          "name": "citation_check_passes",
+          "passed": true,
+          "detail": "possible in OpenAlex; its page loaded and the quote is on it"
+        }
+      ],
+      "review": {
+        "verdict": "accept",
+        "objections": [],
+        "summary": "I found nothing that matters. The quote stands on its own: it calls tetrahedrite a natural copper ore, mentions smelting it, and gives the formula Cu12Sb4S13, which shows both copper and sulphur. That meets the class's membership test, \"copper minerals that carry sulphur\".\n\nThe surrounding text agrees. \"Such an unusual chemical composition\" refers to Cu-Sb, as \"supports\" says, and nothing nearby contradicts the sentence or shifts it to another mineral. The page header and article number match the cited Frontiers in Earth Science paper. The Wikidata series item is a reasonable match for the name \"Tetrahedrite\" as a deposit list would use it.\n\nTwo limits for the person reviewing, neither needing a revision:\n- The passage says nothing about roasting before smelting, so it supports membership as a sulphur-bearing copper ore, not the processing route in the class description.\n- The authors attribute the point about smelting tetrahedrite to Li and Min (2016), which \"supports\" states openly."
+      }
+    },
+    {
+      "mineral": "Pyrrhotite",
+      "outcome": "unsure",
+      "reason": "No passage says pyrrhotite was smelted or used as an ore of copper, iron or tin, or that it wasn't. Passages 1, 3, 4, 5 and 6 concern sulphide phases in slag, bloom metal or inclusions. Passage 2 only says iron minerals such as pyrrhotite are practically always present in ore from polymetallic bodies, which doesn't show whether it was smelted for any of these metals.",
+      "attempts": 1,
+      "row": null,
+      "checks": [],
+      "review": null
+    },
+    {
+      "mineral": "Silver",
+      "outcome": "skipped",
+      "reason": "no Wikidata item is called 'Silver' and is a mineral species",
+      "attempts": 0,
+      "row": null,
+      "checks": [],
+      "review": null
+    },
+    {
+      "mineral": "Molybdenite",
+      "outcome": "accepted",
+      "reason": "I found nothing wrong that matters. The quote stands on its own: it calls molybdenite the world's main source of molybdenum and rhenium, which supports \"none\" as an ore of another metal. \"Supports\" and the notes stay within the quote and its context (the page also gives MoS2). The only inference, that it is therefore an ore of metals other than copper, iron or tin, follows directly.\n\nThe surrounding text suggests that remnants of molybdenite, or its weathering products, in oxidised Sardinian copper ores may have passed an osmium signature into the smelted copper. This is incidental inclusion in a copper ore, not smelting molybdenite for copper, so it does not contradict the class.\n\nThe Wikidata item is the mineral itself. The page matches the cited PLoS ONE article by DOI and subject, and a peer-reviewed paper is adequate for this background fact.",
+      "attempts": 1,
+      "row": {
+        "id": "",
+        "wikidata": "Q382994",
+        "mrds_ore": "Molybdenite",
+        "class": "none",
+        "mined_like": "",
+        "citation": "Daniel Berger et al. (2025). Multiproxy analysis unwraps origin and fabrication biographies of Sardinian figurines: On the trail of metal-driven interaction and mixing practices in the early first millennium BCE. PLoS ONE.",
+        "url": "https://journals.plos.org/plosone/article/file?id=10.1371/journal.pone.0328268&type=printable",
+        "supports": "Molybdenite is a common mineral in ore deposits and the world's main source of molybdenum and rhenium, so it is an ore of metals other than copper, iron or tin.",
+        "quote": "Rhenium and osmium isotopes have been used for decades to date the formation of molybdenite, a common mineral in ore deposits and the world’s main source of molybdenum and rhenium.",
+        "status": "",
+        "proposed_by": "ore-20261125-222345",
+        "notes": "A molybdenum sulphide: the main source of molybdenum and rhenium."
+      },
+      "checks": [
+        {
+          "name": "class_is_known",
+          "passed": true,
+          "detail": "none"
+        },
+        {
+          "name": "wikidata_item_is_the_mineral",
+          "passed": true,
+          "detail": "Q382994 is 'molybdenite' (molybdenum sulfide mineral)"
+        },
+        {
+          "name": "wikidata_item_is_new",
+          "passed": true,
+          "detail": "Q382994 isn't in a crosswalk yet"
+        },
+        {
+          "name": "source_may_be_used",
+          "passed": true,
+          "detail": "the site may be cited"
+        },
+        {
+          "name": "cited_page_loads",
+          "passed": true,
+          "detail": "200, pdf, 163801 characters of text"
+        },
+        {
+          "name": "quote_is_on_the_page",
+          "passed": true,
+          "detail": "found word for word in the pdf page"
+        },
+        {
+          "name": "quote_names_the_mineral",
+          "passed": true,
+          "detail": "the quote names the mineral"
+        },
+        {
+          "name": "citation_check_passes",
+          "passed": true,
+          "detail": "not looked up: a rejected mineral's reference builds nothing"
+        }
+      ],
+      "review": {
+        "verdict": "accept",
+        "objections": [],
+        "summary": "I found nothing wrong that matters. The quote stands on its own: it calls molybdenite the world's main source of molybdenum and rhenium, which supports \"none\" as an ore of another metal. \"Supports\" and the notes stay within the quote and its context (the page also gives MoS2). The only inference, that it is therefore an ore of metals other than copper, iron or tin, follows directly.\n\nThe surrounding text suggests that remnants of molybdenite, or its weathering products, in oxidised Sardinian copper ores may have passed an osmium signature into the smelted copper. This is incidental inclusion in a copper ore, not smelting molybdenite for copper, so it does not contradict the class.\n\nThe Wikidata item is the mineral itself. The page matches the cited PLoS ONE article by DOI and subject, and a peer-reviewed paper is adequate for this background fact."
+      }
+    },
+    {
+      "mineral": "Scheelite",
+      "outcome": "accepted",
+      "reason": "The class \"none\" holds. The quoted sentence identifies scheelite as CaWO4, a calcium salt of tungstic acid, so it contains no copper, iron or tin and cannot be an ore of any of them. Nothing in the surrounding text contradicts this. The page discusses tungsten minerals, mainly wolframite, as contaminants in tin smelting. \"Supports\" adds only the direct reading of the formula, the notes match, and Q409096 is the mineral itself.\n\nTwo minor points for the person reviewing, neither needing a revision. The quote begins with the page's running header (\"97 HM 49(2) 2015 YOUNG & TAYLOR: TUNGSTEN-RICH MEDIEVAL TIN SLAGS\"), which is not part of the sentence. The citation gives 2021 while that header reads 2015; the authors and subject match the work named.",
+      "attempts": 1,
+      "row": {
+        "id": "",
+        "wikidata": "Q409096",
+        "mrds_ore": "Scheelite",
+        "class": "none",
+        "mined_like": "",
+        "citation": "Tim Young & Sean Taylor (2021). ‘Wolf rahm’: archaeological evidence for the veracity of an old term. Historical Metallurgy.",
+        "url": "https://hmsjournal.org/index.php/home/article/download/66/64",
+        "supports": "Scheelite, CaWO4, was shown by Scheele to be a calcium salt of tungstic acid, a composition that includes no copper, iron or tin.",
+        "quote": "97 HM 49(2) 2015 YOUNG & TAYLOR: TUNGSTEN-RICH MEDIEVAL TIN SLAGS Scheele (1781) investigated a mineral known in Swedish as ‘tungsten’ (literally ‘heavy stone’; now known as scheelite, CaWO4) and showed it was a calcium salt of a new acid, tungstic acid.",
+        "status": "",
+        "proposed_by": "ore-20261125-222345",
+        "notes": "A calcium tungstate: a tungsten mineral, not an ore of copper, iron or tin."
+      },
+      "checks": [
+        {
+          "name": "class_is_known",
+          "passed": true,
+          "detail": "none"
+        },
+        {
+          "name": "wikidata_item_is_the_mineral",
+          "passed": true,
+          "detail": "Q409096 is 'scheelite' (tungstate mineral)"
+        },
+        {
+          "name": "wikidata_item_is_new",
+          "passed": true,
+          "detail": "Q409096 isn't in a crosswalk yet"
+        },
+        {
+          "name": "source_may_be_used",
+          "passed": true,
+          "detail": "the site may be cited"
+        },
+        {
+          "name": "cited_page_loads",
+          "passed": true,
+          "detail": "200, pdf, 53641 characters of text"
+        },
+        {
+          "name": "quote_is_on_the_page",
+          "passed": true,
+          "detail": "found word for word in the pdf page"
+        },
+        {
+          "name": "quote_names_the_mineral",
+          "passed": true,
+          "detail": "the quote names the mineral"
+        },
+        {
+          "name": "citation_check_passes",
+          "passed": true,
+          "detail": "not looked up: a rejected mineral's reference builds nothing"
+        }
+      ],
+      "review": {
+        "verdict": "accept",
+        "objections": [],
+        "summary": "The class \"none\" holds. The quoted sentence identifies scheelite as CaWO4, a calcium salt of tungstic acid, so it contains no copper, iron or tin and cannot be an ore of any of them. Nothing in the surrounding text contradicts this. The page discusses tungsten minerals, mainly wolframite, as contaminants in tin smelting. \"Supports\" adds only the direct reading of the formula, the notes match, and Q409096 is the mineral itself.\n\nTwo minor points for the person reviewing, neither needing a revision. The quote begins with the page's running header (\"97 HM 49(2) 2015 YOUNG & TAYLOR: TUNGSTEN-RICH MEDIEVAL TIN SLAGS\"), which is not part of the sentence. The citation gives 2021 while that header reads 2015; the authors and subject match the work named."
+      }
+    }
+  ]
+}
