@@ -135,7 +135,10 @@ class Prompt:
     @classmethod
     def load(cls, name: str) -> Prompt:
         text = (PROMPTS / f"{name}.md").read_text(encoding="utf-8")
-        system, _, task = text.partition("\n---task---\n")
+        system, marker, task = text.partition("\n---task---\n")
+        if not marker or not task.strip():
+            # Without it the agent would get its role and an empty task, and answer nothing in particular.
+            raise ValueError(f"the prompt {name} has no task: it needs a line '---task---' and the task after it")
         return cls(system.strip(), Template(task.strip()), hashlib.sha256(text.encode()).hexdigest()[:12])
 
     def render(self, **values) -> str:

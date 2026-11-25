@@ -10,6 +10,7 @@ request with the user's own `gh` login. The run never merges: the pull request i
 from __future__ import annotations
 
 import json
+import logging
 import os
 import shutil
 import subprocess
@@ -24,6 +25,8 @@ from ..build import build
 from ..upstream import REFERENCES, WIKIDATA, WIKIDATA_ITEMS, back_up, fetch
 from .ore_candidates import Check
 
+log = logging.getLogger(__name__)
+
 RUNS_DIR = Path("data") / "agent_runs"
 # What a build sets in the environment for dbt (build.dbt_environment).
 DBT_ENVIRONMENT = ("CAPABILITIES_BUILD_DIR", "DBT_LOG_PATH", "DBT_TARGET_PATH", "DO_NOT_TRACK")
@@ -34,6 +37,15 @@ FOUND = ("found", "review_found")
 
 class BranchError(Exception):
     """git or gh failed."""
+
+
+@dataclass(frozen=True)
+class Proposals:
+    """What a run's proposals are published as: the pull request's title and body, and the commit's subject."""
+
+    title: str
+    body: str
+    commit: str  # a conventional commit, as every commit in the repository is
 
 
 @dataclass(frozen=True)
@@ -59,13 +71,23 @@ class Worktree:
         return self
 
     def __exit__(self, *exc) -> None:
+        # Cleaning up mustn't fail the run, nor hide the error that ended it: a leftover is only warned about.
+        try:
+            self._remove()
+        except BranchError as error:
+            log.warning("Couldn't remove the worktree %s: %s", self.root, error)
+        if not self.pushed:
+            try:
+                git(self.repo, "branch", "-D", self.branch)
+            except BranchError as error:
+                log.warning("Couldn't delete the branch %s: %s", self.branch, error)
+
+    def _remove(self) -> None:
         try:
             git(self.repo, "worktree", "remove", "--force", str(self.root))
         except BranchError:
             shutil.rmtree(self.root, ignore_errors=True)
             git(self.repo, "worktree", "prune")
-        if not self.pushed:
-            git(self.repo, "branch", "-D", self.branch)
 
     def restore_crosswalk(self) -> None:
         git(self.root, "checkout", "--", str(ORE_CROSSWALK))
@@ -129,7 +151,7 @@ def work_check(row: dict, checks: dict[str, dict]) -> Check:
     return Check("cited_work_is_found", False, f"{result}: {found['note'] or 'not found in OpenAlex or Crossref'}")
 
 
-def publish(worktree: Worktree, build_dir: Path, run_id: str, summary: dict, title: str, body: str, gh: str) -> str:
+def publish(worktree: Worktree, build_dir: Path, run_id: str, summary: dict, proposals: Proposals, gh: str) -> str:
     """Commit the rows with what goes with them, push the branch, and open a draft pull request. Returns its URL."""
     root = worktree.root
     for dataset in (WIKIDATA, WIKIDATA_ITEMS, REFERENCES):
@@ -139,14 +161,14 @@ def publish(worktree: Worktree, build_dir: Path, run_id: str, summary: dict, tit
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(summary, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     git(root, "add", "--", str(ORE_CROSSWALK), str(RUNS_DIR), "snapshots", "CREDITS.md")
-    git(root, "commit", "-m", title, "-m", f"Run summary: {RUNS_DIR / f'{run_id}.json'}. Every reference is "
+    git(root, "commit", "-m", proposals.commit, "-m", f"Run summary: {RUNS_DIR / f'{run_id}.json'}. Every reference is "
         "unverified until a person reads it.")
     git(root, "push", "-u", "origin", worktree.branch)
     worktree.pushed = True
     body_file = build_dir / "pull-request.md"
-    body_file.write_text(body, encoding="utf-8")
+    body_file.write_text(proposals.body, encoding="utf-8")
     return _run([gh, "pr", "create", "--draft", "--base", worktree.base.removeprefix("origin/"), "--head",
-                 worktree.branch, "--title", title, "--body-file", str(body_file)], cwd=root).splitlines()[-1]
+                 worktree.branch, "--title", proposals.title, "--body-file", str(body_file)], cwd=root).splitlines()[-1]
 
 
 def _refresh_credits(root: Path) -> None:

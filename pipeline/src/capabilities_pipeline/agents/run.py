@@ -23,7 +23,7 @@ from capabilities.built import current_graph, load_queue
 
 from ..build import BuildError, git_commit
 from .audit import AUDIT_FILE, AuditLog, audit_dir_for
-from .branch import BranchError, Downloads, Worktree, check_gh, gate, publish, work_check
+from .branch import BranchError, Downloads, Proposals, Worktree, check_gh, gate, publish, work_check
 from .claude import UsageLimitReached, check_login
 from .curate import Curator, ItemResult, Settings, new_run_id
 from .ore_candidates import Candidate, Context, evaluation_set, queue_candidates, write_crosswalk
@@ -59,6 +59,7 @@ class Run:
         self.results: list[ItemResult] = []
         self.stopped: str | None = None
         self.unpublished: str | None = None  # why accepted rows weren't checked together or published, if they weren't
+        self.failed: str | None = None  # the error that ended the run early, if one did
         self.answers: dict[str, dict] = {}
 
     @property
@@ -70,27 +71,41 @@ class Run:
         if self.opens_pull_request:
             check_gh(self.settings.gh_command)
         candidates, context = self._items(build_dir)
+        pull_request = None
         with AuditLog(self.audit_dir / AUDIT_FILE) as audit:
             self.curator = Curator(self.run_id, self.settings, context, audit, self.web, self.on_progress)
             audit.run_started(self.run_id, TASK, self.mode, asdict(self.settings) | {"prompts": self.curator.prompt_versions()},
                               self.login, git_commit(self.root))
-            self._curate(candidates)
-            accepted = [result for result in self.results if result.outcome == "accepted"]
-            pull_request = None
             try:
-                pull_request = self._settle(accepted, audit) if accepted else None
-            except (urllib.error.URLError, TimeoutError, ConnectionError, BranchError) as error:
-                # The proposals are in the audit log, accepted; only checking them together, or publishing, failed.
-                self.unpublished = f"{type(error).__name__}: {error}"
-                self.on_progress(f"No pull request: {self.unpublished}")
-            summary = self.summary()
-            audit.run_ended(self.run_id, self.stopped, summary["outcomes"], pull_request, summary["usage"])
+                pull_request = self._curate_and_settle(candidates, audit)
+            except BaseException as error:
+                # Whatever stops the run (a bug, Dagster terminating it, ^C), what it did so far is still recorded.
+                self.failed = f"{type(error).__name__}: {error}"
+                raise
+            finally:
+                summary = self.summary()
+                audit.run_ended(self.run_id, self.stopped or self.failed, summary["outcomes"], pull_request,
+                                summary["usage"])
+                self._keep_summary(summary, pull_request)
+        return RunReport(self.run_id, self.results, self.stopped, pull_request, summary)
+
+    def _curate_and_settle(self, candidates: list[Candidate], audit: AuditLog) -> str | None:
+        self._curate(candidates)
+        accepted = [result for result in self.results if result.outcome == "accepted"]
+        try:
+            return self._settle(accepted, audit) if accepted else None
+        except (urllib.error.URLError, TimeoutError, ConnectionError, BranchError) as error:
+            # The proposals are in the audit log, accepted; only checking them together, or publishing, failed.
+            self.unpublished = f"{type(error).__name__}: {error}"
+            self.on_progress(f"No pull request: {self.unpublished}")
+            return None
+
+    def _keep_summary(self, summary: dict, pull_request: str | None) -> None:
         # Every run's summary is kept beside the audit log; a pull request also carries it (branch.py).
         path = self.audit_dir / "runs" / f"{self.run_id}.json"
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(summary | {"pull_request": pull_request}, indent=2, ensure_ascii=False) + "\n",
                         encoding="utf-8")
-        return RunReport(self.run_id, self.results, self.stopped, pull_request, summary)
 
     def _items(self, build_dir: Path) -> tuple[list[Candidate], Context]:
         if self.settings.evaluate:
@@ -125,9 +140,13 @@ class Run:
                 if not passing or not self.opens_pull_request:
                     return None
                 summary = self.summary()
-                title = f"Agent proposals: {_count(len(passing), 'ore mineral')} (run {self.run_id})"
-                url = publish(worktree, build_dir, self.run_id, summary, title, pull_request_body(summary),
-                              self.settings.gh_command)
+                rows = _count(len(passing), 'ore mineral')
+                proposals = Proposals(
+                    title=f"Agent proposals: {rows} (run {self.run_id})",
+                    body=pull_request_body(summary),
+                    commit=f"feat(data): agent proposals for {rows} (run {self.run_id})",
+                )
+                url = publish(worktree, build_dir, self.run_id, summary, proposals, self.settings.gh_command)
                 self.on_progress(f"Opened a draft pull request: {url}")
                 return url
 
@@ -172,10 +191,13 @@ class Run:
             "started_at": self.started_at,
             "finished_at": _now(),
             "models": {"proposer": self.settings.proposer_model, "reviewer": self.settings.reviewer_model},
+            # What the aliases above meant on the day: the models the calls actually ran on.
+            "model_ids": dict(self.curator.model_ids),
             "prompts": self.curator.prompt_versions(),
             "plan": self.login.get("plan"),
             "stopped_because": self.stopped,
             "not_published_because": self.unpublished,
+            "failed_because": self.failed,
             "outcomes": outcomes,
             "usage": asdict(self.curator.usage),
             "items": [result.summary() for result in self.results],
@@ -217,16 +239,16 @@ def pull_request_body(summary: dict) -> str:
     ]
     for item in accepted:
         row = item["row"]
-        lines.append(f"| {item['mineral']} | `{row['class']}` | [{row['wikidata']}](https://www.wikidata.org/wiki/"
+        lines.append(f"| {_cell(item['mineral'])} | `{row['class']}` | [{row['wikidata']}](https://www.wikidata.org/wiki/"
                      f"{row['wikidata']}) | [{_cell(row['citation'])}]({row['url']}) | {_cell(row['quote'])} |")
     if others := [item for item in items if item["outcome"] != "accepted"]:
         lines += ["", "Not proposed; they stay in the curation queue:", ""]
-        lines += [f"- {item['mineral']}: {item['outcome']}: {_cell((item['reason'] or '').splitlines()[0] if item['reason'] else '')}"
+        lines += [f"- {_cell(item['mineral'])}: {item['outcome']}: {_cell((item['reason'] or '').splitlines()[0] if item['reason'] else '')}"
                   for item in others]
     usage = summary["usage"]
     lines += [
         "",
-        f"Models: proposer `{summary['models']['proposer']}`, reviewer `{summary['models']['reviewer']}`. Prompts: "
+        f"Models: proposer {_model(summary, 'proposer')}, reviewer {_model(summary, 'reviewer')}. Prompts: "
         f"`{summary['prompts']['proposer']}`, `{summary['prompts']['reviewer']}`. {usage['calls']} calls, "
         f"{usage['web_searches']} searches, {usage['web_fetches']} pages fetched. Plan usage: five-hour "
         f"{_share(usage['first_limits'].get('five_hour'))} → {_share(usage['limits'].get('five_hour'))}, weekly "
@@ -240,7 +262,14 @@ def pull_request_body(summary: dict) -> str:
 
 
 def _cell(text: str) -> str:
-    return " ".join(text.split()).replace("|", "\\|")
+    """Text from a page or an agent, made safe for one table cell: on one line, and with a word joiner after every @, so
+    that a quote saying "@someone" doesn't notify a GitHub user of that name when the pull request opens."""
+    return " ".join(text.split()).replace("|", "\\|").replace("@", "@\u2060")
+
+
+def _model(summary: dict, role: str) -> str:
+    ran = summary.get("model_ids", {}).get(role)
+    return f"`{summary['models'][role]}`" + (f" (`{ran}`)" if ran else "")
 
 
 def _share(value: float | None) -> str:

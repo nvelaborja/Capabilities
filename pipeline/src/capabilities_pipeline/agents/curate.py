@@ -52,6 +52,16 @@ class Settings:
     claude_command: str = "claude"
     gh_command: str = "gh"
 
+    def __post_init__(self):
+        # A threshold is a share, 0 to 1, as Claude Code reports usage: 80 for 80% would never be reached, and the run
+        # would go on until the plan's limit locks its owner out.
+        for name in ("stop_at_five_hour", "stop_at_seven_day"):
+            if not 0 < getattr(self, name) <= 1:
+                raise ValueError(f"{name} is a share of the plan's usage, above 0 and at most 1 (0.8 for 80%), "
+                                 f"not {getattr(self, name)}")
+        if self.items < 1 or self.attempts < 1:
+            raise ValueError("a run needs at least one item, and each item at least one attempt")
+
 
 @dataclass
 class ItemResult:
@@ -118,6 +128,7 @@ class Curator:
         self.proposer_prompt = Prompt.load("ore_proposer")
         self.reviewer_prompt = Prompt.load("ore_reviewer")
         self.usage = Usage()
+        self.model_ids: dict[str, str] = {}  # the model each role last ran on, as Claude Code reported it
 
     def prompt_versions(self) -> dict:
         return {"proposer": self.proposer_prompt.version, "reviewer": self.reviewer_prompt.version}
@@ -180,8 +191,11 @@ class Curator:
             self.audit.call(self.run_id, candidate.name, attempt, role, prompt.version, claude.settings(), task,
                             error=f"{type(error).__name__}: {error}")
             raise
-        self.audit.call(self.run_id, candidate.name, attempt, role, prompt.version, claude.settings(), task, answer)
+        self.audit.call(self.run_id, candidate.name, attempt, role, prompt.version,
+                        claude.settings() | {"model_id": answer.model}, task, answer)
         self.usage.add(answer)
+        if answer.model:
+            self.model_ids[role] = answer.model
         return answer
 
     def _finish(self, result: ItemResult) -> ItemResult:

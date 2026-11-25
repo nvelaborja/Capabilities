@@ -45,7 +45,7 @@ The Dagster job `agent_curation` ([ADR 0048](../../adr/0048-run-agents-through-c
 
 1. **Before anything:** `claude auth status` must say `claude.ai`, no API key may be set, and `gh` must be logged in.
 2. **Propose:** the proposer (web search and fetch, 30 turns) answers with a Wikidata item, an ore class or `none`, a citation, a URL, a quote and what it supports, or `unsure`.
-3. **Check:** code reads the Wikidata item and downloads the cited page (HTML, PDF via pypdf, or text), and looks for the quote word for word.
+3. **Check:** code reads the Wikidata item and downloads the cited page (HTML, PDF via pypdf, or text) if it is on the public web, and looks for the quote word for word.
 4. **Challenge:** the reviewer (no tools, 3 turns) gets the proposal and the downloaded text around the quote, never the proposer's searches, and accepts, asks for a revision, or rejects.
 5. **Gate and pull request:** accepted rows are written into a temporary worktree, the downloads they need are made and the graph built; rows whose cited work isn't found are dropped; the rest become a draft pull request.
 
@@ -77,6 +77,8 @@ cd .. && python3 -c "import duckdb; duckdb.sql(\"select item, outcome, reason fr
 
 - **An API key in the environment changes who pays.** The run refuses to start with one set, rather than unset it silently.
 - **Your own Claude use and the agents share the limits.** A run that stops at 80% leaves you the rest of the window.
+- **`opus` is an alias.** It moves to newer models; the model a call actually ran on is in its `system` `init` event, and the audit log and run summary keep both.
+- **The agent chooses what the pipeline downloads.** A page could tell it what to cite, so the download refuses anything off the public web (this machine, its network, a cloud's metadata address), redirects included.
 - **Each call starts clean.** No saved session, no CLAUDE.md, no plugins: what the agent knows is its system prompt and the task. That keeps results reproducible from the prompt version.
 - **`total_cost_usd` is what the tokens would cost on the API.** A subscription doesn't charge it. It is recorded to compare prompts and models, not as a bill.
 - **Structured output takes a turn.** A role with no tools still needs two turns: its answer, and the `StructuredOutput` call.

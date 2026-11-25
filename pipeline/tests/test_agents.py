@@ -8,6 +8,7 @@ items come from a fake web, and the gate's downloads go to the local Wikidata, O
 import csv
 import json
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -21,7 +22,8 @@ import yaml
 
 from capabilities_pipeline.agents import claude as claude_module
 from capabilities_pipeline.agents.audit import AUDIT_FILE
-from capabilities_pipeline.agents.branch import Downloads
+from capabilities_pipeline.agents import ore_candidates as ore_candidates_module
+from capabilities_pipeline.agents.branch import Downloads, Worktree
 from capabilities_pipeline.agents.claude import (
     AgentError,
     ClaudeCode,
@@ -35,13 +37,14 @@ from capabilities_pipeline.agents.ore_candidates import (
     ORE_CLASSES,
     Candidate,
     Context,
+    Prompt,
     Proposal,
     check,
     evaluation_set,
     write_crosswalk,
 )
-from capabilities_pipeline.agents.run import run_ore_candidates, score
-from capabilities_pipeline.agents.web import Page, WikidataItem, html_text, locate, read
+from capabilities_pipeline.agents.run import pull_request_body, run_ore_candidates, score
+from capabilities_pipeline.agents.web import Page, Web, WikidataItem, html_text, locate, not_public, read
 
 FAKE_CLAUDE = Path(__file__).parent / "fixtures" / "agents" / "fake_claude.py"
 COVELLITE = Candidate("Covellite", "Listed as an ore mineral on 816 MRDS deposits of copper, iron, tin.")
@@ -161,6 +164,8 @@ class TestCallingClaudeCode:
                                      {"name": "WebFetch", "input": {"url": PAGE_URL, "prompt": "Quote it."}}]
         assert result.limits == {"five_hour": 0.5, "seven_day": 0.1}
         assert result.cost_usd == 0.25 and result.usage["output_tokens"] == 100
+        # the role asked for an alias; the answer says which model that meant
+        assert result.model == "claude-opus-5-5"
 
     @pytest.mark.parametrize("scripted, error", [
         pytest.param({"limit": True}, UsageLimitReached, id="the plan's limit is reached"),
@@ -356,8 +361,10 @@ class TestCurating:
         report = run(repo_root, built_dir, fake_claude, audit_dir=tmp_path / "audit", items=1)
         audit = tmp_path / "audit"
         calls = audit_rows(audit, "select role, attempt, json_extract_string(tool_calls, '$[0].input.query'), "
-                                  "json_extract_string(settings, '$.model') from calls order by attempt")
-        assert calls == [("proposer", 1, "galena", "opus"), ("proposer", 2, None, "opus")]
+                                  "json_extract_string(settings, '$.model'), json_extract_string(settings, '$.model_id') "
+                                  "from calls order by attempt")
+        assert calls == [("proposer", 1, "galena", "opus", "claude-opus-5-5"),
+                         ("proposer", 2, None, "opus", "claude-opus-5-5")]
         assert ("quote_is_on_the_page", False) in audit_rows(audit, "select name, passed from checks")
         assert audit_rows(audit, "select item, outcome from outcomes") == [("Galena", "unsure")]
         assert audit_rows(audit, "select run_id, mode, json_extract_string(login, '$.plan') from run_starts") == [
@@ -365,6 +372,29 @@ class TestCurating:
         assert audit_rows(audit, "select count(*) from run_ends") == [(1,)]
         summary = json.loads((audit / "runs" / f"{report.run_id}.json").read_text())
         assert summary["usage"]["calls"] == 2 and summary["usage"]["web_searches"] == 1
+        assert summary["model_ids"] == {"proposer": "claude-opus-5-5"} and summary["failed_because"] is None
+
+    def test_a_run_that_breaks_still_records_its_end_and_its_summary(self, repo_root, built_dir, fake_claude, tmp_path):
+        class Broken(FakeWeb):
+            def page(self, url):
+                raise RuntimeError("a bug in reading pages")
+
+        fake_claude.script(proposer=[answer(GOOD)])
+        with pytest.raises(RuntimeError):
+            run(repo_root, built_dir, fake_claude, web=Broken(), audit_dir=tmp_path / "audit", items=1)
+        ends = audit_rows(tmp_path / "audit", "select run_id, stopped_because from run_ends")
+        assert len(ends) == 1 and ends[0][1] == "RuntimeError: a bug in reading pages"
+        summary = json.loads((tmp_path / "audit" / "runs" / f"{ends[0][0]}.json").read_text())
+        assert summary["failed_because"] == "RuntimeError: a bug in reading pages" and summary["usage"]["calls"] == 1
+
+    @pytest.mark.parametrize("changes", [
+        pytest.param({"stop_at_five_hour": 80}, id="a five-hour threshold given as a percentage"),
+        pytest.param({"stop_at_seven_day": 0}, id="a weekly threshold of nothing"),
+        pytest.param({"items": 0}, id="no items"),
+    ])
+    def test_settings_that_would_never_stop_or_never_start_are_refused(self, fake_claude, changes):
+        with pytest.raises(ValueError):
+            settings(fake_claude, **changes)
 
 
 class TestEvaluating:
@@ -390,6 +420,35 @@ class TestEvaluating:
         ]
         assert score(results, answers) == {"items": 2, "proposed": 2, "right": 1, "accepted": 2, "accepted_right": 1,
                                            "accepted_wrong": 1}
+
+
+class TestThePullRequestText:
+    def test_text_from_a_page_or_an_agent_notifies_nobody(self):
+        row = {"class": "copper-ore", "wikidata": "Q1", "citation": "Blog of @someone", "url": PAGE_URL,
+               "quote": "As @someone showed, covellite was smelted."}
+        summary = {
+            "run": "ore-1", "models": {"proposer": "opus", "reviewer": "opus"}, "model_ids": {"proposer": "claude-opus-5-5"},
+            "prompts": {"proposer": "a", "reviewer": "b"},
+            "usage": {"calls": 2, "web_searches": 1, "web_fetches": 1, "first_limits": {}, "limits": {}},
+            "items": [{"mineral": "Covellite", "outcome": "accepted", "reason": "", "row": row},
+                      {"mineral": "Galena", "outcome": "rejected", "reason": "@reviewer said no", "row": None}],
+        }
+        body = pull_request_body(summary)
+        # then: no @ is followed by a name, so GitHub mentions nobody; a reader still sees "@someone"
+        assert re.search(r"@\w", body) is None
+        assert body.count("@\u2060someone") == 2 and "@\u2060reviewer" in body
+        assert "proposer `opus` (`claude-opus-5-5`)" in body
+
+
+class TestPrompts:
+    def test_a_prompt_without_its_task_is_refused(self, tmp_path, monkeypatch):
+        (tmp_path / "broken.md").write_text("You review minerals.\n\nThe mineral: $name.\n")
+        monkeypatch.setattr(ore_candidates_module, "PROMPTS", tmp_path)
+        with pytest.raises(ValueError, match="---task---"):
+            Prompt.load("broken")
+
+    def test_the_prompts_in_the_repository_have_their_tasks(self):
+        assert Prompt.load("ore_proposer").task.template and Prompt.load("ore_reviewer").task.template
 
 
 class TestTheRepository:
@@ -510,7 +569,8 @@ def published(repo_root, tmp_path_factory, wikidata_endpoint, scholarly_endpoint
                 wikidata_endpoint.extra_items.remove(item)
     branch = f"agents/{report.run_id}"
     show = lambda path: _git(directory / "origin.git", "show", f"{branch}:{path}")  # noqa: E731
-    return {"report": report, "repo": repo, "show": show, "gh": (directory / "gh-calls.txt").read_text().splitlines(),
+    subject = _git(directory / "origin.git", "log", "-1", "--format=%s", branch)
+    return {"report": report, "repo": repo, "show": show, "subject": subject, "gh": (directory / "gh-calls.txt").read_text().splitlines(),
             "audit": directory / "audit", "branch": branch, "build_dir_setting": build_dir_setting,
             "build_dir": directory / "build"}
 
@@ -521,6 +581,12 @@ class TestThePullRequest:
         gh = published["gh"]
         assert gh[:2] == ["auth", "status"]
         assert ["pr", "create", "--draft", "--base", "main", "--head", published["branch"]] == gh[2:9]
+
+    def test_the_commit_is_a_conventional_one_and_the_title_reads_plainly(self, published):
+        run_id = published["report"].run_id
+        assert published["subject"] == f"feat(data): agent proposals for 2 ore minerals (run {run_id})"
+        gh = published["gh"]
+        assert gh[gh.index("--title") + 1] == f"Agent proposals: 2 ore minerals (run {run_id})"
 
     def test_each_row_is_unverified_and_names_its_run_and_quote(self, published):
         rows = {row["mrds_ore"]: row for row in csv.DictReader(
@@ -576,9 +642,50 @@ class TestWhenTheWebFails:
         failed = {c.name: c.detail for c in checks if not c.passed}
         assert failed == {"wikidata_item_is_the_mineral": "Wikidata couldn't be reached: <urlopen error connection refused>"}
 
+    @pytest.mark.parametrize("url", [
+        pytest.param("http://127.0.0.1:8000/api/graph", id="this machine"),
+        pytest.param("http://localhost:3070/", id="this machine by name"),
+        pytest.param("http://192.168.1.1/", id="the local network"),
+        pytest.param("http://169.254.169.254/latest/meta-data/", id="a cloud's metadata service"),
+        pytest.param("http://[::1]/", id="this machine over IPv6"),
+    ])
+    def test_a_citation_never_leads_the_download_off_the_public_web(self, url):
+        # Refused before connecting: nothing is listening at these in the tests, and nothing is asked of the network.
+        page = Web().page(url)
+        assert page.status.startswith("not a public web address") and not page.loaded
+
+    def test_a_public_address_is_public(self):
+        assert not_public("http://93.184.215.14/") is None
+
+    def test_a_redirect_off_the_public_web_isnt_followed(self):
+        import urllib.error
+        import urllib.request
+
+        from capabilities_pipeline.agents.web import _PublicRedirects
+
+        request = urllib.request.Request("http://93.184.215.14/")
+        with pytest.raises(urllib.error.URLError, match="not a public web address"):
+            _PublicRedirects().redirect_request(request, None, 302, "Found", {}, "http://127.0.0.1:3070/")
+
     def test_a_page_in_a_charset_python_doesnt_know_is_read_as_utf8(self):
         page = read(PAGE_URL, "200", "Covellite – roasted.".encode(), "text/plain", "utf8mb4")
         assert page.text == "Covellite – roasted."
+
+
+class TestCleaningUp:
+    def test_a_cleanup_that_fails_neither_fails_the_run_nor_hides_its_error(self, tmp_path, caplog):
+        repo = tmp_path / "repo"
+        _git(tmp_path, "init", "-q", "-b", "main", str(repo))
+        _git(repo, "-c", "user.email=t@example.org", "-c", "user.name=T", "commit", "-q", "--allow-empty", "-m", "first")
+        # when: the run fails, after its branch was already deleted, so cleaning up can't delete it
+        with pytest.raises(ValueError, match="the run's own error"):
+            with Worktree(repo, "agents/test", "main", tmp_path / "worktree") as worktree:
+                _git(worktree.root, "checkout", "-q", "--detach")
+                _git(repo, "branch", "-D", "agents/test")
+                raise ValueError("the run's own error")
+        # then: the run's error is what is raised, the worktree is gone, and the leftover is only warned about
+        assert not (tmp_path / "worktree").exists()
+        assert "Couldn't delete the branch agents/test" in caplog.text
 
 
 class TestTheDagsterJob:

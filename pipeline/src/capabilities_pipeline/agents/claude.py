@@ -47,6 +47,8 @@ class Answer:
     num_turns: int | None
     duration_ms: int | None
     events: list[dict] = field(repr=False, default_factory=list)  # everything the call printed, for the audit log
+    # The model the call ran on (claude-opus-5-5), where the role names an alias (opus) that moves to newer models.
+    model: str | None = None
 
 
 @dataclass(frozen=True)
@@ -119,6 +121,8 @@ def parse(stdout: str, stderr: str = "", returncode: int = 0) -> Answer:
             for block in (event.get("message") or {}).get("content") or []:
                 if block.get("type") in ("tool_use", "server_tool_use") and block.get("name") != "StructuredOutput":
                     tool_calls.append({"name": block.get("name"), "input": block.get("input")})
+    model = next((event.get("model") for event in events
+                  if event.get("type") == "system" and event.get("subtype") == "init"), None)
     result = next((event for event in reversed(events) if event.get("type") == "result"), None)
     if result is None:
         message = (stderr or stdout).strip()[-500:]
@@ -144,6 +148,7 @@ def parse(stdout: str, stderr: str = "", returncode: int = 0) -> Answer:
         num_turns=result.get("num_turns"),
         duration_ms=result.get("duration_ms"),
         events=events,
+        model=model,
     )
 
 

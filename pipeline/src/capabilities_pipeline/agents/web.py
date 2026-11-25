@@ -9,8 +9,10 @@ from __future__ import annotations
 
 import http.client
 import io
+import ipaddress
 import json
 import re
+import socket
 import unicodedata
 import urllib.error
 import urllib.parse
@@ -65,9 +67,11 @@ class Web:
         try:
             if urllib.parse.urlsplit(url).scheme.lower() not in ("http", "https"):
                 return Page(url, "not a web address")
+            if why := not_public(url):
+                return Page(url, f"not a public web address: {why}")
             request = urllib.request.Request(url, headers={
                 "User-Agent": self.user_agent, "Accept": "text/html,application/pdf,text/plain;q=0.9,*/*;q=0.5"})
-            with urllib.request.urlopen(request, timeout=TIMEOUT_S) as response:
+            with _PUBLIC_ONLY.open(request, timeout=TIMEOUT_S) as response:
                 body = response.read(MAX_BYTES + 1)
                 content_type = response.headers.get_content_type()
                 charset = response.headers.get_content_charset() or "utf-8"
@@ -104,6 +108,35 @@ class Web:
             description=english("descriptions").get("value"),
             aliases=tuple(alias["value"] for alias in (entity.get("aliases") or {}).get("en") or []),
         )
+
+
+def not_public(url: str) -> str | None:
+    """Why a URL isn't on the public web, or None if it is. The agent chooses what the pipeline downloads, after reading
+    pages that may tell it what to cite, so a citation must never lead the pipeline to this machine or its network (the
+    Dagster UI, the app's server, a router)."""
+    host = urllib.parse.urlsplit(url).hostname
+    if not host:
+        return "no host"
+    try:
+        addresses = {info[4][0] for info in socket.getaddrinfo(host, None)}
+    except (socket.gaierror, UnicodeError):
+        return None  # nothing to connect to: the download fails as unreachable, which says it better
+    for address in addresses:
+        if not ipaddress.ip_address(address.split("%")[0]).is_global:
+            return f"{host} is {address}, a private, loopback or reserved address"
+    return None
+
+
+class _PublicRedirects(urllib.request.HTTPRedirectHandler):
+    """Follows a redirect only to the public web: a public page mustn't be able to send the download somewhere private."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if why := not_public(newurl):
+            raise urllib.error.URLError(f"redirected to {newurl}, not a public web address: {why}")
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+_PUBLIC_ONLY = urllib.request.build_opener(_PublicRedirects)
 
 
 def read(url: str, status: str, body: bytes, content_type: str, charset: str) -> Page:

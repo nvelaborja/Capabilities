@@ -374,22 +374,22 @@ every call, check and outcome ──▶ audit/agents.duckdb (append-only), and t
 | Preflight | `claude.check_login`, `branch.check_gh` | `claude auth status` says `claude.ai` and no API key is set; `gh` is logged in. Before anything is spent. |
 | Items | `ore_candidates.queue_candidates`, `evaluation_set` | The first N `ore_candidate` items of the current build's queue, most widely listed first. An evaluation takes the minerals a person decided instead, treating their rows as undecided. |
 | Propose | `curate.Curator`, `prompts/ore_proposer.md` | Opus 5.5 (by default) with web search and fetch, 30 turns, answering to `PROPOSAL_SCHEMA`: Wikidata item, class or `none`, citation, URL, quote, supports, notes; or `unsure`. |
-| Check | `ore_candidates.check`, `web.py` | The class has a route to be mined like (the one its rows use); the Wikidata item exists, wasn't merged, is called the mineral's name, and is in no crosswalk; the id is new; the site may be cited (not Mindat); the page loads; the quote (40 to 1,000 characters) is on it word for word, ignoring case and typography, and names the mineral. |
+| Check | `ore_candidates.check`, `web.py` | The class has a route to be mined like (the one its rows use); the Wikidata item exists, wasn't merged, is called the mineral's name, and is in no crosswalk; the id is new; the site may be cited (not Mindat); the page is on the public web (never this machine or its network, nor a redirect there) and loads; the quote (40 to 1,000 characters) is on it word for word, ignoring case and typography, and names the mineral. |
 | Challenge | `prompts/ore_reviewer.md` | Opus 5.5 with no tools, 3 turns: the proposal, the Wikidata item and 2,500 characters each side of the quote, as downloaded. `REVIEW_SCHEMA`: accept, revise or reject, with objections. |
 | Gate | `branch.gate`, `branch.work_check` | Downloads `wikidata_items`, `wikidata_quantities` and `reference_candidates` for the worktree, and builds it. A row passes when its cited work is `found` or `review_found`, or is a web page whose link works; a rejected mineral's (`none`) isn't looked up. |
-| Publish | `branch.publish` | The crosswalk, the three refreshed backups, `CREDITS.md` and `data/agent_runs/<run>.json`, in one commit on `agents/<run>`; a draft pull request titled "Agent proposals: …". |
+| Publish | `branch.publish` | The crosswalk, the three refreshed backups, `CREDITS.md` and `data/agent_runs/<run>.json`, in one commit on `agents/<run>` (`feat(data): agent proposals for …`); a draft pull request titled "Agent proposals: …". Text from pages and agents in its body can't mention anyone on GitHub. |
 
-A run stops before its next item when the plan's five-hour usage, as Claude Code last reported it, reaches `stop_at_five_hour` (0.8) or the weekly reaches `stop_at_seven_day` (0.9), and at once if a call says the limit is reached. What was accepted before it stopped still goes through the gate.
+A run stops before its next item when the plan's five-hour usage, as Claude Code last reported it, reaches `stop_at_five_hour` (0.8) or the weekly reaches `stop_at_seven_day` (0.9), and at once if a call says the limit is reached. The thresholds are shares (0.8, not 80): a run refuses anything outside 0 to 1, which would never stop it. What was accepted before it stopped still goes through the gate.
 
 **The audit log** (`audit/agents.duckdb`, not in git; `agents/audit.py`). Rows are only ever added:
 
 | Table | One row per |
 |---|---|
 | `run_starts` | Run started: its id, task, mode (`propose` or `evaluate`), settings with the prompts' versions, login method and plan, and git commit |
-| `calls` | Call to an agent: item, attempt, role, prompt version, model and settings, the prompt, the answer, every tool call (searches and URLs), token usage, API-equivalent cost, the plan's usage after it, turns, time, error, and every event printed |
+| `calls` | Call to an agent: item, attempt, role, prompt version, model (the alias asked for and the model it ran on) and settings, the prompt, the answer, every tool call (searches and URLs), token usage, API-equivalent cost, the plan's usage after it, turns, time, error, and every event printed |
 | `checks` | Mechanical check: its name, whether it passed, and why |
 | `outcomes` | Item's outcome (`accepted`, `rejected`, `sent_back`, `unsure`, `failed`) and reason, with the row when accepted. A later row for the same item (dropped at the gate) supersedes an earlier one |
-| `run_ends` | Run finished: why it stopped early, if it did, the outcomes, the pull request, and the usage |
+| `run_ends` | Run finished, however it ended (an error too): why it stopped early, if it did, the outcomes, the pull request, and the usage |
 
 ```python
 import duckdb
