@@ -53,9 +53,10 @@ class Proposals:
 class Downloads:
     """Where the gate downloads from: the same services the build's upstream assets use."""
 
-    wikidata_url: str = WIKIDATA.url
+    wikidata_url: str = WIKIDATA.url  # the SPARQL endpoint
     openalex_url: str = REFERENCES.url
     crossref_url: str = REFERENCES.crossref_url
+    wikidata_site_url: str = "https://www.wikidata.org"  # items and search, for finding a mineral's item
 
 
 class Worktree:

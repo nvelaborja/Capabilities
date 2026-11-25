@@ -2,8 +2,8 @@
 
 `claude auth status` prints $FAKE_CLAUDE_AUTH (a Claude Pro login by default). `claude -p …` reads the prompt from
 stdin, logs the call (its arguments, prompt, and whether an API key was in its environment) to $FAKE_CLAUDE_LOG, and
-plays the next scripted answer for its role from $FAKE_CLAUDE_SCRIPT: the proposer (given web tools) or the reviewer
-(given none). An answer is one of:
+plays the next scripted answer for its role from $FAKE_CLAUDE_SCRIPT: the reviewer (its system prompt starts "You
+review") or the proposer. An answer is one of:
 
     {"output": {...}, "searches": ["…"], "fetches": ["https://…"], "five_hour": 0.5}
     {"limit": true}        the plan's usage limit is reached
@@ -24,7 +24,7 @@ def main(argv: list[str]) -> int:
             "loggedIn": True, "authMethod": "claude.ai", "subscriptionType": "pro", "email": "someone@example.com"}))
         return 0
     prompt = sys.stdin.read()
-    role = "reviewer" if argv[argv.index("--tools") + 1] == "" else "proposer"
+    role = "reviewer" if argv[argv.index("--system-prompt") + 1].startswith("You review") else "proposer"
     with open(os.environ["FAKE_CLAUDE_LOG"], "a", encoding="utf-8") as log:
         log.write(json.dumps({"role": role, "argv": argv, "prompt": prompt,
                               "api_key": "ANTHROPIC_API_KEY" in os.environ}) + "\n")

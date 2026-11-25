@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import json
+from collections import Counter
 import tempfile
 import urllib.error
 from dataclasses import asdict, dataclass, field
@@ -27,6 +28,7 @@ from .branch import BranchError, Downloads, Proposals, Worktree, check_gh, gate,
 from .claude import UsageLimitReached, check_login
 from .curate import Curator, ItemResult, Settings, new_run_id
 from .ore_candidates import Candidate, Context, evaluation_set, queue_candidates, write_crosswalk
+from .sources import Library, SourcesUnavailable, known_sources
 from .web import Web
 
 TASK = "ore_candidates"
@@ -42,9 +44,10 @@ class RunReport:
 
 
 def run_ore_candidates(root: Path, build_dir: Path, settings: Settings, downloads: Downloads = Downloads(),
-                       web: Web = Web(), on_progress: Callable[[str], None] = print,
+                       web: Web | None = None, on_progress: Callable[[str], None] = print,
                        audit_dir: Path | None = None) -> RunReport:
     """One run. The audit log and run summaries go in `audit_dir`, by default audit/ in the repository."""
+    web = web or Web(wikidata_url=downloads.wikidata_site_url, openalex_url=downloads.openalex_url)
     return Run(root, settings, downloads, web, on_progress, audit_dir or audit_dir_for(root)).execute(build_dir)
 
 
@@ -64,7 +67,7 @@ class Run:
 
     @property
     def opens_pull_request(self) -> bool:
-        return self.settings.pull_request and not self.settings.evaluate
+        return self.settings.pull_request and not self.settings.evaluate and not self.settings.find_only
 
     def execute(self, build_dir: Path) -> RunReport:
         self.login = check_login(self.settings.claude_command)
@@ -73,7 +76,7 @@ class Run:
         candidates, context = self._items(build_dir)
         pull_request = None
         with AuditLog(self.audit_dir / AUDIT_FILE) as audit:
-            self.curator = Curator(self.run_id, self.settings, context, audit, self.web, self.on_progress)
+            self.curator = Curator(self.run_id, self.settings, context, audit, self.library, self.on_progress)
             audit.run_started(self.run_id, TASK, self.mode, asdict(self.settings) | {"prompts": self.curator.prompt_versions()},
                               self.login, git_commit(self.root))
             try:
@@ -111,9 +114,13 @@ class Run:
         if self.settings.evaluate:
             chosen = evaluation_set()[: self.settings.items]
             self.answers = {candidate.name: answer for candidate, answer in chosen}
-            # The person's rows are left out of what's taken, as if undecided: the agents decide them again.
-            return [candidate for candidate, _ in chosen], Context.of(self.root, leaving_out=frozenset(self.answers))
+            # The person's rows are left out of what's taken, and their sources out of the library, as if undecided:
+            # the agents decide them again.
+            leaving_out = frozenset(self.answers)
+            self.library = Library(self.web, known_sources(self.root, leaving_out))
+            return [candidate for candidate, _ in chosen], Context.of(self.root, leaving_out=leaving_out)
         current_graph(self.root, build_dir)  # the queue is only as current as the build
+        self.library = Library(self.web, known_sources(self.root))
         return queue_candidates(load_queue(build_dir), self.settings.items), Context.of(self.root)
 
     def _curate(self, candidates: list[Candidate]) -> None:
@@ -125,6 +132,9 @@ class Run:
                 self.results.append(self.curator.curate(candidate))
             except UsageLimitReached as error:
                 self.stopped = f"the plan's usage limit was reached: {error}"
+                break
+            except SourcesUnavailable as error:
+                self.stopped = str(error)
                 break
         if self.stopped:
             left = len(candidates) - len(self.results)
@@ -201,6 +211,12 @@ class Run:
             "failed_because": self.failed,
             "outcomes": outcomes,
             "usage": asdict(self.curator.usage),
+            # What code read to find the sources: no model's usage, but OpenAlex's daily allowance (ADR 0047).
+            "sources": {"openalex_searches": self.library.openalex_searches,
+                        "openalex_failures": self.library.openalex_failures,
+                        "pages_downloaded": len(self.library.pages),
+                        # How the downloads answered (200, 403, unreachable…): why a source gave no passages.
+                        "page_statuses": dict(Counter(page.status.split(":")[0] for page in self.library.pages.values()))},
             "items": [result.summary() for result in self.results],
         }
         if self.answers:
@@ -250,8 +266,9 @@ def pull_request_body(summary: dict) -> str:
     lines += [
         "",
         f"Models: proposer {_model(summary, 'proposer')}, reviewer {_model(summary, 'reviewer')}. Prompts: "
-        f"`{summary['prompts']['proposer']}`, `{summary['prompts']['reviewer']}`. {usage['calls']} calls, "
-        f"{usage['web_searches']} searches, {usage['web_fetches']} pages fetched. Plan usage: five-hour "
+        f"`{summary['prompts']['proposer']}`, `{summary['prompts']['reviewer']}`. {usage['calls']} calls; code made "
+        f"{summary['sources']['openalex_searches']} OpenAlex searches and downloaded "
+        f"{summary['sources']['pages_downloaded']} pages. Plan usage: five-hour "
         f"{_share(usage['first_limits'].get('five_hour'))} → {_share(usage['limits'].get('five_hour'))}, weekly "
         f"{_share(usage['first_limits'].get('seven_day'))} → {_share(usage['limits'].get('seven_day'))}.",
         "",
