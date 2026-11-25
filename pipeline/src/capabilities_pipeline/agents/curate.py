@@ -42,13 +42,14 @@ REVIEWER_TURNS = 3
 class Settings:
     items: int = 5
     evaluate: bool = False
-    # The proposer only chooses among passages code found: Sonnet at medium effort. The reviewer is the last check
-    # before a person, and uses little of the plan: Opus (ADR 0048, Evaluation).
+    # The proposer only chooses among passages code found: Sonnet at medium effort. The reviewer, the last check before
+    # a person, thinks harder: Sonnet at high effort, which caught as much as Opus for under half the cost (ADR 0048,
+    # Evaluation).
     proposer_model: str = "sonnet"
-    reviewer_model: str = "opus"
+    reviewer_model: str = "sonnet"
     # How hard each role thinks (claude.EFFORTS); None is Claude Code's default for the model.
     proposer_effort: str | None = "medium"
-    reviewer_effort: str | None = None
+    reviewer_effort: str | None = "high"
     attempts: int = 2  # proposals per item: the first, and one more after being sent back
     # Stop before the next item once this share of the plan's five-hour or weekly usage is used.
     stop_at_five_hour: float = 0.8
