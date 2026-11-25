@@ -37,6 +37,10 @@ PAST = re.compile(r"\b(ancient|prehistor\w*|bronze age|iron age|chalcolithic|neo
 # What isn't a sentence of prose: a link, a DOI, a header or footer, a reference, a keyword list.
 NOT_PROSE = re.compile(r"https?://|doi|\bvol\b|©|keywords?:|isbn|issn|et al\.,? \(?\d{4}|\d+\s*[–-]\s*\d+\s*$",
                        re.IGNORECASE)
+# A figure's or table's caption describes a picture, not what happened: never the evidence (Bornite, 2026-11-25).
+CAPTION = re.compile(r"^\W*(fig(ure)?|table|plate|pl)\.?\s*[\dIVXivx]+\b", re.IGNORECASE)
+# A caption's label alone, which a full stop splits from its text ("Table IV." then the caption's text).
+CAPTION_LABEL = re.compile(r"^\W*(fig(ure)?|table|plate|pl)\.?\s*[\dIVXivx]+[a-z]?[.:]?$", re.IGNORECASE)
 SENTENCE_END = re.compile(r"(?<=[.!?])[\"”’)]?\s+(?=[\"“‘(]?[A-Z0-9])")
 SENTENCE_LENGTH = (40, 1000)  # what a quote may be (ore_candidates.QUOTE_LENGTH)
 # Archaeometallurgy first: a plain "smelting" finds mostly today's industry, and "ore" its mineral processing.
@@ -118,19 +122,22 @@ class Library:
     def passages(self, item: WikidataItem, name: str) -> Found:
         names = {name, *((item.label,) if item.label else ())}
         sources = self.known + self._openalex_sources(name)
-        passages: list[Passage] = []
+        # Ranked across every source, not source by source: otherwise the first sources' weaker sentences fill the places
+        # before a better one is read (Magnetite, 2026-11-25). Ties keep the sources' order, the repository's first.
+        candidates: list[tuple[int, int, Source, tuple[str, str, str]]] = []
         read = with_passages = 0
-        for source in sources:
+        for order, source in enumerate(sources):
             page = self.page(source.url)
             if not page.loaded:
                 continue
             read += 1
             found = _passages_in(page.text, names, lines_are_blocks=page.kind != "pdf")[:PASSAGES_PER_SOURCE]
             with_passages += bool(found)
-            passages += [Passage(len(passages) + i + 1, source, *sentence) for i, sentence in enumerate(found)]
-            if len(passages) >= PASSAGES:
-                break
-        return Found(passages[:PASSAGES], read, with_passages)
+            candidates += [(rank, order, source, sentence) for rank, *sentence in found]
+        candidates.sort(key=lambda candidate: (-candidate[0], candidate[1]))
+        passages = [Passage(number, source, *sentence)
+                    for number, (_, _, source, sentence) in enumerate(candidates[:PASSAGES], start=1)]
+        return Found(passages, read, with_passages)
 
     def _openalex_sources(self, name: str) -> list[Source]:
         sources: dict[str, Source] = {}
@@ -182,8 +189,10 @@ def _readable_copy(work: dict) -> str | None:
 
 
 def openalex_citation(work: dict) -> str:
-    """A reference-list citation from OpenAlex's record: authors, (year), title, and where it was published."""
-    authors = [_surname_first((a.get("author") or {}).get("display_name") or "") for a in work.get("authorships") or []]
+    """A reference-list citation from OpenAlex's record: authors, (year), title, and where it was published. Authors are
+    named as OpenAlex names them: turning a name into "Surname, I." means guessing which part is the surname, and a
+    wrong guess is an error the proposer can't fix (Cuprite, 2026-11-25)."""
+    authors = [" ".join(((a.get("author") or {}).get("display_name") or "").split()) for a in work.get("authorships") or []]
     authors = [a for a in authors if a]
     names = (authors[0] + " et al." if len(authors) > 3 else
              " & ".join([", ".join(authors[:-1]), authors[-1]]) if len(authors) > 1 else "".join(authors))
@@ -199,20 +208,13 @@ def _is_prose(sentence: str) -> bool:
     or more, mostly letters, ending as a sentence ends, and none of the marks of a reference or a page header."""
     letters = sum(c.isalpha() for c in sentence)
     return (len(sentence.split()) >= 8 and sentence.rstrip("\"”’)")[-1:] in ".!?" and letters / len(sentence) > 0.7
-            and sum(c.isdigit() for c in sentence) / len(sentence) < 0.05 and not NOT_PROSE.search(sentence))
+            and sum(c.isdigit() for c in sentence) / len(sentence) < 0.05 and not NOT_PROSE.search(sentence)
+            and not CAPTION.search(sentence))
 
 
-def _surname_first(name: str) -> str:
-    parts = name.split()
-    if len(parts) < 2:
-        return name
-    initials = " ".join(f"{p[0]}." for p in parts[:-1] if p[0].isalpha())
-    return f"{parts[-1]}, {initials}"
-
-
-def _passages_in(text: str, names: set[str], lines_are_blocks: bool) -> list[tuple[str, str, str]]:
-    """The sentences that name the mineral and speak of ore or smelting, most to the point first, each with the
-    sentences either side. A web page's lines are its blocks (a heading ends without a full stop); a PDF's lines are
+def _passages_in(text: str, names: set[str], lines_are_blocks: bool) -> list[tuple[int, str, str, str]]:
+    """The sentences that name the mineral and speak of ore or smelting, most to the point first, each with its rank and
+    the sentences either side. A web page's lines are its blocks (a heading ends without a full stop); a PDF's lines are
     where the text wrapped, so they are joined, and a word it broke across two lines is mended, as the quote check
     allows."""
     if not lines_are_blocks:
@@ -222,10 +224,11 @@ def _passages_in(text: str, names: set[str], lines_are_blocks: bool) -> list[tup
     shortest, longest = SENTENCE_LENGTH
     found = []
     for i, sentence in enumerate(sentences):
+        after_a_label = i > 0 and CAPTION_LABEL.match(sentences[i - 1])
         if shortest <= len(sentence) <= longest and named.search(sentence) and SUBJECT.search(sentence) \
-                and _is_prose(sentence):
+                and _is_prose(sentence) and not after_a_label:
             rank = 3 * len(SMELTING.findall(sentence)) + 2 * len(PAST.findall(sentence)) + len(SUBJECT.findall(sentence))
             found.append((rank, i, sentence))
     found.sort(key=lambda hit: (-hit[0], hit[1]))
-    return [(sentence, sentences[i - 1] if i else "", sentences[i + 1] if i + 1 < len(sentences) else "")
-            for _, i, sentence in found]
+    return [(rank, sentence, sentences[i - 1] if i else "", sentences[i + 1] if i + 1 < len(sentences) else "")
+            for rank, i, sentence in found]

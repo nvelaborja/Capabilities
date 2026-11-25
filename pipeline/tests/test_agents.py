@@ -376,7 +376,7 @@ class TestCurating:
             {"about": "class", "objection": "Galena is a lead ore."}], "summary": "Wrong class."}}])
         report = run(repo_root, built_dir, fake_claude, audit_dir=tmp_path / "audit", items=1)
         proposer, review = fake_claude.calls("proposer")[0]["prompt"], fake_claude.calls("reviewer")[0]["prompt"]
-        assert "[1] From: Example, A. (2021). Lead ores at an example site. Example Journal. (OpenAlex" in proposer
+        assert "[1] From: Ada Example (2021). Lead ores at an example site. Example Journal. (OpenAlex" in proposer
         assert "Notes on ores. " + GALENA_SENTENCE in review and "[1] From:" not in review
         assert (report.results[0].outcome, report.results[0].attempts) == ("rejected", 1)
         assert "Galena is a lead ore." in report.results[0].reason
@@ -484,9 +484,9 @@ class TestFindingSources:
         # and the sentence, mended where the PDF broke a word, is still found on the page word for word
         assert locate(passage.sentence, text) is not None
 
-    def test_the_repositorys_own_sources_come_first_and_each_page_is_read_once(self):
+    def test_on_a_tie_the_repositorys_own_source_comes_first_and_each_page_is_read_once(self):
         known = Source("Known, K. (2000). A page we cite.", "https://example.org/known", "cited in the repository")
-        page = Page(known.url, "200", "Galena was smelted for lead at the example site.", None, "text")
+        page = Page(known.url, "200", GALENA_SENTENCE, None, "text")  # as good a sentence as the OpenAlex work's
         web = FakeWeb(pages={known.url: page})
         library = Library(web, [known])
         found = library.passages(GALENA_ITEM, "Galena")
@@ -494,10 +494,22 @@ class TestFindingSources:
         assert [(p.number, p.source.origin) for p in found.passages] == [(1, "cited in the repository"), (2, "OpenAlex")]
         assert web.asked.count(GALENA_URL) == 1 and web.searched == ["Galena archaeometallurgy", "Galena ancient smelting"]
 
+    def test_passages_are_ranked_across_sources_so_a_better_one_read_later_isnt_crowded_out(self):
+        # given: twelve pages the repository cites, each with weak sentences (galena in a slag), read before the
+        # OpenAlex work that says it was roasted and smelted
+        weak = " ".join(f"Galena grains number {n} were seen in the copper slag." for n in "ABC")
+        known = [Source(f"Page {n}.", f"https://example.org/known-{n}", "cited in the repository") for n in range(12)]
+        web = FakeWeb(pages={s.url: Page(s.url, "200", weak, None, "text") for s in known})
+        found = Library(web, known).passages(GALENA_ITEM, "Galena")
+        assert len(found.passages) == 12 and found.passages[0].sentence == GALENA_SENTENCE
+
     @pytest.mark.parametrize("line", [
         pytest.param("Journal of Ores 12:1114–1127 https://doi.org/10.1/x Galena smelting at the example site.", id="a header"),
         pytest.param("Keywords: galena, smelting, lead, slag, furnace, roasting, silver, cupellation.", id="keywords"),
         pytest.param("Smith J, Jones K (2001) Galena ores and their smelting in the example valley.", id="a reference"),
+        pytest.param("Figure 9: Galena ore from the example mine, before and after roasting for smelting.", id="a caption"),
+        pytest.param("Table IV. Galena, chalcopyrite and the other sulphide ores smelted at each of the sites.",
+                     id="a table's title"),
     ])
     def test_a_line_that_isnt_prose_isnt_offered(self, line):
         text = line + "\n" + "In antiquity galena was roasted and then smelted in small furnaces for its lead."
@@ -507,11 +519,16 @@ class TestFindingSources:
             "In antiquity galena was roasted and then smelted in small furnaces for its lead."]
 
     @pytest.mark.parametrize("authors, citation", [
-        pytest.param(["Ada Example"], "Example, A. (2021). Lead ores. Example Journal.", id="one author"),
-        pytest.param(["Ada Example", "Bo Sample"], "Example, A. & Sample, B. (2021). Lead ores. Example Journal.",
+        pytest.param(["Ada Example"], "Ada Example (2021). Lead ores. Example Journal.", id="one author"),
+        pytest.param(["Ada Example", "Bo Sample"], "Ada Example & Bo Sample (2021). Lead ores. Example Journal.",
                      id="two"),
-        pytest.param(["Ada Example", "Bo Sample", "Cy Test", "Di Trial"], "Example, A. et al. (2021). Lead ores. "
+        pytest.param(["Ada Example", "Bo Sample", "Cy Test"], "Ada Example, Bo Sample & Cy Test (2021). Lead ores. "
+                     "Example Journal.", id="three"),
+        pytest.param(["Ada Example", "Bo Sample", "Cy Test", "Di Trial"], "Ada Example et al. (2021). Lead ores. "
                      "Example Journal.", id="more than three"),
+        # names as OpenAlex gives them: no guess at which part is the surname
+        pytest.param(["Seyed Mohammadamin Emami"], "Seyed Mohammadamin Emami (2021). Lead ores. Example Journal.",
+                     id="a name of three parts"),
     ])
     def test_a_citation_is_made_from_openalexs_record_not_written_by_a_model(self, authors, citation):
         work = {"display_name": "Lead ores", "publication_year": 2021, "primary_location": {
@@ -522,7 +539,7 @@ class TestFindingSources:
         found = Library(FakeWeb(), []).passages(GALENA_ITEM, "Galena")
         proposal = Proposal.from_choice(GOOD, GALENA_ITEM, found.passages)
         assert (proposal.wikidata, proposal.quote, proposal.url) == (GALENA_ITEM.id, GALENA_SENTENCE, GALENA_URL)
-        assert proposal.citation == "Example, A. (2021). Lead ores at an example site. Example Journal."
+        assert proposal.citation == "Ada Example (2021). Lead ores at an example site. Example Journal."
 
     @pytest.mark.parametrize("web, reason", [
         pytest.param(FakeWeb(items={GALENA_ITEM.id: None}), "no Wikidata item is called 'Galena'", id="no item"),
@@ -647,7 +664,7 @@ BOOK_WORK = {"id": "W3", "display_name": "A book no index lists", "publication_y
              "authorships": [{"author": {"display_name": "A Nobody"}}],
              "primary_location": {"source": {"display_name": "Nowhere Press"}}}
 WEB_PAGE_CITATION = "Ores of the example valley (web page). Example Museum."
-UNLISTED_BOOK = "Nobody, A. (1999). A book no index lists. Nowhere Press."
+UNLISTED_BOOK = "A Nobody (1999). A book no index lists. Nowhere Press."
 
 
 def _git(directory: Path, *arguments: str) -> str:
