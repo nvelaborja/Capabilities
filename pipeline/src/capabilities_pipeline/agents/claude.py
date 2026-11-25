@@ -22,10 +22,18 @@ API_CREDENTIALS = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_USE
 # How Claude Code says a plan's limit is used up, when it says it in words rather than in a rate-limit event.
 LIMIT_REACHED = re.compile(r"usage limit|limit reached|hit your limit|rate limit", re.IGNORECASE)
 TIMEOUT_S = 900
+# Claude Code's effort levels (`--effort`): how much the model thinks before it acts, which is much of what a call uses.
+EFFORTS = ("low", "medium", "high", "xhigh", "max")
 
 
 class AgentError(Exception):
-    """A call gave no usable answer: it failed, ran out of turns, or returned no structured output."""
+    """A call gave no usable answer: it failed, ran out of turns, or returned no structured output. `spent` is what it
+    used all the same (tokens, tools, the plan's usage), when it printed that: a call that runs out of turns can use as
+    much of the plan as one that answers."""
+
+    def __init__(self, message: str, spent: Answer | None = None):
+        super().__init__(message)
+        self.spent = spent
 
 
 class UsageLimitReached(AgentError):
@@ -60,9 +68,10 @@ class ClaudeCode:
     max_turns: int = 20
     command: str = "claude"
     timeout_s: int = TIMEOUT_S
+    effort: str | None = None  # None leaves it to Claude Code's default for the model
 
     def settings(self) -> dict:
-        return {"model": self.model, "tools": list(self.tools), "max_turns": self.max_turns}
+        return {"model": self.model, "effort": self.effort, "tools": list(self.tools), "max_turns": self.max_turns}
 
     def arguments(self, system: str, schema: dict) -> list[str]:
         tools = ",".join(self.tools)
@@ -70,6 +79,7 @@ class ClaudeCode:
             self.command, "-p",
             "--safe-mode", "--strict-mcp-config", "--no-session-persistence",
             "--model", self.model,
+            *(("--effort", self.effort) if self.effort else ()),
             "--max-turns", str(self.max_turns),
             "--tools", tools,
         ]
@@ -124,32 +134,34 @@ def parse(stdout: str, stderr: str = "", returncode: int = 0) -> Answer:
     model = next((event.get("model") for event in events
                   if event.get("type") == "system" and event.get("subtype") == "init"), None)
     result = next((event for event in reversed(events) if event.get("type") == "result"), None)
-    if result is None:
-        message = (stderr or stdout).strip()[-500:]
-        if limited or LIMIT_REACHED.search(message):
-            raise UsageLimitReached(message or "the plan's usage limit is reached")
-        raise AgentError(f"Claude Code exited with {returncode} and no result: {message or 'no output'}")
-    if result.get("is_error") or result.get("subtype") != "success":
-        message = str(result.get("result") or result.get("subtype"))
-        if limited or result.get("api_error_status") == 429 or LIMIT_REACHED.search(message):
-            raise UsageLimitReached(message)
-        if result.get("subtype") == "error_max_turns":
-            raise AgentError(f"ran out of turns ({result.get('num_turns')}) before answering")
-        raise AgentError(f"Claude Code failed: {message[:500]}")
-    if not isinstance(result.get("structured_output"), dict):
-        raise AgentError("the answer had no structured output")
-    return Answer(
-        output=result["structured_output"],
+    spent = Answer(
+        output=(result or {}).get("structured_output") if isinstance((result or {}).get("structured_output"), dict)
+        else {},
         tool_calls=tool_calls,
-        usage=result.get("usage") or {},
-        cost_usd=result.get("total_cost_usd"),
+        usage=(result or {}).get("usage") or {},
+        cost_usd=(result or {}).get("total_cost_usd"),
         limits=limits,
-        session_id=result.get("session_id"),
-        num_turns=result.get("num_turns"),
-        duration_ms=result.get("duration_ms"),
+        session_id=(result or {}).get("session_id"),
+        num_turns=(result or {}).get("num_turns"),
+        duration_ms=(result or {}).get("duration_ms"),
         events=events,
         model=model,
     )
+    if result is None:
+        message = (stderr or stdout).strip()[-500:]
+        if limited or LIMIT_REACHED.search(message):
+            raise UsageLimitReached(message or "the plan's usage limit is reached", spent)
+        raise AgentError(f"Claude Code exited with {returncode} and no result: {message or 'no output'}", spent)
+    if result.get("is_error") or result.get("subtype") != "success":
+        message = str(result.get("result") or result.get("subtype"))
+        if limited or result.get("api_error_status") == 429 or LIMIT_REACHED.search(message):
+            raise UsageLimitReached(message, spent)
+        if result.get("subtype") == "error_max_turns":
+            raise AgentError(f"ran out of turns ({result.get('num_turns')}) before answering", spent)
+        raise AgentError(f"Claude Code failed: {message[:500]}", spent)
+    if not spent.output:
+        raise AgentError("the answer had no structured output", spent)
+    return spent
 
 
 def refuse_api_credentials() -> None:

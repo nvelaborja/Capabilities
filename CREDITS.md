@@ -93,6 +93,7 @@ Direct dependencies. Each brings its own dependencies, all under permissive lice
 | [Vite](https://vite.dev/), [Vitest](https://vitest.dev/), [TypeScript](https://www.typescriptlang.org/), [ESLint](https://eslint.org/) | Building and testing the web app | MIT, Apache-2.0 |
 | [LikeC4](https://likec4.dev/) | Architecture diagrams (ADR 0039) | MIT |
 | [pypdf](https://github.com/py-pdf/pypdf) | Reading the text of a PDF an agent cites, to find its quote (ADR 0048) | BSD-3-Clause |
+| [truststore](https://github.com/sethmlarson/truststore) | Checking a cited site's certificate against the operating system's trusted roots (ADR 0048) | MIT |
 | [pytest](https://pytest.org/), [uv](https://docs.astral.sh/uv/) | Testing and packaging | MIT, MIT or Apache-2.0 |
 
 ## Map tiles

@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from typing import Callable
 
 from .audit import AuditLog
-from .claude import AgentError, Answer, ClaudeCode, UsageLimitReached
+from .claude import EFFORTS, AgentError, Answer, ClaudeCode, UsageLimitReached
 from .ore_candidates import (
     PROPOSAL_SCHEMA,
     REVIEW_SCHEMA,
@@ -43,6 +43,9 @@ class Settings:
     evaluate: bool = False
     proposer_model: str = "opus"
     reviewer_model: str = "opus"
+    # How hard each role thinks (claude.EFFORTS); None is Claude Code's default for the model.
+    proposer_effort: str | None = None
+    reviewer_effort: str | None = None
     attempts: int = 2  # proposals per item: the first, and one more after being sent back
     # Stop before the next item once this share of the plan's five-hour or weekly usage is used.
     stop_at_five_hour: float = 0.8
@@ -59,6 +62,9 @@ class Settings:
             if not 0 < getattr(self, name) <= 1:
                 raise ValueError(f"{name} is a share of the plan's usage, above 0 and at most 1 (0.8 for 80%), "
                                  f"not {getattr(self, name)}")
+        for name in ("proposer_effort", "reviewer_effort"):
+            if getattr(self, name) not in (None, *EFFORTS):
+                raise ValueError(f"{name} is one of {', '.join(EFFORTS)}, or unset, not {getattr(self, name)!r}")
         if self.items < 1 or self.attempts < 1:
             raise ValueError("a run needs at least one item, and each item at least one attempt")
 
@@ -123,8 +129,9 @@ class Curator:
         self.run_id, self.settings, self.context, self.audit, self.web = run_id, settings, context, audit, web
         self.on_progress = on_progress
         self.proposer = ClaudeCode(settings.proposer_model, ("WebSearch", "WebFetch"), PROPOSER_TURNS,
-                                   settings.claude_command)
-        self.reviewer = ClaudeCode(settings.reviewer_model, (), REVIEWER_TURNS, settings.claude_command)
+                                   settings.claude_command, effort=settings.proposer_effort)
+        self.reviewer = ClaudeCode(settings.reviewer_model, (), REVIEWER_TURNS, settings.claude_command,
+                                   effort=settings.reviewer_effort)
         self.proposer_prompt = Prompt.load("ore_proposer")
         self.reviewer_prompt = Prompt.load("ore_reviewer")
         self.usage = Usage()
@@ -188,8 +195,14 @@ class Curator:
         try:
             answer = claude.ask(task, prompt.system, schema)
         except AgentError as error:
-            self.audit.call(self.run_id, candidate.name, attempt, role, prompt.version, claude.settings(), task,
+            # A failed call still used the plan (Tenorite's 30 turns used about 14 points of the five-hour window), so
+            # what it spent is counted and recorded, and the next threshold check sees the plan's usage after it.
+            spent = error.spent
+            self.audit.call(self.run_id, candidate.name, attempt, role, prompt.version,
+                            claude.settings() | {"model_id": spent.model if spent else None}, task, spent,
                             error=f"{type(error).__name__}: {error}")
+            if spent:
+                self.usage.add(spent)
             raise
         self.audit.call(self.run_id, candidate.name, attempt, role, prompt.version,
                         claude.settings() | {"model_id": answer.model}, task, answer)

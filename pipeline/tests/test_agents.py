@@ -176,6 +176,19 @@ class TestCallingClaudeCode:
         with pytest.raises(error):
             ClaudeCode("opus", ("WebSearch",), 30, str(fake_claude.command)).ask("Task.", "Role.", {})
 
+    def test_a_call_that_runs_out_of_turns_still_says_what_it_spent(self, fake_claude):
+        fake_claude.script(proposer=[{"error": "max_turns", "five_hour": 0.7}])
+        with pytest.raises(AgentError) as raised:
+            ClaudeCode("opus", ("WebSearch",), 30, str(fake_claude.command)).ask("Task.", "Role.", {})
+        spent = raised.value.spent
+        assert spent.limits["five_hour"] == 0.7 and spent.usage["output_tokens"] == 100 and spent.output == {}
+
+    def test_the_effort_asked_for_is_passed_on(self, fake_claude):
+        fake_claude.script(proposer=[answer({"x": 1})])
+        ClaudeCode("sonnet", ("WebSearch",), 30, str(fake_claude.command), effort="medium").ask("Task.", "Role.", {})
+        argv = fake_claude.calls()[0]["argv"]
+        assert argv[argv.index("--model") + 1] == "sonnet" and argv[argv.index("--effort") + 1] == "medium"
+
     def test_a_limit_reached_before_any_result_is_still_a_limit(self):
         with pytest.raises(UsageLimitReached):
             parse("", "Claude AI usage limit reached|1795573200", 1)
@@ -342,6 +355,16 @@ class TestCurating:
         report = run(repo_root, built_dir, fake_claude, audit_dir=tmp_path / "audit", items=2)
         assert [r.outcome for r in report.results] == ["failed", "unsure"]
 
+    def test_a_failed_calls_use_of_the_plan_counts_toward_stopping(self, repo_root, built_dir, fake_claude, tmp_path):
+        # given: the first item's proposer runs out of turns, having used the plan up to 85%
+        fake_claude.script(proposer=[{"error": "max_turns", "five_hour": 0.85}])
+        report = run(repo_root, built_dir, fake_claude, audit_dir=tmp_path / "audit", items=3, stop_at_five_hour=0.8)
+        # then: the run stops before the next item, and the call's usage is in the audit log
+        assert [r.outcome for r in report.results] == ["failed"] and "85%" in report.stopped_because
+        assert report.summary["usage"]["calls"] == 1
+        assert audit_rows(tmp_path / "audit", "select json_extract_string(limits, '$.five_hour'), error is not null "
+                                              "from calls") == [("0.85", True)]
+
     def test_reaching_the_plans_limit_stops_the_run_and_leaves_the_rest(self, repo_root, built_dir, fake_claude, tmp_path):
         fake_claude.script(proposer=[answer(GOOD | {"decision": "unsure"}), {"limit": True}])
         report = run(repo_root, built_dir, fake_claude, audit_dir=tmp_path / "audit", items=5)
@@ -391,6 +414,7 @@ class TestCurating:
         pytest.param({"stop_at_five_hour": 80}, id="a five-hour threshold given as a percentage"),
         pytest.param({"stop_at_seven_day": 0}, id="a weekly threshold of nothing"),
         pytest.param({"items": 0}, id="no items"),
+        pytest.param({"proposer_effort": "hard"}, id="an effort Claude Code doesn't have"),
     ])
     def test_settings_that_would_never_stop_or_never_start_are_refused(self, fake_claude, changes):
         with pytest.raises(ValueError):
@@ -521,7 +545,8 @@ def _fake_gh(directory: Path) -> Path:
 def published(repo_root, tmp_path_factory, wikidata_endpoint, scholarly_endpoint, lookups_offline):
     """One run over the top three ore candidates of a throwaway repository: Galena rejected as an ore (citing a web
     page), Sphalerite proposed as a copper sulphide citing a web page, and Gold as an iron ore citing a book no index
-    lists (both made up, for the test). The agents accept all three; the gate drops Gold."""
+    lists (both made up, for the test). The agents accept all three, and all three pass the gate: Gold's book isn't
+    found, which is noted, not held against it."""
     directory = tmp_path_factory.mktemp("published")
     repo = _repository(repo_root, directory)
     fake = FakeClaude(directory / "fake-claude")
@@ -584,9 +609,9 @@ class TestThePullRequest:
 
     def test_the_commit_is_a_conventional_one_and_the_title_reads_plainly(self, published):
         run_id = published["report"].run_id
-        assert published["subject"] == f"feat(data): agent proposals for 2 ore minerals (run {run_id})"
+        assert published["subject"] == f"feat(data): agent proposals for 3 ore minerals (run {run_id})"
         gh = published["gh"]
-        assert gh[gh.index("--title") + 1] == f"Agent proposals: 2 ore minerals (run {run_id})"
+        assert gh[gh.index("--title") + 1] == f"Agent proposals: 3 ore minerals (run {run_id})"
 
     def test_each_row_is_unverified_and_names_its_run_and_quote(self, published):
         rows = {row["mrds_ore"]: row for row in csv.DictReader(
@@ -598,13 +623,27 @@ class TestThePullRequest:
         assert sphalerite["quote"] == "Sphalerite was roasted with the copper sulphides at the example mine."
         assert (rows["Galena"]["id"], rows["Galena"]["class"]) == ("", "none")
 
-    def test_a_row_whose_cited_work_isnt_found_is_dropped_and_the_rest_checked_again(self, published):
-        assert "Gold" not in published["show"]("data/crosswalks/ore_minerals.csv")
+    def test_a_work_no_index_lists_isnt_held_against_its_row(self, published):
+        # Many books, reports and web pages are in neither OpenAlex nor Crossref (ADR 0047); the row's page was read and
+        # its quote found, so the row goes in, with what the check found noted.
+        assert "Gold" in published["show"]("data/crosswalks/ore_minerals.csv")
         gold = next(r for r in published["report"].results if r.candidate.name == "Gold")
-        assert (gold.outcome, gold.row) == ("rejected", None)
-        assert gold.reason.startswith("its cited work wasn't found: not_found")
-        outcomes = audit_rows(published["audit"], "select outcome from outcomes where item = 'Gold' order by recorded_at")
-        assert outcomes == [("accepted",), ("rejected",)]
+        assert gold.outcome == "accepted"
+        assert gold.checks[-1].detail == "not_found; its page loaded and the quote is on it"
+
+    @pytest.mark.parametrize("result, passes", [
+        pytest.param("found", True, id="found"),
+        pytest.param("possible", True, id="possibly found"),
+        pytest.param("not_found", True, id="not found"),
+        pytest.param("not_searched", True, id="a web page"),
+        pytest.param("doi_disagrees", False, id="a DOI that leads to another work"),
+    ])
+    def test_only_a_wrong_doi_drops_a_row(self, result, passes):
+        from capabilities_pipeline.agents.branch import work_check
+
+        row = {"class": "iron-ore", "citation": "Example, A. (2020). Ores."}
+        checks = {row["citation"]: {"result": result, "note": "Why.", "match_service": None, "links": []}}
+        assert work_check(row, checks).passed is passes
 
     def test_a_rejected_minerals_reference_isnt_looked_up(self, published):
         galena = next(r for r in published["report"].results if r.candidate.name == "Galena")
@@ -613,11 +652,11 @@ class TestThePullRequest:
     def test_the_commit_carries_the_runs_summary_the_refreshed_backups_and_the_works_cited(self, published):
         run_id = published["report"].run_id
         summary = json.loads(published["show"](f"data/agent_runs/{run_id}.json"))
-        assert summary["run"] == run_id and summary["outcomes"] == {"accepted": 2, "rejected": 1}
-        # The Wikidata download behind the backup asked for the new item, and not for the dropped one.
+        assert summary["run"] == run_id and summary["outcomes"] == {"accepted": 3}
+        # The Wikidata download behind the backup asked for the new items, and not for the rejected mineral's.
         query = json.loads(published["show"]("snapshots/wikidata_items/snapshot.json"))["query"]
-        assert "wd:Q99999911" in query and "wd:Q99999912" not in query
-        assert WEB_PAGE_CITATION in published["show"]("CREDITS.md")
+        assert "wd:Q99999911" in query and "wd:Q99999912" in query and "wd:Q99999910" not in query
+        assert WEB_PAGE_CITATION in published["show"]("CREDITS.md") and UNLISTED_BOOK in published["show"]("CREDITS.md")
 
     def test_the_gates_build_leaves_dbt_pointed_at_the_repositorys_own_build(self, published):
         # The run builds the repository to read its queue, which points dbt there; the gate's build mustn't move it.

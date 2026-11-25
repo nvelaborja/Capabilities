@@ -13,6 +13,7 @@ import ipaddress
 import json
 import re
 import socket
+import ssl
 import unicodedata
 import urllib.error
 import urllib.parse
@@ -91,7 +92,7 @@ class Web:
         url = f"{self.wikidata_url}/wiki/Special:EntityData/{item}.json"
         request = urllib.request.Request(url, headers={"User-Agent": self.user_agent, "Accept": "application/json"})
         try:
-            with urllib.request.urlopen(request, timeout=TIMEOUT_S) as response:
+            with _PUBLIC_ONLY.open(request, timeout=TIMEOUT_S) as response:
                 entities = json.loads(response.read()).get("entities") or {}
         except urllib.error.HTTPError as error:
             if error.code in (400, 404):
@@ -136,7 +137,15 @@ class _PublicRedirects(urllib.request.HTTPRedirectHandler):
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
-_PUBLIC_ONLY = urllib.request.build_opener(_PublicRedirects)
+def _system_trust() -> ssl.SSLContext:
+    """Certificates checked against the operating system's trusted roots, as a browser or curl checks them. Python's
+    own bundle can lack a root the system trusts, and fail a site every browser opens (Azurite's source, 2026-11-25)."""
+    import truststore
+
+    return truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+
+
+_PUBLIC_ONLY = urllib.request.build_opener(urllib.request.HTTPSHandler(context=_system_trust()), _PublicRedirects)
 
 
 def read(url: str, status: str, body: bytes, content_type: str, charset: str) -> Page:

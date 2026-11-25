@@ -67,7 +67,7 @@ class AuditLog:
              answer: Answer | None = None, error: str | None = None):
         self._insert(
             "calls", run_id, item, attempt, role, prompt_version, _json(settings), prompt,
-            _json(answer.output) if answer else None,
+            _json(answer.output) if answer and answer.output else None,
             _json(answer.tool_calls) if answer else None,
             _json(answer.usage) if answer else None,
             answer.cost_usd if answer else None,
