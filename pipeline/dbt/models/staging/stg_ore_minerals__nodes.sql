@@ -40,17 +40,22 @@ templates as (
 ),
 
 reference as (
-    select id, json_array(json_object(
-        'citation', citation, 'url', url, 'supports', supports,
-        -- The crosswalk's own status for its reference (ADR 0047); unverified when it gives none.
-        'status', coalesce(nullif(trim(status), ''), 'unverified')
+    select id, json_array(json_merge_patch(
+        json_object(
+            'citation', citation, 'url', url, 'supports', supports,
+            -- The crosswalk's own status for its reference (ADR 0047); unverified when it gives none.
+            'status', coalesce(nullif(trim(status), ''), 'unverified')
+        ),
+        -- The passage that supports it, word for word, when the row gives one (an agent's always does, ADR 0048).
+        -- A null leaves the key out.
+        json_object('quote', nullif(trim(quote), ''))
     )) as "references"
     from ores
 ),
 
 -- Where each node came from: the mineral from its Wikidata item, its deposits' places from MRDS, and its route from
--- the template it copies.
-provenance as (
+-- the template it copies. A row an agent proposed says which run (ADR 0048), on all three.
+origins as (
     select id as mineral, 1 as part, json_object(
         'layer', 'upstream', 'dataset', 'wikidata', 'record', wikidata,
         'url', 'https://www.wikidata.org/wiki/' || wikidata, 'crosswalk', 'data/crosswalks/ore_minerals.csv'
@@ -67,6 +72,13 @@ provenance as (
         'layer', 'upstream', 'copied_from', mined_like, 'crosswalk', 'data/crosswalks/ore_minerals.csv'
     )
     from ores
+),
+
+provenance as (
+    select origins.mineral, origins.part,
+        json_merge_patch(origins.provenance, json_object('proposed_by', nullif(trim(ores.proposed_by), ''))) as provenance
+    from origins
+    join ores on ores.id = origins.mineral
 ),
 
 materials as (

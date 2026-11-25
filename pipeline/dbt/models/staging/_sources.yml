@@ -99,8 +99,9 @@ sources:
       - name: ore_minerals
         description: >
           Ore minerals that join the graph from upstream (data/crosswalks/ore_minerals.csv, ADR 0045): each row's
-          Wikidata item, MRDS name, ore class, the curated route it is mined like, and the reference for its class.
-          Rows with class none were reviewed and rejected, and build nothing.
+          Wikidata item, MRDS name, ore class, the curated route it is mined like, and the reference for its class,
+          with the run that proposed it when an agent did (ADR 0048). Rows with class none were reviewed and
+          rejected, and build nothing.
         columns:
           - name: id
             data_tests: [unique]
@@ -118,12 +119,18 @@ sources:
             data_tests: [not_null]
           - name: supports
             data_tests: [not_null]
+          - name: quote
+            description: The passage of the cited work that supports the row, word for word (ADR 0048).
           - name: status
             description: How far the reference has been checked; empty means unverified (ADR 0047).
             data_tests:
               - accepted_values:
                   arguments:
                     values: [unverified, secondary, verified]
+          - name: proposed_by
+            description: >
+              The agent run that proposed the row, whose summary is data/agent_runs/<run>.json; empty for a row a
+              person wrote (ADR 0048).
       - name: wikidata_items
         description: >
           The English label and description, and the chemical formula, of every crosswalked Wikidata item, as the

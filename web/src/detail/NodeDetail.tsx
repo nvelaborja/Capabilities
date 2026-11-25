@@ -228,7 +228,10 @@ function Needs({ data, statusOf, onDrill, quickAdd, onExpandAll }: NeedsProps) {
   );
 }
 
-/** "From Wikidata (Q108212 ↗), brought in by data/crosswalks/ore_minerals.csv." for a node that came from upstream. */
+/**
+ * "From Wikidata (Q108212 ↗), brought in by data/crosswalks/ore_minerals.csv." for a node that came from upstream, and
+ * "Proposed by an agent, run …" when an agent proposed its crosswalk row (ADR 0048).
+ */
 function NodeOrigin({ upstream }: { upstream: NodeUpstream }) {
   const origin = nodeOrigin(upstream);
   return (
@@ -244,6 +247,13 @@ function NodeOrigin({ upstream }: { upstream: NodeUpstream }) {
         </>
       )}
       , brought in by <code>{upstream.crosswalk}</code>.
+      {upstream.proposed_by && (
+        <>
+          {" "}
+          Proposed by an agent, run <code>{upstream.proposed_by.run}</code> (see <code>{upstream.proposed_by.summary}</code>
+          ), and merged by a person.
+        </>
+      )}
     </p>
   );
 }

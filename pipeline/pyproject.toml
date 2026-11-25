@@ -12,6 +12,7 @@ dependencies = [
     "dagster-webserver>=1.13",
     "dbt-core>=1.10",
     "dbt-duckdb>=1.9",
+    "pypdf>=7.1",
 ]
 
 [tool.uv.sources]

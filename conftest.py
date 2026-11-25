@@ -111,11 +111,11 @@ WIKIDATA_SAMPLE = REPO_ROOT / "pipeline" / "tests" / "fixtures" / "wikidata-samp
 WIKIDATA_ITEMS_BACKUP = REPO_ROOT / "snapshots" / "wikidata_items" / "wikidata_items.parquet"
 
 
-def _items_csv() -> bytes:
+def _items_csv(extra: list[tuple] = ()) -> bytes:
     import duckdb
 
     rows = duckdb.sql("select item, label, description, formula from read_parquet(?) order by all",
-                      params=[str(WIKIDATA_ITEMS_BACKUP)]).fetchall()
+                      params=[str(WIKIDATA_ITEMS_BACKUP)]).fetchall() + list(extra)
     out = io.StringIO()
     writer = csv.writer(out, lineterminator="\n")
     writer.writerow(["item", "label", "description", "formula"])
@@ -129,7 +129,7 @@ class _SparqlEndpoint(BaseHTTPRequestHandler):
         query = parse_qs(body)["query"][0]
         self.server.queries.append(query)
         # Each of our two queries gets its own answer: the labels query asks for rdfs:label.
-        result = _items_csv() if "rdfs:label" in query else WIKIDATA_SAMPLE.read_bytes()
+        result = _items_csv(self.server.extra_items) if "rdfs:label" in query else WIKIDATA_SAMPLE.read_bytes()
         self.send_response(200)
         self.send_header("Content-Type", "text/csv")
         self.send_header("Content-Length", str(len(result)))
@@ -143,11 +143,13 @@ class _SparqlEndpoint(BaseHTTPRequestHandler):
 @pytest.fixture(scope="session")
 def wikidata_endpoint():
     """A local stand-in for Wikidata's SPARQL endpoint, so tests never use the network: it answers each query with the
-    matching sample and keeps the queries it was sent."""
+    matching sample and keeps the queries it was sent. Items a test adds to `extra_items` (item, label, description,
+    formula) are answered too; the test removes them when done."""
     server = ThreadingHTTPServer(("127.0.0.1", 0), _SparqlEndpoint)
-    server.queries = []
+    server.queries, server.extra_items = [], []
     threading.Thread(target=server.serve_forever, daemon=True).start()
-    yield SimpleNamespace(url=f"http://127.0.0.1:{server.server_port}/sparql", queries=server.queries)
+    yield SimpleNamespace(url=f"http://127.0.0.1:{server.server_port}/sparql", queries=server.queries,
+                          extra_items=server.extra_items)
     server.shutdown()
 
 

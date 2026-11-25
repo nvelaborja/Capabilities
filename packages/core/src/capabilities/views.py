@@ -459,8 +459,8 @@ def about(graph: Graph, key: str) -> dict:
 
 def node_source(graph: Graph, node_id: str) -> dict | None:
     """Where a node that came from upstream came from (ADR 0045), and the crosswalk that brought it in: a dataset and
-    record (a mineral from its Wikidata item, a deposit's places from MRDS), or the curated route it copies. None for a
-    curated node."""
+    record (a mineral from its Wikidata item, a deposit's places from MRDS), or the curated route it copies, and the
+    agent run that proposed its row, if one did (ADR 0048). None for a curated node."""
     provenance = graph.upstream_nodes.get(node_id)
     if not provenance:
         return None
@@ -471,6 +471,10 @@ def node_source(graph: Graph, node_id: str) -> dict | None:
             source["url"] = provenance["url"]
     if "copied_from" in provenance:
         source["copied_from"] = {"id": provenance["copied_from"], "label": graph.label(provenance["copied_from"])}
+    if provenance.get("proposed_by"):
+        # An agent run proposed the crosswalk row (ADR 0048); its summary is committed beside the data.
+        source["proposed_by"] = {"run": provenance["proposed_by"],
+                                 "summary": f"data/agent_runs/{provenance['proposed_by']}.json"}
     return source
 
 
@@ -507,7 +511,7 @@ def quantity_source(graph: Graph, thing_id: str, quantity: str) -> dict:
 
 def references(graph: Graph, item: dict) -> list[dict]:
     """An item's references, each with what the citation check found for its work (ADR 0047), when the graph is built."""
-    fields = ("citation", "doi", "url", "supports", "status")
+    fields = ("citation", "doi", "url", "supports", "quote", "status")
     rows = []
     for ref in item.get("references", []):
         row = {field: ref[field] for field in fields if field in ref}

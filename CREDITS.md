@@ -92,6 +92,7 @@ Direct dependencies. Each brings its own dependencies, all under permissive lice
 | [MapLibre GL JS](https://maplibre.org/) | The map of where things are found (ADR 0042) | BSD-3-Clause |
 | [Vite](https://vite.dev/), [Vitest](https://vitest.dev/), [TypeScript](https://www.typescriptlang.org/), [ESLint](https://eslint.org/) | Building and testing the web app | MIT, Apache-2.0 |
 | [LikeC4](https://likec4.dev/) | Architecture diagrams (ADR 0039) | MIT |
+| [pypdf](https://github.com/py-pdf/pypdf) | Reading the text of a PDF an agent cites, to find its quote (ADR 0048) | BSD-3-Clause |
 | [pytest](https://pytest.org/), [uv](https://docs.astral.sh/uv/) | Testing and packaging | MIT, MIT or Apache-2.0 |
 
 ## Map tiles
@@ -104,4 +105,4 @@ The map's background ([ADR 0042](docs/adr/0042-show-where-things-are-found-on-a-
 
 ## Tools
 
-- Much of the code, documentation and research for this project was written with [Claude Code](https://claude.com/claude-code) (Anthropic). Facts proposed by AI agents are labelled as such in the app, with a link to the run that produced them ([ADR 0035](docs/adr/0035-propose-curated-facts-with-audited-agents.md)).
+- Much of the code, documentation and research for this project was written with [Claude Code](https://claude.com/claude-code) (Anthropic). Facts proposed by AI agents, which run through Claude Code too, are labelled as such in the app, with the run that produced them ([ADR 0035](docs/adr/0035-propose-curated-facts-with-audited-agents.md), [ADR 0048](docs/adr/0048-run-agents-through-claude-code-on-a-claude-subscription.md)).

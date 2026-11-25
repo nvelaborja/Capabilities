@@ -115,6 +115,8 @@ export interface Reference {
   doi?: string;
   url?: string;
   supports?: string;
+  /** The passage of the work that supports the claim, word for word (an agent's proposal always gives one, ADR 0048). */
+  quote?: string;
   status?: "unverified" | "secondary" | "verified";
   /** What the citation check found for the work (ADR 0047); only in a built graph. */
   check?: ReferenceCheck;
@@ -207,6 +209,8 @@ export interface NodeUpstream {
   record?: string;
   url?: string;
   copied_from?: Named;
+  /** The agent run that proposed the crosswalk row (ADR 0048), and its summary in the repository. */
+  proposed_by?: { run: string; summary: string };
 }
 
 export interface About {

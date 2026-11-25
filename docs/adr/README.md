@@ -40,7 +40,7 @@ Each file records one significant design decision: the context, what we decided,
 | [0032](0032-extract-materials-from-sources-by-routes.md) | Extract materials from sources by ordinary routes | Accepted |
 | [0033](0033-build-a-python-data-platform-around-the-graph.md) | Build a Python data platform around the graph | Accepted |
 | [0034](0034-build-the-graph-from-upstream-datasets-and-a-curated-layer.md) | Build the graph from upstream datasets and a curated layer | Accepted; "the curated layer always wins" superseded by 0043 |
-| [0035](0035-propose-curated-facts-with-audited-agents.md) | Propose curated facts with audited AI agents, reviewed by agents and people | Accepted |
+| [0035](0035-propose-curated-facts-with-audited-agents.md) | Propose curated facts with audited AI agents, reviewed by agents and people | Accepted; models and interfaces, spending caps and the audit log's home superseded by 0048 |
 | [0036](0036-place-sources-and-profiles-in-space-and-time.md) | Place sources and profiles in space and time | Accepted |
 | [0037](0037-license-the-project-for-non-commercial-use-only.md) | License the project for non-commercial use only | Accepted |
 | [0038](0038-serve-the-app-from-a-built-graph-artifact.md) | Serve the app from a built graph artifact (Parquet tables and a manifest, built by dbt) | Accepted |
@@ -53,3 +53,4 @@ Each file records one significant design decision: the context, what we decided,
 | [0045](0045-bring-ore-minerals-in-from-upstream-roast-sulphides-and-queue-the-gaps.md) | Bring ore minerals in from upstream, roast copper sulphides, and queue the gaps | Accepted |
 | [0046](0046-place-ancient-mines-and-quarries-from-pleiades.md) | Place ancient mines and quarries from Pleiades | Accepted |
 | [0047](0047-check-citations-against-openalex-and-crossref.md) | Check citations against OpenAlex and Crossref | Accepted |
+| [0048](0048-run-agents-through-claude-code-on-a-claude-subscription.md) | Run curation agents through Claude Code on a Claude subscription, and start with ore candidates | Proposed |

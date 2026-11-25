@@ -50,6 +50,10 @@
           "description": "The specific claim in this file that the source supports.",
           "type": "string"
         },
+        "quote": {
+          "description": "The passage of the source that supports the claim, word for word.",
+          "type": "string"
+        },
         "status": {
           "description": "unverified = cited but not checked; secondary = taken from a secondary summary of the source; verified = a reviewer read the source and confirmed the claim.",
           "enum": ["unverified", "secondary", "verified"]

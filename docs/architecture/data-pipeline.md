@@ -1,6 +1,6 @@
 # Data pipeline
 
-Reference for how the graph is built: inputs, stages, tables, outputs, checks and commands. The diagrams are at `/architecture/`: `pipeline_overview` shows the build as stages in series (1a curated layer and 1b download, 2 load, 3a transform and 3b test, 4 publish, 5 serve), and `pipeline` shows every input, table and output in the same stages, with green lineage arrows for where the data goes next. For background on the tools, see [DuckDB](technologies/duckdb.md), [dbt](technologies/dbt.md), [Parquet](technologies/parquet.md) and [Dagster](technologies/dagster.md). Decisions: [ADR 0034](../adr/0034-build-the-graph-from-upstream-datasets-and-a-curated-layer.md) (a built graph from a curated layer and, later, upstream datasets) [ADR 0038](../adr/0038-serve-the-app-from-a-built-graph-artifact.md) (the artifact the app reads), [ADR 0040](../adr/0040-orchestrate-the-build-with-dagster.md) (Dagster, and the quick build without it), [ADR 0041](../adr/0041-place-sources-with-mrds-deposits-through-a-crosswalk.md) (MRDS deposits as source occurrences) [ADR 0043](../adr/0043-take-quantities-from-wikidata-with-upstream-first-and-overrides.md) (quantities from Wikidata, upstream first, with overrides) [ADR 0044](../adr/0044-require-every-upstream-dataset-with-cold-backups-in-git.md) (every dataset required, with cold backups in git) and [ADR 0045](../adr/0045-bring-ore-minerals-in-from-upstream-roast-sulphides-and-queue-the-gaps.md) (ore minerals from upstream as nodes, and the curation queue). Spatial work uses [DuckDB spatial and GeoParquet](technologies/duckdb-spatial-and-geoparquet.md); Wikidata is queried with [SPARQL](technologies/wikidata-and-sparql.md).
+Reference for how the graph is built: inputs, stages, tables, outputs, checks and commands. The diagrams are at `/architecture/`: `pipeline_overview` shows the build as stages in series (1a curated layer and 1b download, 2 load, 3a transform and 3b test, 4 publish, 5 serve), and `pipeline` shows every input, table and output in the same stages, with green lineage arrows for where the data goes next. For background on the tools, see [DuckDB](technologies/duckdb.md), [dbt](technologies/dbt.md), [Parquet](technologies/parquet.md) and [Dagster](technologies/dagster.md). Decisions: [ADR 0034](../adr/0034-build-the-graph-from-upstream-datasets-and-a-curated-layer.md) (a built graph from a curated layer and, later, upstream datasets) [ADR 0038](../adr/0038-serve-the-app-from-a-built-graph-artifact.md) (the artifact the app reads), [ADR 0040](../adr/0040-orchestrate-the-build-with-dagster.md) (Dagster, and the quick build without it), [ADR 0041](../adr/0041-place-sources-with-mrds-deposits-through-a-crosswalk.md) (MRDS deposits as source occurrences) [ADR 0043](../adr/0043-take-quantities-from-wikidata-with-upstream-first-and-overrides.md) (quantities from Wikidata, upstream first, with overrides) [ADR 0044](../adr/0044-require-every-upstream-dataset-with-cold-backups-in-git.md) (every dataset required, with cold backups in git) [ADR 0045](../adr/0045-bring-ore-minerals-in-from-upstream-roast-sulphides-and-queue-the-gaps.md) (ore minerals from upstream as nodes, and the curation queue) and [ADR 0048](../adr/0048-run-agents-through-claude-code-on-a-claude-subscription.md) (agents proposing ore crosswalk rows). Spatial work uses [DuckDB spatial and GeoParquet](technologies/duckdb-spatial-and-geoparquet.md); Wikidata is queried with [SPARQL](technologies/wikidata-and-sparql.md).
 
 ## Summary
 
@@ -102,7 +102,7 @@ Every table is replaced on every build. The crosswalks and suppressions are load
 
 **`raw.wikidata_things`**: the crosswalk `data/crosswalks/wikidata_things.csv`: `id`, `wikidata` (a Q id) and `notes`.
 
-**`raw.ore_minerals`**: the crosswalk `data/crosswalks/ore_minerals.csv`: `id`, `wikidata`, `mrds_ore`, `class`, `mined_like`, `citation`, `url`, `supports`, `notes` ([data format](../data-format.md)).
+**`raw.ore_minerals`**: the crosswalk `data/crosswalks/ore_minerals.csv`: `id`, `wikidata`, `mrds_ore`, `class`, `mined_like`, `citation`, `url`, `supports`, `quote`, `status`, `proposed_by`, `notes` ([data format](../data-format.md)).
 
 **`raw.wikidata_items`**: the Wikidata items snapshot, as text.
 
@@ -198,7 +198,7 @@ Tests: `kind` not null; `label` not null for every node (overrides have none).
 - `<id>-deposit`: a regional source;
 - `mine-<id>`: the `mined_like` route as a JSON patch, with the mineral, its deposit, its label (the template's, with the template material's name replaced) and its outputs swapped in. Its references are the template's, each made `unverified`, with `supports` prefixed "Cited for the route this copies (<template label>): ".
 
-Each node's provenance is `{"layer": "upstream", "crosswalk": "data/crosswalks/ore_minerals.csv", ...}` with what it came from: the mineral `"dataset": "wikidata", "record": <Q id>, "url": ...`; the deposit `"dataset": "mrds", "record": "deposits listing <MRDS name> as an ore mineral"`; the route `"copied_from": <template>`.
+Each node's provenance is `{"layer": "upstream", "crosswalk": "data/crosswalks/ore_minerals.csv", ...}` with what it came from: the mineral `"dataset": "wikidata", "record": <Q id>, "url": ...`; the deposit `"dataset": "mrds", "record": "deposits listing <MRDS name> as an ore mineral"`; the route `"copied_from": <template>`. A row an agent proposed adds `"proposed_by": <run>` to all three, and its `quote` joins the mineral's reference ([ADR 0048](../adr/0048-run-agents-through-claude-code-on-a-claude-subscription.md)); empty values leave the keys out.
 
 **`stg_mrds__deposits`** (view). One row per MRDS deposit, typed.
 
@@ -345,7 +345,57 @@ The same steps are Dagster assets ([Dagster](technologies/dagster.md)). `assets.
 | `graph_facts`, `graph_nodes`, `source_occurrences`, `reference_checks`, `curation_queue` | marts | dbt marts, written as Parquet | Their tests above |
 | `graph_manifest` | marts | Publish (`write_manifest`) | None |
 
+**The agent job.** `agent_curation` is a job, not an asset, so "Materialize all" never starts it. Its one op, `curate_ore_candidates`, takes its size and settings as run config (`items`, `evaluate`, the two models, the usage thresholds, `pull_request`, `base`) and the `downloads` resource for the gate's downloads. See [Agent curation](#agent-curation).
+
 Every dbt test that belongs to one model or source is an asset check (94 today). Tests that compare two tables, such as `crosswalk_maps_to_sources`, still run in `dbt build` but aren't attached to an asset. "Materialize all" downloads every dataset again, and looks up every cited work; to rebuild from the snapshots you have, select everything except the `upstream` group. Loading the definitions runs `dbt parse` first, so the asset list always matches the dbt project. dbt's files for each Dagster run go in `build/dbt/target/<run>/`.
+
+## Agent curation
+
+Agents work through the curation queue's ore candidates and propose rows for the ore crosswalk ([ADR 0035](../adr/0035-propose-curated-facts-with-audited-agents.md), [ADR 0048](../adr/0048-run-agents-through-claude-code-on-a-claude-subscription.md), [Claude Code agents](technologies/claude-code-agents.md)). It is a stage beside the build, not in it: started by hand, it reads the built graph's queue and ends in a draft pull request against the curated layer, which a person merges or closes. Nothing an agent proposes reaches the built graph until then.
+
+```
+curation_queue.parquet ──▶ ore candidates, top N ──▶ for each, one at a time:
+                                                     proposer (claude -p: web search and fetch) ──▶ a crosswalk row and a quote
+                                                       ▼
+                                                     mechanical checks: class and template, Wikidata item, id, site,
+                                                     page downloaded by us (HTML, PDF, text), quote on it word for word
+                                                       ▼ (fail: back to the proposer, with the reasons; two proposals at most)
+                                                     reviewer (claude -p: no tools) reads the downloaded page ──▶ accept / revise / reject
+accepted rows ──▶ temporary worktree, branch agents/<run>, from origin/main:
+                  write the crosswalk ─▶ download Wikidata items and quantities, OpenAlex and Crossref ─▶ build and test
+                  ─▶ drop rows whose cited work isn't found, and check the rest again
+                  ─▶ back up the three snapshots, regenerate CREDITS.md, write data/agent_runs/<run>.json
+                  ─▶ commit, push, gh pr create --draft
+every call, check and outcome ──▶ audit/agents.duckdb (append-only), and the run's summary to audit/runs/<run>.json
+```
+
+| Step | Code | What it checks or writes |
+|---|---|---|
+| Preflight | `claude.check_login`, `branch.check_gh` | `claude auth status` says `claude.ai` and no API key is set; `gh` is logged in. Before anything is spent. |
+| Items | `ore_candidates.queue_candidates`, `evaluation_set` | The first N `ore_candidate` items of the current build's queue, most widely listed first. An evaluation takes the minerals a person decided instead, treating their rows as undecided. |
+| Propose | `curate.Curator`, `prompts/ore_proposer.md` | Opus 5.5 (by default) with web search and fetch, 30 turns, answering to `PROPOSAL_SCHEMA`: Wikidata item, class or `none`, citation, URL, quote, supports, notes; or `unsure`. |
+| Check | `ore_candidates.check`, `web.py` | The class has a route to be mined like (the one its rows use); the Wikidata item exists, wasn't merged, is called the mineral's name, and is in no crosswalk; the id is new; the site may be cited (not Mindat); the page is on the public web (never this machine or its network, nor a redirect there) and loads; the quote (40 to 1,000 characters) is on it word for word, ignoring case and typography, and names the mineral. |
+| Challenge | `prompts/ore_reviewer.md` | Opus 5.5 with no tools, 3 turns: the proposal, the Wikidata item and 2,500 characters each side of the quote, as downloaded. `REVIEW_SCHEMA`: accept, revise or reject, with objections. |
+| Gate | `branch.gate`, `branch.work_check` | Downloads `wikidata_items`, `wikidata_quantities` and `reference_candidates` for the worktree, and builds it. A row passes when its cited work is `found` or `review_found`, or is a web page whose link works; a rejected mineral's (`none`) isn't looked up. |
+| Publish | `branch.publish` | The crosswalk, the three refreshed backups, `CREDITS.md` and `data/agent_runs/<run>.json`, in one commit on `agents/<run>` (`feat(data): agent proposals for …`); a draft pull request titled "Agent proposals: …". Text from pages and agents in its body can't mention anyone on GitHub. |
+
+A run stops before its next item when the plan's five-hour usage, as Claude Code last reported it, reaches `stop_at_five_hour` (0.8) or the weekly reaches `stop_at_seven_day` (0.9), and at once if a call says the limit is reached. The thresholds are shares (0.8, not 80): a run refuses anything outside 0 to 1, which would never stop it. What was accepted before it stopped still goes through the gate.
+
+**The audit log** (`audit/agents.duckdb`, not in git; `agents/audit.py`). Rows are only ever added:
+
+| Table | One row per |
+|---|---|
+| `run_starts` | Run started: its id, task, mode (`propose` or `evaluate`), settings with the prompts' versions, login method and plan, and git commit |
+| `calls` | Call to an agent: item, attempt, role, prompt version, model (the alias asked for and the model it ran on) and settings, the prompt, the answer, every tool call (searches and URLs), token usage, API-equivalent cost, the plan's usage after it, turns, time, error, and every event printed |
+| `checks` | Mechanical check: its name, whether it passed, and why |
+| `outcomes` | Item's outcome (`accepted`, `rejected`, `sent_back`, `unsure`, `failed`) and reason, with the row when accepted. A later row for the same item (dropped at the gate) supersedes an earlier one |
+| `run_ends` | Run finished, however it ended (an error too): why it stopped early, if it did, the outcomes, the pull request, and the usage |
+
+```python
+import duckdb
+duckdb.sql("select run_id, item, outcome, reason from 'audit/agents.duckdb'.outcomes order by recorded_at").show()
+duckdb.sql("select run_id, role, count(*), sum(cost_usd) from 'audit/agents.duckdb'.calls group by all").show()
+```
 
 ## Freshness
 
@@ -374,6 +424,7 @@ A build is current when `manifest.json` exists, its `fingerprint` equals the fin
 | Pleiades tests (`pipeline/tests/test_pleiades.py`) | 13 real Pleiades places (`pipeline/tests/fixtures/pleiades-sample.csv`), gzipped and "downloaded" from a local file; and every place, from the cold backup | Matching by tag and by text, "Iron Age", class-level copper mines, dates, approximate locations, unmatched places in the queue, suppressions, and class-level places on a mineral's map. |
 | Citation tests (`pipeline/tests/test_citations.py`) | What OpenAlex and Crossref answered on 2026-11-24 (the committed backup, `snapshots/reference_candidates/`), served by a local stand-in for both (`scholarly_endpoint` in `conftest.py`), with links answered from the backup too (`lookups_offline`); a local service that is always busy or answers a web page | A download gives back the backup unchanged; each work looked up once; DOIs, searches and web pages; retries and the fallback; only web links opened; every result, a wrong DOI, a citation or DOI added since the lookup, free copies only for works found, and the reading queue (copied routes and the ore crosswalk's `status`), with no network. |
 | Ore mineral tests (`pipeline/tests/test_ore_minerals.py`) | The built graph from the cold backups | The upstream nodes, roasting, and the queue. |
+| Agent tests (`pipeline/tests/test_agents.py`) | A stand-in for `claude` that plays back scripted answers as stream-json (`fixtures/agents/fake_claude.py`), a fake web of made-up pages and Wikidata items, a stand-in `gh`, and for the gate a throwaway git repository with a local bare "origin" and the Wikidata, OpenAlex and Crossref stand-ins | Calling Claude Code (arguments, events, limits, the login check and an API key), reading pages and quotes, every mechanical check, retries and their bound, the reviewer's view, usage thresholds, the audit log, the evaluation score, and a whole run to a draft pull request with a row dropped at the gate, with no network and no Claude usage. |
 | Wikidata tests (`pipeline/tests/test_wikidata.py`) | 4 real Wikidata statements (`pipeline/tests/fixtures/wikidata-sample.csv`) and every crosswalked item's label, description and formula (the committed backup, `snapshots/wikidata_items/`), served by a local stand-in for the SPARQL endpoint (`wikidata_endpoint` in `conftest.py`) | The query, the snapshot, precedence, overrides (and stale ones) and suppressions, with no network. |
 
 The built graph has the curated graph's documents in the same order, except that each thing's quantities are the values `graph_facts` chose, followed by the upstream nodes. `pipeline/tests/test_build.py` checks both. Copies of the data made for tests (`data_copy`) link to the real cold backups; a test that needs a dataset missing replaces the link with a copy that leaves it out.
@@ -390,6 +441,9 @@ The built graph has the curated graph's documents in the same order, except that
 | `pipeline/dbt/dbt_project.yml` | Project settings: staging models are views, marts are external Parquet, each layer's Dagster group, and anonymous usage statistics are off. |
 | `pipeline/dbt/profiles.yml` | The DuckDB connection: the warehouse path, and `external_root` (where external models are written), both from `$CAPABILITIES_BUILD_DIR`, and the `spatial` extension. DuckDB downloads the extension the first time it loads it. |
 | `pipeline/pyproject.toml`, `[tool.dg]` | Where the `dg` command finds the Dagster definitions. |
+| `audit/agents.duckdb`, `audit/runs/<run>.json` | The agents' append-only audit log, and every run's summary. Ignored by git. `$CAPABILITIES_AUDIT_DIR` puts them elsewhere (tests do). |
+| `data/agent_runs/<run>.json` | The summary of a run whose proposals are in a pull request, committed with them. |
+| `pipeline/src/capabilities_pipeline/agents/prompts/`, `evaluation/` | The agents' prompts, and the evaluation set. |
 
 The build directory is, in order: `--build-dir`, then `$CAPABILITIES_BUILD_DIR`, then `build/` in the repository. `build/` is ignored by git. Tests always use a temporary directory.
 
@@ -419,6 +473,9 @@ cd pipeline && uv run dg launch --assets 'upstream/mrds_deposits'   # just downl
 cd pipeline && uv run dg launch --assets 'upstream/wikidata_quantities'   # just query Wikidata again
 uv run capabilities backup                     # make newer downloads the cold backups in snapshots/ (then commit)
 uv run capabilities queue                      # the curation queue: what to review next
+claude auth status                             # agents run on this login: authMethod must be "claude.ai"
+cd pipeline && uv run dg launch --job agent_curation --config-json '{"ops": {"curate_ore_candidates": {"config": {"items": 10, "evaluate": true}}}}'   # an evaluation
+cd pipeline && uv run dg launch --job agent_curation --config-json '{"ops": {"curate_ore_candidates": {"config": {"items": 5}}}}'   # five queue items, to a draft PR
 ```
 
 To look at the output from Python:
@@ -439,7 +496,7 @@ duckdb.sql("select id, layer, value, curated_value, disagrees from 'build/graph/
 |---|---|
 | M1 | Done: Dagster runs the build; MRDS, the MRDS crosswalk and `source_occurrences`, served by `GET /api/occurrences/{id}` to the map; Wikidata's quantities through a crosswalk, overrides, suppressions and `graph_facts`; every dataset required, with cold backups; upstream ore minerals as nodes, roasting, and `curation_queue`. Pleiades' ancient mines and quarries as occurrences of sources and ore classes, and `unmatched_place` in the queue (slice 4c, [ADR 0046](../adr/0046-place-ancient-mines-and-quarries-from-pleiades.md)). |
 | M2 | Done: every cited work looked up in OpenAlex and Crossref, and every cited link checked (`upstream/reference_candidates`); the `reference_checks` mart; the reading queue (`unread_reference`) ([ADR 0047](../adr/0047-check-citations-against-openalex-and-crossref.md)). |
-| M3 | The agent curation stage and its append-only audit log. |
+| M3 | Slice 3a: the agent curation job on ore candidates, its mechanical checks, gate, draft pull requests and append-only audit log, on a Claude subscription ([ADR 0048](../adr/0048-run-agents-through-claude-code-on-a-claude-subscription.md)). Next: sources for routes whose references are all unverified (3b), then the report button, withdrawal and batch re-checks by run (3c). |
 | M5 | Raw and staging tables move to Apache Iceberg with an Apache Polaris catalog; the build still exports this artifact for the app. |
 
 Each change updates this page in the same pull request ([ADR 0039](../adr/0039-keep-architecture-docs-and-diagrams-current.md)).
