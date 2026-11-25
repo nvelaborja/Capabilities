@@ -165,6 +165,7 @@ dependencies = [
     { name = "dbt-core" },
     { name = "dbt-duckdb" },
     { name = "pypdf" },
+    { name = "python-dotenv" },
     { name = "truststore" },
 ]
 
@@ -178,6 +179,7 @@ requires-dist = [
     { name = "dbt-core", specifier = ">=1.10" },
     { name = "dbt-duckdb", specifier = ">=1.9" },
     { name = "pypdf", specifier = ">=7.1" },
+    { name = "python-dotenv", specifier = ">=1.2" },
     { name = "truststore", specifier = ">=0.10" },
 ]
 
