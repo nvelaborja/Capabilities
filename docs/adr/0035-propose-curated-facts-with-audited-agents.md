@@ -1,6 +1,6 @@
 # 0035. Propose curated facts with audited AI agents, reviewed by agents and people
 
-- **Status:** Accepted
+- **Status:** Accepted; models and interfaces, spending caps and API rate limits, and where the audit log lives superseded by [0048](0048-run-agents-through-claude-code-on-a-claude-subscription.md)
 - **Date:** 2026-11-20
 
 ## Context

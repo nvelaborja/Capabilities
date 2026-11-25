@@ -21,6 +21,7 @@ One page per technology the project uses. Each page teaches the technology, enou
 | dbt | Transforms and tests the data inside DuckDB | [dbt.md](dbt.md) |
 | Wikidata and SPARQL | Quantity values for our things, from one query to Wikidata | [wikidata-and-sparql.md](wikidata-and-sparql.md) |
 | OpenAlex and Crossref | Checking that cited works exist, and finding free copies to read | [openalex-and-crossref.md](openalex-and-crossref.md) |
+| Claude Code agents | Agents that propose ore crosswalk rows, on a Claude subscription, checked by code and by each other | [claude-code-agents.md](claude-code-agents.md) |
 | Dagster | Orchestration: the build as assets, with lineage, checks and run history | [dagster.md](dagster.md) |
 | FastAPI | The API server | [fastapi.md](fastapi.md) |
 | React, Vite and Cytoscape.js | The web app and the graph drawing | [react-vite-and-cytoscape.md](react-vite-and-cytoscape.md) |
@@ -34,7 +35,6 @@ These get a page in the pull request that introduces them ([ADR 0039](../../adr/
 
 | Technology | Milestone | Role |
 |---|---|---|
-| AI agents (Claude API) | M3 | Proposing and challenging curated facts, with an audit log |
 | Apache Iceberg | M5 | Table format on object storage: snapshots, time travel, schema evolution |
 | Apache Polaris | M5 | The Iceberg REST catalog shared by every engine |
 | SeaweedFS | M5 | S3-compatible object storage, locally |

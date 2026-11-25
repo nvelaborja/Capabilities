@@ -10,7 +10,7 @@ model {
   }
 
   github = external 'GitHub' {
-    description 'Hosts the repository and pull requests, and runs CI (GitHub Actions): validate, build the graph, tests, lint and the web build.'
+    description 'Hosts the repository and pull requests, agents\' draft pull requests among them, and runs CI (GitHub Actions): validate, build the graph, tests, lint and the web build.'
   }
 
   openfreemap = external 'OpenFreeMap' {
@@ -37,6 +37,14 @@ model {
     description 'The DOI registration agency; its REST API serves publishers\' bibliographic metadata, without restrictions. It finds each work we cite by DOI, or from the whole citation (query.bibliographic) (ADR 0047).'
   }
 
+  claude = external 'Claude, through Claude Code' {
+    description 'Anthropic\'s Claude models, reached through the Claude Code CLI in print mode (claude -p) on the owner\'s Claude subscription, so agent runs draw on the plan\'s usage limits rather than an API bill. Each call starts clean, with only its role\'s tools (ADR 0048).'
+  }
+
+  theWeb = external 'The web' {
+    description 'The pages agents search and cite: papers, museum, university and survey pages. The pipeline downloads every cited page itself to check its quote.'
+  }
+
   capabilities = system 'Capabilities' {
     description 'A free, non-commercial knowledge graph of what it physically takes to make and do things, with a reasoner that answers three questions.'
 
@@ -56,6 +64,11 @@ model {
       description 'A copy of every upstream dataset, so the graph builds offline, in CI and when a download fails. Every dataset is required: a build uses the newest copy, download or backup, and stops if one has neither (ADR 0044).'
     }
 
+    audit = store 'Audit log' {
+      technology 'DuckDB, append-only (audit/agents.duckdb), not in git'
+      description 'Every agent run: its start and end, every call (prompt version, model, answer, tool calls, tokens, the plan\'s usage), every mechanical check and every outcome. Rows are only ever added (ADR 0048).'
+    }
+
     pipeline = container 'Pipeline' {
       technology 'Python, dbt Core, dbt-duckdb, Dagster'
       description 'pipeline/: builds the graph from its inputs, with `capabilities build` or as Dagster assets.'
@@ -71,6 +84,10 @@ model {
       dagster = component 'Dagster assets' {
         technology 'Dagster, dagster-dbt (assets.py, definitions.py)'
         description 'The same steps as assets, plus the MRDS and Wikidata downloads: grouped upstream, raw, staging and marts. dbt tests are asset checks. `dg dev` shows lineage and run history.'
+      }
+      agents = component 'Agent curation' {
+        technology 'Python, Claude Code CLI, Dagster job agent_curation (capabilities_pipeline.agents)'
+        description 'Started by hand with a size: a proposer agent researches each ore candidate and proposes a crosswalk row; code checks it, downloading the cited page; a reviewer agent challenges it. Accepted rows are built and tested in a temporary worktree and opened as a draft pull request (ADR 0035, ADR 0048).'
       }
       dbt = component 'dbt project' {
         technology 'dbt Core with the DuckDB adapter'
@@ -323,6 +340,19 @@ model {
   capabilities.warehouse.stgMrds -> capabilities.artifact.occurrences 'deposits with coordinates, as points'
   capabilities.warehouse.rawCrosswalk -> capabilities.artifact.occurrences 'match rules'
   capabilities.warehouse.rawSnapshots -> capabilities.artifact.occurrences 'retrieval time, for provenance'
+
+  contributor -> capabilities.pipeline.agents 'launches an agent run by hand, and merges or closes its pull request'
+  capabilities.pipeline.dagster -> capabilities.pipeline.agents 'runs the agent_curation job'
+  capabilities.pipeline.agents -> capabilities.artifact.queue 'takes the top ore candidates'
+  capabilities.pipeline.agents -> claude 'asks the proposer and the reviewer (claude -p, stream-json)'
+  claude -> theWeb 'searches and fetches (the proposer only)'
+  capabilities.pipeline.agents -> theWeb 'downloads each cited page, to find the quote word for word'
+  capabilities.pipeline.agents -> wikidata 'reads the item each proposal names'
+  capabilities.pipeline.agents -> capabilities.pipeline.downloader 'gate: downloads what the new rows need'
+  capabilities.pipeline.agents -> capabilities.pipeline.loader 'gate: builds and tests the worktree'
+  capabilities.pipeline.agents -> capabilities.audit 'appends every call, check and outcome'
+  capabilities.pipeline.agents -> github 'pushes agents/<run> and opens a draft pull request (gh)'
+  github -> capabilities.curated 'a merged pull request adds the rows'
 
   // Lineage: the data, stage to stage, the way it flows (view pipeline).
   mrds -[lineage]-> capabilities.snapshots 'mrds-csv.zip, as Parquet'

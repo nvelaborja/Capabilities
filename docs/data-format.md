@@ -184,15 +184,19 @@ Don't keep a curated value that Wikidata gives: remove it, and the references th
 | `class` | The ore class it joins: `copper-ore`, `copper-sulphide-ore` (roasted before smelting), `iron-ore`, `tin-ore`; or `none` for a mineral reviewed and rejected |
 | `mined_like` | The curated route it is mined like (`mine-malachite`, `mine-hematite`); empty for a rejected row |
 | `citation`, `url`, `supports` | The reference that puts it in its class (or rejects it), and what it supports. Credited in CREDITS.md |
+| `quote` | The passage of the reference that supports it, word for word. Optional for a person; an agent's row always has one, found on the page by code ([ADR 0048](adr/0048-run-agents-through-claude-code-on-a-claude-subscription.md)). Shown under the reference in the app |
 | `status` | How far that reference has been checked: `unverified`, `secondary` or `verified`, as for any reference. Empty means `unverified` |
+| `proposed_by` | The agent run that proposed the row (`ore-20261125-090000`), whose summary is `data/agent_runs/<run>.json`; empty for a row a person wrote. The app says "Proposed by an agent" on its nodes |
 | `notes` | Added to its description |
 
 ```csv
-id,wikidata,mrds_ore,class,mined_like,citation,url,supports,status,notes
-siderite,Q192669,Siderite,iron-ore,mine-hematite,"Föll, H. ...",https://...,"Siderite is relatively easy to smelt...",,An iron carbonate.
+id,wikidata,mrds_ore,class,mined_like,citation,url,supports,quote,status,proposed_by,notes
+siderite,Q192669,Siderite,iron-ore,mine-hematite,"Föll, H. ...",https://...,"Siderite is relatively easy to smelt...",,,,An iron carbonate.
 ```
 
 Add a mineral only with a reference that it was smelted as its class says; leave it in the curation queue otherwise (`uv run capabilities queue`). Rejecting a mineral (`none`, with the reference that says why) takes it off the queue. After adding rows, query Wikidata again, as for `wikidata_things.csv`.
+
+Agents can work through the ore candidates too, on a Claude subscription ([ADR 0048](adr/0048-run-agents-through-claude-code-on-a-claude-subscription.md)): `cd pipeline && uv run dg launch --job agent_curation --config-json '{"ops": {"curate_ore_candidates": {"config": {"items": 5}}}}'`. What passes their checks arrives as a draft pull request; merge, edit or close it as you would anyone's. An agent's references stay `unverified`.
 
 `pleiades_sources.csv` places Pleiades' ancient mines and quarries at our sources and ore classes, with the years they are attested ([ADR 0046](adr/0046-place-ancient-mines-and-quarries-from-pleiades.md)). One row per rule:
 
@@ -320,4 +324,5 @@ For example: deadwood 0, stone chopper 1, timber and cut timber 2, heat 4, charc
 - `status` is honest about checking: `unverified` (cited, not checked), `secondary` (taken from a summary of the source), `verified` (someone read the source and confirmed the claim).
 - `TODO-source` in a note marks a number or claim that still needs a source. Search for it to find work to do.
 - `supports` says exactly which claim the source backs.
+- `quote` (optional) gives the passage that backs it, word for word; the app shows it under the reference. Agents always give one ([ADR 0048](adr/0048-run-agents-through-claude-code-on-a-claude-subscription.md)).
 - The build looks every cited work up in OpenAlex and Crossref, and checks every cited link ([ADR 0047](adr/0047-check-citations-against-openalex-and-crossref.md)). The results are in the detail pane under each reference, and the works not yet verified are the reading queue (`uv run capabilities queue`, `unread_reference`), with a free copy where one is known. A check never changes `status`: finding a work says it exists, not that it supports the claim. Read it, then change the YAML (or the ore crosswalk's `status` column). A work leaves the reading queue when every use of it is verified, except the copies of a route an ore mineral is mined like: those follow their template, where the work is read. Write citations as `Author, A. (Year). Title. Publisher.`, which is what the lookup reads, and give the `doi` when there is one.
