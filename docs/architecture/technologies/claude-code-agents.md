@@ -47,7 +47,7 @@ The Dagster job `agent_curation` ([ADR 0048](../../adr/0048-run-agents-through-c
 2. **Find, in code:** the mineral's Wikidata item (search, then the item called exactly its name that is a mineral species); the sources (pages the repository already cites, then OpenAlex's open-access works); and the passages: sentences naming the mineral and ore or smelting, word for word. Nothing found: the item is skipped, and no model is asked.
 3. **Choose:** the proposer (Sonnet at medium effort, 3 turns) gets the numbered passages and answers with a class or `none` and the passage that supports it, or `unsure`. Code fills in the quote, citation and URL from the passage.
 4. **Check:** code checks the class, the item, the id, the site and the quote on the page.
-5. **Challenge:** the reviewer (Opus, 3 turns) gets the proposal and the page around the quote, never what else the proposer was offered, and accepts, asks for a revision, or rejects.
+5. **Challenge:** the reviewer (Sonnet at high effort, 3 turns) gets the proposal and the page around the quote, never what else the proposer was offered, and accepts, asks for a revision, or rejects.
 6. **Gate and pull request:** accepted rows are written into a temporary worktree, the downloads they need are made and the graph built; a row is dropped only if the DOI it cites leads to another work; the rest become a draft pull request.
 
 Every call, check and outcome is appended to `audit/agents.duckdb`. A run stops before its next item once the plan's five-hour usage passes 80% (or weekly 90%), and at once if the limit is reached.
@@ -79,7 +79,7 @@ cd .. && python3 -c "import duckdb; duckdb.sql(\"select item, outcome, reason fr
 
 - **An API key in the environment changes who pays.** The run refuses to start with one set, rather than unset it silently.
 - **Your own Claude use and the agents share the limits.** A run that stops at 80% leaves you the rest of the window.
-- **Model and effort are what a call uses up.** Each role's `--model` and `--effort` (low to max) are settings of the run. The first evaluation, on Opus at its default effort, used about 6–7 points of a Pro plan's five-hour window per item (ADR 0048, *Evaluation*).
+- **Model and effort are what a call uses up.** Each role's `--model` and `--effort` (low to max) are settings of the run. The first evaluation, an Opus agent searching the web, used about 6–7 points of a Pro plan's five-hour window per item; with code finding the sources and Sonnet choosing (medium effort) and reviewing (high), about 0.4 (ADR 0048, *Evaluation*).
 - **A failed call still costs.** A call that runs out of turns prints its usage and the plan's limits all the same; the pipeline counts them, so the stop thresholds see them.
 - **`opus` is an alias.** It moves to newer models; the model a call actually ran on is in its `system` `init` event, and the audit log and run summary keep both.
 - **Records from outside choose what the pipeline downloads.** An OpenAlex record or a page could point anywhere, so the download refuses anything off the public web (this machine, its network, a cloud's metadata address), redirects included.

@@ -35,13 +35,20 @@ SMELTING = re.compile(r"\b(smelt\w*|roast\w*|bloomer\w*|crucibles?|furnaces?)\b"
 PAST = re.compile(r"\b(ancient|prehistor\w*|bronze age|iron age|chalcolithic|neolithic|roman|medieval|antiquity|"
                   r"archaeo\w*|early|historic\w*|BC|BCE)\b", re.IGNORECASE)
 # What isn't a sentence of prose: a link, a DOI, a header or footer, a reference, a keyword list.
-NOT_PROSE = re.compile(r"https?://|doi|\bvol\b|©|keywords?:|isbn|issn|et al\.,? \(?\d{4}|\d+\s*[–-]\s*\d+\s*$",
-                       re.IGNORECASE)
+NOT_PROSE = re.compile(r"https?://|doi|\bvol\b|©|keywords?:|isbn|issn|\d+\s*[–-]\s*\d+\s*$", re.IGNORECASE)
+# A reference-list entry starts with a surname and initials ("Smith J, Jones K (2001) …"); a sentence that cites a work
+# in passing ("… (Tylecote et al. 1971) …") is still prose.
+REFERENCE_ENTRY = re.compile(r"^[A-Z][\w'’-]+ [A-Z]{1,3}[,(]|^[A-Z][\w'’-]+, (?:[A-Z]\. ?){1,3}[,(]")
 # A figure's or table's caption describes a picture, not what happened: never the evidence (Bornite, 2026-11-25).
 CAPTION = re.compile(r"^\W*(fig(ure)?|table|plate|pl)\.?\s*[\dIVXivx]+\b", re.IGNORECASE)
 # A caption's label alone, which a full stop splits from its text ("Table IV." then the caption's text).
 CAPTION_LABEL = re.compile(r"^\W*(fig(ure)?|table|plate|pl)\.?\s*[\dIVXivx]+[a-z]?[.:]?$", re.IGNORECASE)
 SENTENCE_END = re.compile(r"(?<=[.!?])[\"”’)]?\s+(?=[\"“‘(]?[A-Z0-9])")
+# A full stop that ends an abbreviation or an initial, not a sentence: "(Fig. 2)", "Tylecote et al. 1971", "J. Smith".
+# Splitting there cut accepted quotes off mid-sentence (Chalcopyrite and Siderite, 2026-11-25).
+ABBREVIATION = re.compile(r"(\b(figs?|et al|e\.g|i\.e|cf|ca|approx|nos?|vols?|pp?|eds?|pls?|tabs?|sect|ch|esp|resp|vs|"
+                          r"incl|dr|prof|st|mt)|\(c)\.$", re.IGNORECASE)
+INITIAL = re.compile(r"(^|[\s(])[A-Z]\.$")
 SENTENCE_LENGTH = (40, 1000)  # what a quote may be (ore_candidates.QUOTE_LENGTH)
 # Archaeometallurgy first: a plain "smelting" finds mostly today's industry, and "ore" its mineral processing.
 OPENALEX_SEARCHES = ("{name} archaeometallurgy", "{name} ancient smelting")
@@ -203,13 +210,25 @@ def openalex_citation(work: dict) -> str:
                                       f"{title}.", f"{venue}." if venue else "") if part).strip()
 
 
+def _sentences(block: str) -> list[str]:
+    """A block's sentences: split where a sentence ends, then mended where the split came after an abbreviation or an
+    initial instead."""
+    sentences: list[str] = []
+    for piece in (p for p in SENTENCE_END.split(block) if p):
+        if sentences and (ABBREVIATION.search(sentences[-1]) or INITIAL.search(sentences[-1])):
+            sentences[-1] += " " + piece
+        else:
+            sentences.append(piece)
+    return sentences
+
+
 def _is_prose(sentence: str) -> bool:
     """A sentence someone wrote, not a header, footer, reference or keyword list a PDF's text runs together: eight words
     or more, mostly letters, ending as a sentence ends, and none of the marks of a reference or a page header."""
     letters = sum(c.isalpha() for c in sentence)
     return (len(sentence.split()) >= 8 and sentence.rstrip("\"”’)")[-1:] in ".!?" and letters / len(sentence) > 0.7
-            and sum(c.isdigit() for c in sentence) / len(sentence) < 0.05 and not NOT_PROSE.search(sentence)
-            and not CAPTION.search(sentence))
+            and sum(c.isdigit() for c in sentence) / len(sentence) < 0.1 and not NOT_PROSE.search(sentence)
+            and not CAPTION.search(sentence) and not REFERENCE_ENTRY.search(sentence))
 
 
 def _passages_in(text: str, names: set[str], lines_are_blocks: bool) -> list[tuple[int, str, str, str]]:
@@ -219,7 +238,7 @@ def _passages_in(text: str, names: set[str], lines_are_blocks: bool) -> list[tup
     allows."""
     if not lines_are_blocks:
         text = re.sub(r"(\w)-\s*\n\s*(\w)", r"\1\2", text).replace("\n", " ")
-    sentences = [s for block in text.split("\n") for s in SENTENCE_END.split(" ".join(block.split())) if s]
+    sentences = [s for block in text.split("\n") for s in _sentences(" ".join(block.split()))]
     named = re.compile("|".join(rf"\b{re.escape(n)}" for n in names), re.IGNORECASE)
     shortest, longest = SENTENCE_LENGTH
     found = []

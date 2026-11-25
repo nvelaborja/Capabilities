@@ -518,6 +518,19 @@ class TestFindingSources:
         assert [p.sentence for p in found.passages] == [
             "In antiquity galena was roasted and then smelted in small furnaces for its lead."]
 
+    @pytest.mark.parametrize("sentence", [
+        pytest.param("For copper smelting the main ores were sulphides like galena PbS (Fig. 2) and others.",
+                     id="a figure reference"),
+        pytest.param("Galena ores were smelted by other experimentalists (Crew 1991; Tylecote et al. 1971) in shafts.",
+                     id="et al."),
+        pytest.param("As J. R. Smith showed, galena was roasted before it was smelted for its lead.", id="initials"),
+    ])
+    def test_a_sentence_isnt_cut_off_at_an_abbreviation(self, sentence):
+        # Two accepted quotes ended mid-sentence at "(Fig." and "et al." (Chalcopyrite and Siderite, 2026-11-25)
+        text = "The site lies in the hills. " + sentence + " The slag was dumped nearby."
+        web = FakeWeb(pages={GALENA_URL: Page(GALENA_URL, "200", text, None, "html")})
+        assert [p.sentence for p in Library(web, []).passages(GALENA_ITEM, "Galena").passages] == [sentence]
+
     @pytest.mark.parametrize("authors, citation", [
         pytest.param(["Ada Example"], "Ada Example (2021). Lead ores. Example Journal.", id="one author"),
         pytest.param(["Ada Example", "Bo Sample"], "Ada Example & Bo Sample (2021). Lead ores. Example Journal.",
