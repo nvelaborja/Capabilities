@@ -9,7 +9,6 @@ what a passage must say, the prompts, what a proposal is and how it is checked, 
 from __future__ import annotations
 
 import hashlib
-import re
 import urllib.parse
 from abc import ABC, abstractmethod
 from dataclasses import dataclass

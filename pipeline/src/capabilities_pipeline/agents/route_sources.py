@@ -132,8 +132,10 @@ class RouteSources(Task):
                   if requirement.get("thing") or requirement.get("category")]
         labels = {id_: self.graph.label(id_) for r in needed for id_ in (r.get("thing") or r.get("category"),)}
         if achieves.get("thing"):
-            main = [self.graph.label(achieves["thing"]), *techniques]
-            others = list(labels.values())
+            # The thing it makes; a technique ("Pottery", "Woodworking") is too broad to name the route by, so it
+            # only counts as something else it speaks of (find-only run, 2026-11-25).
+            main = [self.graph.label(achieves["thing"])]
+            others = list(labels.values()) + techniques
         else:
             # A route that does something (cuts, moves, heats) is named by its tools and technique, not the verb.
             tools = [labels[r.get("thing") or r.get("category")] for r in needed if r["role"] == "tool"]
@@ -314,10 +316,14 @@ def _terms(labels: list[str]) -> tuple[str, ...]:
     return tuple(terms)
 
 
+# Verbs that say nothing of how a thing is made: "make" matched "does not make up" (find-only run, 2026-11-25).
+GENERIC_ACTIVITIES = {"making", "building", "selecting", "gathering", "collecting"}
+
+
 def _activity(label: str) -> str | None:
     """What the route does, from its label's first word ("Smelting copper ore" → smelting), to look for as a term."""
     first = label.split()[0].lower()
-    return first if first.endswith("ing") and len(first) > 5 else None
+    return first if first.endswith("ing") and len(first) > 5 and first not in GENERIC_ACTIVITIES else None
 
 
 def _pattern(terms: tuple[str, ...]) -> re.Pattern:

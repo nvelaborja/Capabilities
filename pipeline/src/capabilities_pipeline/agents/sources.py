@@ -36,8 +36,13 @@ SUBJECT = re.compile(r"\b(smelt\w*|ores?|roast\w*|furnaces?|slags?|bloom\w*|copp
 SMELTING = re.compile(r"\b(smelt\w*|roast\w*|bloomer\w*|crucibles?|furnaces?)\b", re.IGNORECASE)
 PAST = re.compile(r"\b(ancient|prehistor\w*|bronze age|iron age|chalcolithic|neolithic|roman|medieval|antiquity|"
                   r"archaeo\w*|early|historic\w*|BC|BCE)\b", re.IGNORECASE)
-# What isn't a sentence of prose: a link, a DOI, a header or footer, a reference, a keyword list.
-NOT_PROSE = re.compile(r"https?://|doi|\bvol\b|©|keywords?:|isbn|issn|\d+\s*[–-]\s*\d+\s*$", re.IGNORECASE)
+# What isn't a sentence of prose: a link, a DOI, a header or footer, a reference, a keyword list, an article's dates,
+# a journal's volume and issue ("36(1)"), which a PDF's running header runs into the text.
+NOT_PROSE = re.compile(r"https?://|doi|\bvol\b|©|key ?words?:|isbn|issn|article history|\b\d+\(\d+\)"
+                       r"|\d+\s*[–-]\s*\d+\s*$", re.IGNORECASE)
+# A sentence starting with a number is a page number, footnote mark or section number run into it ("(17) For…",
+# "3.2.2 Decipherment…", "437Change and…"), found in the route sources' find-only run (2026-11-25).
+NUMBERED = re.compile(r"^\W*\d")
 # A reference-list entry starts with a surname and initials ("Smith J, Jones K (2001) …"); a sentence that cites a work
 # in passing ("… (Tylecote et al. 1971) …") is still prose.
 REFERENCE_ENTRY = re.compile(r"^[A-Z][\w'’-]+ [A-Z]{1,3}[,(]|^[A-Z][\w'’-]+, (?:[A-Z]\. ?){1,3}[,(]")
@@ -308,7 +313,7 @@ def _is_prose(sentence: str) -> bool:
     letters = sum(c.isalpha() for c in sentence)
     return (len(sentence.split()) >= 8 and sentence.rstrip("\"”’)")[-1:] in ".!?" and letters / len(sentence) > 0.7
             and sum(c.isdigit() for c in sentence) / len(sentence) < 0.1 and not NOT_PROSE.search(sentence)
-            and not CAPTION.search(sentence) and not REFERENCE_ENTRY.search(sentence))
+            and not CAPTION.search(sentence) and not REFERENCE_ENTRY.search(sentence) and not NUMBERED.search(sentence))
 
 
 def _passages_in(text: str, wanted: Wanted, lines_are_blocks: bool) -> list[tuple[int, str, str, str]]:

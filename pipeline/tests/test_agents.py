@@ -592,6 +592,12 @@ class TestFindingSources:
         pytest.param("Figure 9: Galena ore from the example mine, before and after roasting for smelting.", id="a caption"),
         pytest.param("Table IV. Galena, chalcopyrite and the other sulphide ores smelted at each of the sites.",
                      id="a table's title"),
+        pytest.param("6 Historical Metallurgy 36(1) 2002 6–16 Galena smelting in the Celtic oppidum of the valley.",
+                     id="a running header"),
+        pytest.param("(17) For galena smelting in antiquity see also the very recent work on the furnaces.",
+                     id="a footnote"),
+        pytest.param("Key words: galena, smelting, lead, slag, furnace, roasting, silver, cupellation.",
+                     id="key words"),
     ])
     def test_a_line_that_isnt_prose_isnt_offered(self, line):
         text = line + "\n" + "In antiquity galena was roasted and then smelted in small furnaces for its lead."
@@ -1134,6 +1140,15 @@ class TestFindingRouteSources:
         graph = Graph.from_curated(route_root)
         assert graph.label("rope").lower() in terms.main and graph.label("plant-fiber").lower() in terms.others
         assert "twisting" in terms.others  # what it does, from its label
+
+    def test_a_routes_technique_and_a_verb_as_broad_as_making_dont_name_it(self, route_root):
+        # "Pottery" and "make" matched "does not make up" for a blowpipe (find-only run, 2026-11-25)
+        task = route_task(route_root)
+        route = replace(task.route(TWIST), document=yaml.safe_load(TWIST_ROUTE) | {"label": "Making test cord"})
+        terms = task.terms(route)
+        graph = Graph.from_curated(route_root)
+        assert terms.main == (graph.label("rope").lower(),)
+        assert graph.label("rope-making").lower() in terms.others and "making" not in terms.others
 
     def test_a_route_that_does_something_is_found_by_its_tools_and_technique(self, route_root):
         task = route_task(route_root)
