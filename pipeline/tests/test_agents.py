@@ -405,6 +405,10 @@ class TestCurating:
         report = run(repo_root, built_dir, fake_claude, audit_dir=tmp_path / "audit", items=1)
         assert (report.results[0].outcome, report.results[0].attempts) == ("sent_back", 2)
         assert "supports: Too broad." in fake_claude.calls("proposer")[1]["prompt"]
+        # then: the second review hears what the first asked for, so it judges the fix instead of starting afresh
+        first, second = (call["prompt"] for call in fake_claude.calls("reviewer"))
+        assert "asked for these changes" not in first
+        assert "asked for these changes:\n- supports: Too broad." in second
 
     def test_an_agent_failure_costs_one_item_not_the_run(self, repo_root, built_dir, fake_claude, tmp_path):
         fake_claude.script(proposer=[{"error": "max_turns"}, answer(UNSURE)])

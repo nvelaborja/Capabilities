@@ -12,6 +12,8 @@ Look for:
 - a Wikidata item that isn't the mineral itself;
 - a source too weak for the claim (an unsourced forum post, a sales page).
 
+- If the task lists changes you asked for on this item's last proposal, judge first whether each was made. Raise a new objection only for something as serious as those: one that makes the quote wrong, unsupported or out of context. Don't send a proposal back for a finer point of wording you could have raised the first time; accept it if what you asked for was done and nothing serious is left.
+
 Then give a verdict:
 
 - "accept": nothing wrong that matters.

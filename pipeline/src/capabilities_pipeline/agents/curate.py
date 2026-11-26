@@ -162,10 +162,10 @@ class Curator:
         if self.settings.find_only:
             offered = "\n".join(f"[{p.number}] {p.source.citation}: {p.sentence}" for p in finding.passages)
             return self._finish(ItemResult(item, "found", f"{finding.found.detail()}\n{offered}", 0))
-        feedback, last = None, None
+        feedback, objected, last = None, None, None
         for attempt in range(1, self.settings.attempts + 1):
             try:
-                last = self._attempt(item, finding, attempt, feedback)
+                last = self._attempt(item, finding, attempt, feedback, objected)
             except UsageLimitReached:
                 raise
             except AgentError as error:
@@ -173,12 +173,14 @@ class Curator:
             if last.outcome != "sent_back":
                 return self._finish(last)
             feedback = last.reason
+            objected = _objections(last.review) if last.review else objected
         return self._finish(last)
 
     def _record(self, item: Item, attempt: int, check: Check) -> None:
         self.audit.check(self.run_id, item.name, attempt, check.name, check.passed, check.detail)
 
-    def _attempt(self, item: Item, finding: Finding, attempt: int, feedback: str | None) -> ItemResult:
+    def _attempt(self, item: Item, finding: Finding, attempt: int, feedback: str | None,
+                 objected: str | None) -> ItemResult:
         task = self.task.proposer_task(self.proposer_prompt, item, finding, feedback)
         answer = self._ask("proposer", item, attempt, self.proposer, self.proposer_prompt, task,
                            self.task.proposal_schema(finding))
@@ -195,9 +197,14 @@ class Curator:
             reason = "It failed these checks:\n" + "\n".join(f"- {c.name}: {c.detail}" for c in failed)
             return ItemResult(item, "sent_back", reason, attempt, proposal, checks=checks)
         task = self.task.reviewer_task(self.reviewer_prompt, item, proposal, evidence)
+        if objected:
+            # Without them a second review starts afresh, and finds new, finer faults in a proposal that fixed the
+            # first ones: copper-from-ore took the reviewer's own wording and was sent back for its scope (run
+            # routes-20261126-191441).
+            task += f"\n\nYou reviewed this item's last proposal and asked for these changes:\n{objected}\n"
         review = self._ask("reviewer", item, attempt, self.reviewer, self.reviewer_prompt, task,
                            self.review_schema).output
-        objections = "\n".join(f"- {o['about']}: {o['objection']}" for o in review.get("objections") or [])
+        objections = _objections(review)
         if review["verdict"] == "accept":
             change = self.task.change(item, proposal, self.run_id)
             return ItemResult(item, "accepted", review.get("summary", ""), attempt, proposal, change, checks, review)
@@ -237,3 +244,7 @@ class Curator:
 
 def new_run_id(prefix: str, now: datetime | None = None) -> str:
     return f"{prefix}-" + (now or datetime.now(timezone.utc)).strftime("%Y%m%d-%H%M%S")
+
+
+def _objections(review: dict) -> str:
+    return "\n".join(f"- {o['about']}: {o['objection']}" for o in review.get("objections") or [])

@@ -29,5 +29,5 @@ Then give:
 
 - decision: "propose", or "unsure" (then passage 0, fill unsure_why, and leave supports empty).
 - passage: the number of the passage you choose.
-- supports: one sentence in your own words: what the chosen sentence supports about this route. Say no more than it says.
+- supports: one sentence in your own words: what the chosen sentence supports about this route. Say no more than it says. It is shown on the reference as the claim the source backs, so write only the claim: no caveats, and nothing about what the sentence leaves out.
 $feedback
