@@ -87,8 +87,12 @@ class TestOreMineralNodes:
 
 
 class TestRoasting:
-    def test_copper_sulphides_are_roasted_into_an_ore_that_smelts_to_copper(self, graph):
-        assert graph.members("copper-sulphide-ore") == {"bornite", "chalcocite", "chalcopyrite"}
+    def test_copper_sulphides_are_roasted_into_an_ore_that_smelts_to_copper(self, graph, repo_root):
+        from capabilities.graph import ore_crosswalk_rows
+
+        # every mineral the crosswalk classes as a copper sulphide, those a person reviewed among them
+        sulphides = {row["id"] for row in ore_crosswalk_rows(repo_root) if row["class"] == "copper-sulphide-ore"}
+        assert graph.members("copper-sulphide-ore") == sulphides >= {"bornite", "chalcocite", "chalcopyrite"}
         assert "roasted-copper-ore" in graph.members("copper-ore")
 
     def test_a_sulphide_deposit_is_enough_for_copper(self, graph):
@@ -105,9 +109,15 @@ class TestCurationQueue:
     def queue(self, built_dir) -> list[dict]:
         return load_queue(built_dir)
 
-    def test_ore_candidates_are_the_unreviewed_minerals_of_copper_iron_and_tin_deposits_most_listed_first(self, queue):
+    def test_ore_candidates_are_the_unreviewed_minerals_of_copper_iron_and_tin_deposits_most_listed_first(self, queue,
+                                                                                                      repo_root):
+        from capabilities.graph import ore_crosswalk_rows
+
         candidates = [item for item in queue if item["kind"] == "ore_candidate"]
-        assert candidates[0]["label"] == "Galena"
+        # The top is whichever undecided mineral MRDS lists most: deciding one (a person's row, or an agent's) moves the
+        # queue on, so it isn't named here.
+        decided = {row["mrds_ore"].casefold() for row in ore_crosswalk_rows(repo_root)}
+        assert candidates and all(item["label"].casefold() not in decided for item in candidates)
         assert [item["priority"] for item in candidates] == sorted((item["priority"] for item in candidates), reverse=True)
         assert all(item["priority"] >= 20 for item in candidates)
         # Reviewed minerals, taken or rejected, and those of curated source kinds, are off the list.
@@ -128,9 +138,12 @@ class TestCurationQueue:
     def test_the_queue_command_shows_the_top_of_each_kind(self, repo_root, built_dir, capsys):
         from capabilities.cli import main
 
+        from capabilities.built import load_queue
+
+        top = next(item for item in load_queue(built_dir) if item["kind"] == "ore_candidate")
         assert main(["--root", str(repo_root), "--build-dir", str(built_dir), "queue", "--limit", "2"]) == 0
         output = capsys.readouterr().out
-        assert "ore_candidate (" in output and "  Galena: Listed as an ore mineral on " in output
+        assert "ore_candidate (" in output and f"  {top['label']}: Listed as an ore mineral on " in output
         assert "--kind ore_candidate --limit 0 for all" in output
 
 

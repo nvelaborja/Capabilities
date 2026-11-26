@@ -1,8 +1,10 @@
 """Citation checks: every cited work looked up in OpenAlex and Crossref, and every cited link checked (ADR 0047).
 
-Nothing here asks the real services: `scholarly_endpoint` (conftest) stands in for both, answering from the committed
-backup, and links are answered from it too. `built_dir` and `graph` are built from the backups, so the checks below are
-the real results of 2026-11-24.
+Nothing here asks the real services: `scholarly_endpoint` (conftest) stands in for both, answering from a recording of
+what they answered on 2026-11-24, and links are answered from it too. `recorded` is the repository's graph built with a
+download through the stand-ins, so the checks below are the real results of that day, whatever the committed backup holds
+since: it is refreshed with the data, and the services' answers change with it. A count of the repository's works is
+worked out from the data, not written down, so adding a citation doesn't break a test.
 """
 
 from contextlib import contextmanager
@@ -11,7 +13,7 @@ from types import SimpleNamespace
 import duckdb
 import pytest
 
-from capabilities.built import load_built, load_queue, load_reference_checks
+from capabilities.built import load_built, load_queue, load_reference_checks, run_build
 from capabilities.views import references
 from capabilities_pipeline.build import build
 
@@ -58,19 +60,48 @@ def rows(parquet) -> list[tuple]:
 
 
 @pytest.fixture(scope="module")
-def checks(built_dir) -> dict[str, dict]:
-    return load_reference_checks(built_dir)
+def recorded(tmp_path_factory, repo_root, fetch_references):
+    """The repository's graph built with the reference candidates downloaded through the stand-ins: the answers of
+    2026-11-24, not whatever the committed backup holds now."""
+    build_dir = tmp_path_factory.mktemp("recorded")
+    fetch_references(build_dir)
+    run_build(repo_root, build_dir)
+    return build_dir
+
+
+@pytest.fixture(scope="module")
+def checks(recorded) -> dict[str, dict]:
+    return load_reference_checks(recorded)
+
+
+@pytest.fixture(scope="module")
+def graph(repo_root, recorded):
+    return load_built(repo_root, recorded)
+
+
+def recorded_rows(parquet) -> list[tuple]:
+    """The rows of a download for the works the recording has: a work cited since it was made isn't in it."""
+    from conftest import RECORDED_REFERENCES
+
+    # A row is a work's lookup (citation, service, lookup, query) or a link's check (no citation): keyed so, a link cited
+    # since isn't taken for a recorded one.
+    recorded = {row[:4] for row in rows(RECORDED_REFERENCES)}
+    return [row for row in rows(parquet) if row[:4] in recorded]
 
 
 class TestLookingUp:
     def test_a_download_gives_back_what_the_services_answered_unchanged(self, tmp_path, repo_root, fetch_references):
-        from capabilities_pipeline.upstream import REFERENCES, backup_directory
+        from capabilities_pipeline.citations import cited_works
+        from capabilities_pipeline.upstream import REFERENCES
+        from conftest import RECORDED_REFERENCES
 
         # given: the stand-ins, answering what OpenAlex and Crossref answered on 2026-11-24
         snapshot = fetch_references(tmp_path)
-        # then: the same rows as the backup made from the real download
-        assert rows(REFERENCES.parquet(tmp_path)) == rows(backup_directory(REFERENCES, repo_root) / "reference_candidates.parquet")
-        assert (snapshot["works"], snapshot["searched"]) == (43, 27)
+        # then: for every work the recording has, the same rows as the real download made that day
+        assert recorded_rows(REFERENCES.parquet(tmp_path)) == rows(RECORDED_REFERENCES)
+        # and every work the repository cites now was looked up, the searchable ones searched
+        works = cited_works(repo_root)
+        assert (snapshot["works"], snapshot["searched"]) == (len(works), sum(work.searchable for work in works))
 
     def test_each_work_is_looked_up_once_however_often_it_is_cited(self, repo_root):
         from capabilities_pipeline.citations import cited_works
@@ -137,13 +168,14 @@ class TestLookingUp:
     def test_offline_the_lookups_fall_back_to_the_cold_backup(self, tmp_path, repo_root, lookups_offline):
         from dataclasses import replace
 
-        from capabilities_pipeline.upstream import REFERENCES, fetch_or_fall_back
+        from capabilities_pipeline.upstream import REFERENCES, backup_directory, fetch_or_fall_back
 
         # given: port 9, which refuses connections, as a service that is down would
         dataset = replace(REFERENCES, crossref_url="http://127.0.0.1:9")
         with lookups_offline():
             snapshot, error = fetch_or_fall_back(dataset, repo_root, tmp_path, "http://127.0.0.1:9")
-        assert (snapshot["copy"], snapshot["rows"]) == ("backup", 242)
+        backup = backup_directory(REFERENCES, repo_root) / "reference_candidates.parquet"
+        assert (snapshot["copy"], snapshot["rows"]) == ("backup", len(rows(backup)))
         assert error
 
 
@@ -264,9 +296,11 @@ class TestChangesSinceTheLookup:
 
 
 class TestReadingQueue:
-    def test_works_not_yet_read_are_queued_the_most_depended_on_first(self, built_dir):
+    def test_works_not_yet_read_are_queued_the_most_depended_on_first(self, built_dir, repo_root):
+        from capabilities_pipeline.citations import cited_works
+
         reading = [item for item in load_queue(built_dir) if item["kind"] == "unread_reference"]
-        assert len(reading) == 43  # nothing is verified yet
+        assert len(reading) == len(cited_works(repo_root))  # nothing is verified yet
         assert reading[0]["priority"] == max(item["priority"] for item in reading)
         tylecote = next(item for item in reading if item["label"] == TYLECOTE)
         assert tylecote["detail"].startswith("Cited by 11 routes.")
@@ -290,9 +324,10 @@ class TestInTheApp:
 
     def test_a_reference_says_how_its_own_link_answered(self, graph):
         (crucible,) = [ref for ref in references(graph, graph.routes["steel-by-crucible"]) if ref["citation"] == CRUCIBLE]
-        assert crucible["check"] == {"result": "not_searched", "checked_at": "2026-11-24T21:45:44Z",
-                                     "note": "A web page, or a work with no year: only its links are checked.",
-                                     "link": "refused"}
+        check = dict(crucible["check"])
+        assert check.pop("checked_at")  # when the download was made
+        assert check == {"result": "not_searched", "note": "A web page, or a work with no year: only its links are checked.",
+                         "link": "refused"}
 
     def test_the_curated_graph_has_no_checks(self, curated_graph):
         assert all("check" not in ref for ref in references(curated_graph, curated_graph.routes["move-on-sledge"]))

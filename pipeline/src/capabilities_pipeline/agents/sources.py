@@ -25,7 +25,7 @@ from pathlib import Path
 from capabilities.graph import load_documents, ore_crosswalk_rows
 
 from ..citations import _references_in
-from .web import Page, Web, WikidataItem
+from .web import MINERAL_SPECIES, Page, Web, WikidataItem
 
 # Sentences worth a model's attention name the mineral and one of these.
 SUBJECT = re.compile(r"\b(smelt\w*|ores?|roast\w*|furnaces?|slags?|bloom\w*|copper|iron|tin|metal\w*|min(e|ed|ing)|"
@@ -57,6 +57,8 @@ NOT_SOURCES = {"erratum", "dataset", "paratext", "editorial", "retraction", "pee
 OPENALEX_WORKS = 5  # per search
 PASSAGES_PER_SOURCE = 3
 PASSAGES = 12
+# Names for the Wikidata classes a lookup reports, where we know them; others are shown by id.
+CLASS_NAMES = {MINERAL_SPECIES: "mineral species", "Q11344": "chemical element"}
 NETWORK_ERRORS = (urllib.error.URLError, TimeoutError, ConnectionError, http.client.HTTPException, ValueError)
 
 
@@ -79,6 +81,15 @@ class Passage:
     sentence: str  # word for word from the page: the quote, if it is chosen
     before: str = ""
     after: str = ""
+
+
+@dataclass(frozen=True)
+class Lookup:
+    """The item found for a mineral, if one was, and each item Wikidata's search returned, with why it was or wasn't
+    taken."""
+
+    item: WikidataItem | None
+    seen: tuple[str, ...]
 
 
 @dataclass
@@ -117,14 +128,64 @@ class Library:
             self.items[item] = self.web.wikidata_item(item)
         return self.items[item]
 
-    def item_for(self, name: str) -> WikidataItem | None:
-        """The mineral's Wikidata item: called exactly `name`, and a mineral species. Raises a network error when
-        Wikidata can't be reached, which is not the same as there being no item."""
-        for found in self.web.wikidata_search(name):
-            item = self.wikidata_item(found)
-            if item and item.id == found and item.is_called(name) and item.is_a_mineral:
-                return item
+    def item_for(self, name: str) -> Lookup:
+        """The mineral's Wikidata item, and every item the search returned with why it was or wasn't taken, so a skip
+        explains itself. The item is called exactly `name` (label or alias) and is a mineral: a mineral species, or a
+        subclass of a class of minerals (limonite is filed under "oxide class of minerals"). A native metal's name finds
+        the element, which isn't a mineral, so a one-word name is tried again as "native <name>" (native silver).
+        Raises a network error when Wikidata can't be reached, which is not the same as there being no item."""
+        names = [name] + ([f"native {name.lower()}"] if len(name.split()) == 1 else [])
+        seen = []
+        for wanted in names:
+            for found in self.web.wikidata_search(wanted):
+                item = self.wikidata_item(found)
+                why_not = self._why_not(item, found, wanted)
+                seen.append(self._described(found, item, wanted) + (f": {why_not}" if why_not else ": taken"))
+                if not why_not:
+                    return Lookup(item, tuple(seen))
+        return Lookup(None, tuple(seen))
+
+    def _why_not(self, item: WikidataItem | None, found: str, name: str) -> str | None:
+        if item is None:
+            return "no such item"
+        if item.id != found:
+            return f"merged into {item.id}"
+        if not item.is_called(name):
+            return f"not called {name!r}"
+        if not (item.is_a_mineral or self._in_a_class_of_minerals(item)):
+            return "neither a mineral species nor a subclass of a class of minerals"
         return None
+
+    def _in_a_class_of_minerals(self, item: WikidataItem) -> bool:
+        # A heuristic on English labels: a subclass of anything whose label says "mineral" ("oxide class of minerals",
+        # a mineral group). It could also match, say, "mineral resource"; the item must still be called exactly the
+        # MRDS name, and every item taken is recorded, so a wrong one shows in the audit log and the pull request.
+        return any("mineral" in (self._label(parent) or "").lower() for parent in item.subclass_of)
+
+    def _described(self, found: str, item: WikidataItem | None, wanted: str) -> str:
+        """An item the search returned, for the audit log. Only what the decision already read is named: the parents
+        of an item called the name searched for (read to tell a class of minerals), and the few classes in
+        CLASS_NAMES. Naming every hit's classes (albums, bands, colours) would cost a request each."""
+        if item is None:
+            return found
+        called = item.is_called(wanted)
+
+        def name(c: str, read: bool) -> str:
+            label = CLASS_NAMES.get(c) or (self._label(c) if read else None)
+            return f"{c} {label!r}" if label else c
+
+        kinds = ", ".join(name(c, False) for c in item.instance_of) or "nothing"
+        parents = ", ".join(name(c, called and not item.is_a_mineral) for c in item.subclass_of) or "nothing"
+        return f"{found} {item.label!r} ({item.description or 'no description'}; instance of {kinds}; subclass of {parents})"
+
+    def _label(self, item_id: str) -> str | None:
+        if item_id in CLASS_NAMES:
+            return CLASS_NAMES[item_id]
+        try:
+            item = self.wikidata_item(item_id)
+        except NETWORK_ERRORS:
+            return None
+        return item.label if item else None
 
     def passages(self, item: WikidataItem, name: str) -> Found:
         names = {name, *((item.label,) if item.label else ())}

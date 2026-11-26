@@ -160,6 +160,7 @@ class Context:
     templates: dict[str, str]
     taken_ids: frozenset[str]
     taken_items: frozenset[str]
+    decided_items: frozenset[str] = frozenset()  # the ore crosswalk's own items: minerals already decided
 
     @classmethod
     def of(cls, root: Path, leaving_out: frozenset[str] = frozenset()) -> Context:
@@ -180,6 +181,7 @@ class Context:
             templates=templates,
             taken_ids=frozenset(graph.things) | frozenset(graph.routes) | {row["id"] for row in kept if row["id"]},
             taken_items=frozenset(row["wikidata"] for row in kept) | frozenset(_wikidata_things(root)),
+            decided_items=frozenset(row["wikidata"] for row in kept),
         )
 
 
@@ -339,8 +341,8 @@ def evaluation_set() -> list[tuple[Candidate, dict]]:
         return [(Candidate(row["mrds_ore"], row["detail"]), row) for row in csv.DictReader(file)]
 
 
-def queue_candidates(queue: list[dict], count: int) -> list[Candidate]:
-    """The first `count` ore candidates in the curation queue: the most widely listed first."""
+def queue_candidates(queue: list[dict], count: int | None) -> list[Candidate]:
+    """The first `count` ore candidates in the curation queue (all of them for None): the most widely listed first."""
     candidates = [item for item in queue if item["kind"] == "ore_candidate"]
     return [Candidate(item["label"], item["detail"].split(". Review it")[0] + ".") for item in candidates[:count]]
 

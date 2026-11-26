@@ -87,6 +87,7 @@ npm run diagrams                 # live preview of the LikeC4 diagrams in docs/a
 - Python 3.12 with type hints. Keep functions small and named so callers read like prose.
 - Comments explain why, not what.
 - Tests describe behavior. When a test fails, fix the code unless the test is wrong, and say why.
+- Tests must survive data changes: an agent's pull request adds rows and refreshes backups. Work a count or a "top of the queue" out from the data instead of writing it down, name the items a run uses (`minerals`), and test behaviour that depends on an upstream answer against a fixed recording in `pipeline/tests/fixtures/`, not against `snapshots/`.
 - Conventional Commits (`feat:`, `fix:`, `docs:`...), lines under 120 characters.
 - Work on a branch and open a draft pull request. Never push to `main`.
 - The project is for non-commercial use only: code under PolyForm Noncommercial 1.0.0, data under CC BY-NC-SA 4.0 ([ADR 0037](docs/adr/0037-license-the-project-for-non-commercial-use-only.md)). Check a dependency's or dataset's license before adding it, never call the project "open source", and add every new dataset or cited work to [CREDITS.md](CREDITS.md) (`uv run capabilities credits` regenerates the works cited).

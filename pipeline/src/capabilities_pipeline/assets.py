@@ -73,6 +73,7 @@ class AgentRunConfig(Config):
     stop_at_seven_day: float = 0.9
     pull_request: bool = True
     base: str = "origin/main"
+    minerals: list[str] = []  # these minerals (MRDS names), instead of the top of the queue
     find_only: bool = False  # find the items and passages, ask no model: what a run would offer, for none of the plan
 
 
@@ -230,7 +231,7 @@ def definitions(root: Path, build_dir: Path) -> Definitions:
         "your Claude login, so it draws on your plan's usage limits.")
     def curate_ore_candidates(context: OpExecutionContext, config: AgentRunConfig, downloads: UpstreamDownloads) -> dict:
         report = run_ore_candidates(
-            root, build_dir, Settings(**config.model_dump()),
+            root, build_dir, Settings(**(config.model_dump() | {"minerals": tuple(config.minerals)})),
             Downloads(downloads.wikidata_url, downloads.openalex_url, downloads.crossref_url,
                       downloads.wikidata_site_url),
             on_progress=context.log.info,
