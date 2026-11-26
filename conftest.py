@@ -153,16 +153,19 @@ def wikidata_endpoint():
     server.shutdown()
 
 
-# What OpenAlex and Crossref answered for every cited work, and how every cited link answered: the committed backup
-# (OpenAlex CC0; Crossref's bibliographic metadata, no abstracts). The stand-in rebuilds each response from it, so a
-# download through the stand-in gives back the backup, and nothing in the tests asks the real services (ADR 0047).
-REFERENCES_BACKUP = REPO_ROOT / "snapshots" / "reference_candidates" / "reference_candidates.parquet"
+# What OpenAlex and Crossref answered for every work cited on 2026-11-24, and how every cited link answered: the backup
+# as it was that day (OpenAlex CC0; Crossref's bibliographic metadata, no abstracts), kept as a fixture. The stand-in
+# rebuilds each response from it, and nothing in the tests asks the real services (ADR 0047). It is a fixed recording,
+# not the committed backup: the backup is refreshed whenever the data changes (an agent's pull request refreshes it), and
+# the real services' answers with it, which must not change what the tests expect. A work cited since is answered as
+# not found, and a link not recorded as working.
+RECORDED_REFERENCES = REPO_ROOT / "pipeline" / "tests" / "fixtures" / "reference-answers-2026-11-24.parquet"
 
 
 def _reference_rows() -> list[dict]:
     import duckdb
 
-    relation = duckdb.sql("select * from read_parquet(?)", params=[str(REFERENCES_BACKUP)])
+    relation = duckdb.sql("select * from read_parquet(?)", params=[str(RECORDED_REFERENCES)])
     return [dict(zip(relation.columns, row)) for row in relation.fetchall()]
 
 
@@ -234,7 +237,7 @@ class _ScholarlyEndpoint(BaseHTTPRequestHandler):
 
 @pytest.fixture(scope="session")
 def scholarly_endpoint():
-    """A local stand-in for the OpenAlex and Crossref APIs, answering from the committed backup, and keeping the requests
+    """A local stand-in for the OpenAlex and Crossref APIs, answering from the 2026-11-24 recording, and keeping the requests
     it was sent. `links` is how each cited link answered when the backup was made."""
     server = ThreadingHTTPServer(("127.0.0.1", 0), _ScholarlyEndpoint)
     server.rows, server.requests = _reference_rows(), []
