@@ -25,7 +25,7 @@ from capabilities.built import CHECKS_FILE, graph_dir
 from capabilities.graph import Graph, load_documents, ore_crosswalk_rows
 
 from .sources import Library, Passage, Source, Wanted
-from .task import Check, Evidence, Finding, Prompt, Skip, Task, cell, offered, page_checks
+from .task import ChangeError, Check, Evidence, Finding, Prompt, Skip, Task, cell, offered, page_checks
 from .web import excerpt
 from . import yaml_edit
 
@@ -206,9 +206,16 @@ class RouteSources(Task):
             checks.append(Check("supports_is_said", long_enough, "says what it supports" if long_enough
                                 else "a new reference must say what it supports, in a sentence"))
         else:
-            quoted = bool(references[proposal.reference].get("quote"))
+            reference = references[proposal.reference]
+            quoted = bool(reference.get("quote"))
             checks = [Check("reference_has_no_quote", not quoted, f"reference {proposal.reference + 1} already has a "
                             "quote" if quoted else f"a quote for reference {proposal.reference + 1}")]
+            # A person's verified or secondary reference keeps what they wrote: an unread quote under it would read as
+            # theirs. A route named for a run needn't be in the queue, so it can have one.
+            unverified = reference.get("status") == "unverified"
+            checks.append(Check("reference_is_unverified", unverified, f"reference {proposal.reference + 1} is "
+                                f"{reference.get('status')}, so a person has read it" if not unverified
+                                else f"reference {proposal.reference + 1} is unverified"))
         on_page, page, found = page_checks(proposal.url, proposal.quote, self.library)
         named = bool(self.terms(route).wanted().named.search(proposal.quote))
         checks += on_page + [Check("quote_names_the_route", named, "the quote names what the route makes or uses"
@@ -268,16 +275,10 @@ class RouteSources(Task):
     def write(self, root: Path, changes: list[dict]) -> None:
         for change in changes:
             path = root / change["file"]
-            text = path.read_text(encoding="utf-8")
-            if change["reference"] is None:
-                text = yaml_edit.add_reference(text, {
-                    "citation": change["citation"], "url": change["url"], "supports": change["supports"],
-                    "quote": change["quote"], "status": "unverified", "proposed_by": change["proposed_by"]})
-            else:
-                fields = {"url": change["url"]} if change.get("adds_url") else {}
-                text = yaml_edit.quote_reference(text, change["reference"], fields | {
-                    "quote": change["quote"], "proposed_by": change["proposed_by"]})
-            path.write_text(text, encoding="utf-8")
+            try:
+                path.write_text(_edited(path.read_text(encoding="utf-8"), change), encoding="utf-8")
+            except (yaml_edit.EditError, OSError) as error:
+                raise ChangeError(change, f"{change['file']}: {error}") from error
 
     def citation(self, change: dict) -> str | None:
         return change["citation"].strip()
@@ -291,6 +292,18 @@ class RouteSources(Task):
             lines.append(f"| `{change['route']}`{copies} | {which} | [{cell(change['citation'])}]({change['url']}) | "
                          f"{cell(change['supports'])} | {cell(change['quote'])} |")
         return lines
+
+
+def _edited(text: str, change: dict) -> str:
+    if change["reference"] is None:
+        return yaml_edit.add_reference(text, {
+            "citation": change["citation"], "url": change["url"], "supports": change["supports"],
+            "quote": change["quote"], "status": "unverified", "proposed_by": change["proposed_by"]})
+    # By its citation, not the number it had in the run's copy: the file written to is the base branch's, where the
+    # references may be in another order.
+    fields = {"url": change["url"]} if change.get("adds_url") else {}
+    return yaml_edit.quote_reference(text, yaml_edit.reference_citing(text, change["citation"]), fields | {
+        "quote": change["quote"], "proposed_by": change["proposed_by"]})
 
 
 def free_copies(build_dir: Path) -> dict[str, str]:
@@ -334,11 +347,16 @@ def _pattern(terms: tuple[str, ...]) -> re.Pattern:
 def _forms(term: str) -> str:
     if not term.endswith("ing"):
         return rf"\b{re.escape(term)}(?:e?s)?\b"
-    stem = re.sub(r"(\w)\1$", r"\1", term[:-3])  # knapping → knap
-    stem = stem[:-1] if stem.endswith("y") else stem  # quarrying → quarr(y, ied)
-    # A short stem only with a verb's endings: "min" would also find "mineral".
-    return (rf"\b{re.escape(stem)}\w*" if len(stem) >= 4
-            else rf"\b{re.escape(stem)}(?:e|es|ed|er|ers|ing)\b")
+    stem = term[:-3]
+    if re.search(r"[^aeiou]y$", stem):  # quarrying: quarry, quarries, quarried, quarrier
+        return rf"\b{re.escape(stem[:-1])}(?:y|ying|ies|ied|ier|iers)\b"
+    stem = re.sub(r"([^aeiou])\1$", r"\1", stem)  # knapping → knap, knapped, knapper
+    # A verb's own endings, never any: "allo" found "allow", "cast" "castle" (code review, 2026-11-26).
+    verb = rf"{re.escape(stem)}{re.escape(stem[-1])}?(?:e|es|ed|er|ers|ing)"
+    if len(stem) < 4:
+        return rf"\b{verb}\b"  # "min" alone, or "mins", would find something else
+    # The stem alone (a smith, cast bronze) only in lower case: "Smith (1981)" is an author.
+    return rf"\b(?:{verb}|(?-i:{re.escape(stem)}s?))\b"
 
 
 def _listed(references: list[dict]) -> str:

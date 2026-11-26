@@ -196,7 +196,7 @@ siderite,Q192669,Siderite,iron-ore,mine-hematite,"Föll, H. ...",https://...,"Si
 
 Add a mineral only with a reference that it was smelted as its class says; leave it in the curation queue otherwise (`uv run capabilities queue`). Rejecting a mineral (`none`, with the reference that says why) takes it off the queue. After adding rows, query Wikidata again, as for `wikidata_things.csv`.
 
-Agents can work through the ore candidates too, on a Claude subscription ([ADR 0048](adr/0048-run-agents-through-claude-code-on-a-claude-subscription.md)): `cd pipeline && uv run dg launch --job agent_curation --config-json '{"ops": {"curate_ore_candidates": {"config": {"items": 5}}}}'`. What passes their checks arrives as a draft pull request; merge, edit or close it as you would anyone's. An agent's references stay `unverified`.
+Agents can work through the ore candidates too, on a Claude subscription ([ADR 0048](adr/0048-run-agents-through-claude-code-on-a-claude-subscription.md)): `cd pipeline && uv run dg launch --job agent_curation --config-json '{"ops": {"curate": {"config": {"items": 5}}}}'`. What passes their checks arrives as a draft pull request; merge, edit or close it as you would anyone's. An agent's references stay `unverified`.
 
 `pleiades_sources.csv` places Pleiades' ancient mines and quarries at our sources and ore classes, with the years they are attested ([ADR 0046](adr/0046-place-ancient-mines-and-quarries-from-pleiades.md)). One row per rule:
 

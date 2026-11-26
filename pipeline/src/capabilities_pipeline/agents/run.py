@@ -30,7 +30,7 @@ from .curate import Curator, ItemResult, Settings, new_run_id
 from .ore_candidates import OreCandidates
 from .route_sources import RouteSources
 from .sources import Library, SourcesUnavailable, known_sources
-from .task import Item, Task, cell
+from .task import ChangeError, Item, Task, cell
 from .web import Web
 
 TASKS = {task.name: task for task in (OreCandidates, RouteSources)}
@@ -191,7 +191,14 @@ class Run:
         touched = self.task.files([result.change for result in accepted])
         while passing:
             worktree.restore(touched)
-            self.task.write(worktree.root, [result.change for result in passing])
+            try:
+                self.task.write(worktree.root, [result.change for result in passing])
+            except ChangeError as error:
+                # One change that can't be written (a route file laid out unusually) mustn't cost the others theirs.
+                refused = next(result for result in passing if result.change is error.change)
+                self._reject(audit, refused, f"its change couldn't be written: {error}")
+                passing.remove(refused)
+                continue
             self.on_progress(f"Checking {_count(len(passing), 'change')}: downloading what they need and building the "
                              "graph")
             try:

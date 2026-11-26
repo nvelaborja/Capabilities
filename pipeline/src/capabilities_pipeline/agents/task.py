@@ -39,6 +39,14 @@ class Check:
     detail: str
 
 
+class ChangeError(Exception):
+    """A change that can't be written to the repository's files: the gate rejects its item and checks the rest."""
+
+    def __init__(self, change: dict, reason: str):
+        super().__init__(reason)
+        self.change = change
+
+
 @dataclass(frozen=True)
 class Skip:
     """Why an item isn't put to a model: the check that failed, what it found, and the checks that passed before it."""
@@ -172,7 +180,9 @@ class Task(ABC):
         """The files the changes write, relative to the repository: restored between gate passes, and committed."""
 
     @abstractmethod
-    def write(self, root: Path, changes: list[dict]) -> None: ...
+    def write(self, root: Path, changes: list[dict]) -> None:
+        """Writes the changes into the repository at `root`; raises ChangeError, naming the change, for one that can't
+        be written there."""
 
     @abstractmethod
     def citation(self, change: dict) -> str | None:

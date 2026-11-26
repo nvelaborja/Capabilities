@@ -68,11 +68,24 @@ def quote_reference(text: str, index: int, fields: dict) -> str:
     return _checked("".join(new_lines), expected)
 
 
+def reference_citing(text: str, citation: str) -> int:
+    """The index of the file's reference citing `citation`."""
+    references = (yaml.safe_load(text) or {}).get("references") or []
+    found = [i for i, r in enumerate(references) if r.get("citation", "").strip() == citation.strip()]
+    if len(found) != 1:
+        raise EditError(f"{len(found) or 'no'} references cite {citation!r}: expected one")
+    return found[0]
+
+
 def _references(lines: list[str]) -> tuple[int | None, int, int]:
     """Where the top-level `references` block starts and ends (the end is after its last item, before any blank lines
     or comments that follow it), and how far its items are indented."""
     start = next((i for i, line in enumerate(lines) if re.match(r"^references:\s*(#.*)?$", line)), None)
     if start is None:
+        # A list written another way (`references: []`) would get a second `references` key, which PyYAML reads
+        # without complaint, keeping the last.
+        if any(re.match(r"^references\s*:", line) for line in lines):
+            raise EditError("the references aren't a block list of items")
         return None, len(lines), 2
     end = next((i for i in range(start + 1, len(lines)) if lines[i].strip() and not lines[i][0].isspace()
                 and not lines[i].startswith(("-", "#"))), len(lines))

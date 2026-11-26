@@ -1,6 +1,6 @@
 # 0049. Have agents quote sources for routes whose references are all unverified
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-25
 
 ## Context
@@ -24,15 +24,15 @@ Only a person who read a work marks its reference `verified` ([0035](0035-propos
 
 Either way the reference stays `unverified` and the route stays in the queue; the queue's item says "A quote is ready to check" once one of its references has a quote.
 
-**Code finds the passages** as for ore candidates: the route's own references' pages first, then the repository's other cited pages, then OpenAlex's open-access works for "<label> archaeology" and "<label> experimental archaeology". A sentence is offered if it is prose and names what the route makes (its thing; for a route that does something, its tools and technique) and something else of it (its materials, tools or technique, or what it does, from its label's first word unless that is as broad as "making"). Ranking and the other filters are 0048's, and a sentence starting with a number, or carrying a journal's volume and issue (a PDF's running header), is never offered.
+**Code finds the passages** as for ore candidates: the route's own references' pages first, then the repository's other cited pages, then OpenAlex's open-access works for "<label> archaeology" and "<label> experimental archaeology". A sentence is offered if it is prose and names what the route makes (its thing; for a route that does something, its tools and technique) and something else of it (its materials, tools or technique, or what it does, from its label's first word unless that is as broad as "making", in a verb's own forms only). Ranking and the other filters are 0048's, and a sentence starting with a number, or carrying a journal's volume and issue (a PDF's running header), is never offered.
 
 A find-only run over the 40 queued routes on 2026-11-25 found passages for 33 at first, many off the subject ("Pottery" and "make" matched "does not make up" for a blowpipe). Naming the route by its thing alone, and leaving out broad verbs and running headers, found them for 22, on the subject; the rest are skipped without asking a model.
 
 **The proposer** (Sonnet, medium effort) reads the route as a person does (what it makes, what it takes and under what conditions, its notes and its references) and the numbered passages, each from the route's own references marked as such, and chooses one or says it is unsure. **The reviewer** (Sonnet, high effort) reads the route, the proposal and the page around the quote, with 0048's rules: the quote must carry the claim by itself, and a citation's style isn't objected to.
 
-**Checks in code:** for a new reference, that the route doesn't already cite the work (same citation or URL) and that it says what it supports; for a quote on an existing reference, that it has none yet; and for both, that the site may be cited, the page loads, the quote is on it word for word, and the quote names what the route makes or uses.
+**Checks in code:** for a new reference, that the route doesn't already cite the work (same citation or URL) and that it says what it supports; for a quote on an existing reference, that it has none yet and is `unverified`; and for both, that the site may be cited, the page loads, the quote is on it word for word, and the quote names what the route makes or uses.
 
-**Route files are edited as text.** A reference is inserted as lines (or fields into one), each value a double-quoted scalar, and the file is parsed again: the edit is refused unless the only difference is the one intended. The gate validates the data (`capabilities validate`) before it builds.
+**Route files are edited as text.** A reference is inserted as lines (or fields into one, found by its citation in the base branch's file), each value a double-quoted scalar, and the file is parsed again: the edit is refused unless the only difference is the one intended, and only that route's proposal is rejected. The gate validates the data (`capabilities validate`) before it builds.
 
 **A reference records who proposed it.** `proposed_by` (the run, `routes-20261125-120000`) is an optional field of every reference; the app says "Proposed by an agent, run …" under it.
 

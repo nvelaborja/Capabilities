@@ -1065,6 +1065,12 @@ BRAID_ROUTE = _test_route(BRAID, "Braiding test cord", f"""  - citation: "{BOOK}
 """)
 
 
+# On the base branch its site report is cited differently than in the run's copy: the quote can't be written there.
+PLAIT = "plait-test-cord"
+PLAIT_ROUTE = TWIST_ROUTE.replace(f"id: {TWIST}", f"id: {PLAIT}").replace("Twisting test cord", "Plaiting test cord")
+PLAIT_ON_MAIN = PLAIT_ROUTE.replace(SITE_REPORT, "Spinner, B. (2001). Cord at another example site. Example Journal.")
+
+
 def _with_test_routes(root: Path) -> None:
     (root / "data" / "routes" / f"{TWIST}.yaml").write_text(TWIST_ROUTE, encoding="utf-8")
     (root / "data" / "routes" / f"{BRAID}.yaml").write_text(BRAID_ROUTE, encoding="utf-8")
@@ -1121,6 +1127,19 @@ class TestEditingRouteFiles:
         with pytest.raises(EditError, match=refused):
             quote_reference(TWIST_ROUTE, index, fields)
 
+    def test_a_reference_is_found_by_its_citation_wherever_it_is_in_the_file(self):
+        from capabilities_pipeline.agents.yaml_edit import EditError, reference_citing
+
+        assert reference_citing(TWIST_ROUTE, SITE_REPORT) == 1 and reference_citing(TWIST_ROUTE, f" {BOOK}") == 0
+        with pytest.raises(EditError, match="no references cite"):
+            reference_citing(TWIST_ROUTE, "Someone (2000). Another work.")
+
+    def test_references_written_as_a_flow_list_are_refused_not_given_a_second_key(self):
+        from capabilities_pipeline.agents.yaml_edit import EditError, add_reference
+
+        with pytest.raises(EditError, match="block list"):
+            add_reference("id: x\nkind: route\nreferences: []\n", {"citation": "C.", "status": "unverified"})
+
 
 class TestFindingRouteSources:
     def test_the_queues_routes_are_the_curated_ones_not_the_copies_made_for_each_ore(self, repo_root, built_dir):
@@ -1167,6 +1186,22 @@ class TestFindingRouteSources:
             (COPY_SENTENCE, BOOK, "cited by this route"), (SITE_SENTENCE, SITE_REPORT, "cited by this route")]
         # then: "The rope is long and sturdy enough for the boats used today." names the rope and nothing it takes
         assert all("sturdy" not in p.sentence for p in finding.passages)
+
+    @pytest.mark.parametrize("term, found, not_found", [
+        pytest.param("alloying", ["alloy", "Alloyed", "alloying"], ["allow", "allocation"], id="alloying"),
+        pytest.param("casting", ["cast bronze", "Casting", "casts"], ["a castle"], id="casting"),
+        pytest.param("smithing", ["a smith", "smithed", "Smithing"], ["Smith (1981)"], id="smithing"),
+        pytest.param("quarrying", ["a quarry", "quarried", "Quarries"], ["a quart"], id="quarrying"),
+        pytest.param("knapping", ["knapped", "a knapper"], ["a knapsack"], id="knapping"),
+        pytest.param("mining", ["mined", "miners", "Mining"], ["a mineral", "5 min"], id="mining"),
+    ])
+    def test_an_activity_is_found_by_its_verbs_forms_not_by_any_word_starting_like_it(self, term, found, not_found):
+        # "Alloying" found "allow", "Smithing" an author, "Casting" a castle (code review, 2026-11-26)
+        from capabilities_pipeline.agents.route_sources import _pattern
+
+        pattern = _pattern((term,))
+        assert [text for text in found if not pattern.search(text)] == []
+        assert [text for text in not_found if pattern.search(text)] == []
 
     def test_a_route_nothing_speaks_of_is_skipped(self, route_root):
         task = route_task(route_root, FakeWeb())
@@ -1230,6 +1265,18 @@ class TestRouteProposals:
         checks, _ = task.check(quoted, RouteProposal("propose", 1, SITE_REPORT, SITE_URL, SITE_SENTENCE, "R."), finding)
         assert "reference_has_no_quote" in [c.name for c in checks if not c.passed]
 
+    @pytest.mark.parametrize("status", ["verified", "secondary"])
+    def test_a_reference_a_person_has_read_isnt_given_an_agents_quote(self, found, status):
+        # A route named for a run needn't be in the queue, so one of its references may be verified.
+        from capabilities_pipeline.agents.route_sources import RouteProposal
+
+        task, route, finding, _ = found
+        references = [dict(r) for r in route.document["references"]]
+        references[1]["status"] = status
+        read = replace(route, document=route.document | {"references": references})
+        checks, _ = task.check(read, RouteProposal("propose", 1, SITE_REPORT, SITE_URL, SITE_SENTENCE, "R."), finding)
+        assert [c.name for c in checks if not c.passed] == ["reference_is_unverified"]
+
     def test_the_proposer_reads_the_route_its_references_and_which_passages_are_its_own(self, found):
         task, route, finding, _ = found
         text = task.proposer_task(Prompt.load("route_proposer"), route, finding, None)
@@ -1245,13 +1292,16 @@ def routes_published(repo_root, tmp_path_factory, wikidata_endpoint, scholarly_e
     directory = tmp_path_factory.mktemp("routes-published")
     repo = _repository(repo_root, directory)
     _with_test_routes(repo)
+    plait = repo / "data" / "routes" / f"{PLAIT}.yaml"
+    plait.write_text(PLAIT_ON_MAIN, encoding="utf-8")
     _git(repo, "add", "-A")
     _git(repo, "commit", "-q", "-m", "The test routes")
     _git(repo, "push", "-q", "origin", "main")
+    plait.write_text(PLAIT_ROUTE, encoding="utf-8")  # the run's copy, not committed
     fake = FakeClaude(directory / "fake-claude")
     choice = {"decision": "propose", "passage": 1, "supports": "Rope was braided from plant fibers in antiquity.",
               "unsure_why": ""}
-    fake.script(proposer=[answer(choice), answer(choice)], reviewer=[answer(ACCEPT)] * 2)
+    fake.script(proposer=[answer(choice)] * 3, reviewer=[answer(ACCEPT)] * 3)
     gh = _fake_gh(directory)
     with pytest.MonkeyPatch.context() as patch, lookups_offline():
         for name, value in fake.environment().items():
@@ -1260,7 +1310,7 @@ def routes_published(repo_root, tmp_path_factory, wikidata_endpoint, scholarly_e
             patch.delenv(name, raising=False)
         report = run_agents(
             repo, directory / "build",
-            replace(settings(fake, task="route_sources", items=2, names=(TWIST, BRAID)), pull_request=True,
+            replace(settings(fake, task="route_sources", items=3, names=(TWIST, BRAID, PLAIT)), pull_request=True,
                     gh_command=str(gh)),
             Downloads(wikidata_endpoint.url, scholarly_endpoint.openalex_url, scholarly_endpoint.crossref_url),
             web=FakeWeb(pages=ROUTE_PAGES, works={"braiding": [CORD_WORK]}), on_progress=lambda message: None,
@@ -1276,11 +1326,18 @@ def routes_published(repo_root, tmp_path_factory, wikidata_endpoint, scholarly_e
 class TestTheRoutePullRequest:
     def test_both_routes_are_accepted_and_opened_as_one_draft(self, routes_published):
         report = routes_published["report"]
-        assert [(r.item.name, r.outcome) for r in report.results] == [(TWIST, "accepted"), (BRAID, "accepted")]
+        assert [(r.item.name, r.outcome) for r in report.results] == [
+            (TWIST, "accepted"), (BRAID, "accepted"), (PLAIT, "rejected")]
         assert report.run_id.startswith("routes-")
         assert routes_published["subject"] == f"feat(data): agent proposals for 2 routes (run {report.run_id})"
         gh = routes_published["gh"]
         assert gh[gh.index("--title") + 1] == f"Agent proposals: 2 routes (run {report.run_id})"
+
+    def test_a_quote_for_a_reference_the_base_branch_cites_differently_is_rejected_alone(self, routes_published):
+        # The run's copy numbers the references; the file written to is the base branch's, found by citation.
+        plait = next(r for r in routes_published["report"].results if r.item.name == PLAIT)
+        assert plait.reason.startswith("its change couldn't be written") and "no references cite" in plait.reason
+        assert routes_published["show"](f"data/routes/{PLAIT}.yaml") + "\n" == PLAIT_ON_MAIN
 
     def test_the_pull_request_says_what_each_proposal_changes(self, routes_published, route_root):
         body = pull_request_body(routes_published["report"].summary, route_task(route_root))
