@@ -1,8 +1,9 @@
 """Where accepted proposals go: a temporary worktree on a new branch, `agents/<run>`, started from main (ADR 0048).
 
-There the rows are written into the crosswalk, and the checks that need the whole repository run: Wikidata's labels
-and quantities for the new items and OpenAlex and Crossref for the new citations are downloaded, and the graph is
-built, its tests and all. A row whose cited work isn't found is dropped, and the rest are checked again. What passes is
+There the changes are written (crosswalk rows, a route's references), and the checks that need the whole repository
+run: Wikidata's labels and quantities for the new items and OpenAlex and Crossref for the new citations are downloaded,
+and the graph is built, its tests and all. A change whose cited work is wrong is dropped, and the rest are checked
+again. What passes is
 committed with the refreshed cold backups, the works cited and the run's summary, pushed, and opened as a draft pull
 request with the user's own `gh` login. The run never merges: the pull request is the review (ADR 0035).
 """
@@ -19,11 +20,10 @@ from pathlib import Path
 
 import duckdb
 from capabilities.built import CHECKS_FILE, graph_dir
-from capabilities.graph import ORE_CROSSWALK
 
 from ..build import build
 from ..upstream import REFERENCES, WIKIDATA, WIKIDATA_ITEMS, back_up, fetch
-from .ore_candidates import Check
+from .task import Check
 
 log = logging.getLogger(__name__)
 
@@ -47,6 +47,7 @@ class Proposals:
     title: str
     body: str
     commit: str  # a conventional commit, as every commit in the repository is
+    files: tuple[Path, ...]  # what the changes wrote, relative to the repository
 
 
 @dataclass(frozen=True)
@@ -91,8 +92,9 @@ class Worktree:
             shutil.rmtree(self.root, ignore_errors=True)
             git(self.repo, "worktree", "prune")
 
-    def restore_crosswalk(self) -> None:
-        git(self.root, "checkout", "--", str(ORE_CROSSWALK))
+    def restore(self, files: list[Path]) -> None:
+        """The files as the branch has them, before the next set of changes is written."""
+        git(self.root, "checkout", "--", *map(str, files))
 
 
 def git(directory: Path, *arguments: str) -> str:
@@ -137,12 +139,12 @@ def gate(root: Path, build_dir: Path, downloads: Downloads) -> dict[str, dict]:
             for citation, result, note, service, links in rows}
 
 
-def work_check(row: dict, checks: dict[str, dict]) -> Check:
-    if row["class"] == "none":
-        # A row rejecting a mineral builds nothing, so its reference isn't looked up (ADR 0047). Its page and quote
-        # were still checked, and the reviewer read them.
+def work_check(citation: str | None, checks: dict[str, dict]) -> Check:
+    """Whether the build's citation check found anything wrong with the work a change cites; None for a change whose
+    citation isn't looked up (a rejected mineral's row builds nothing)."""
+    if citation is None:
         return Check("citation_check_passes", True, "not looked up: a rejected mineral's reference builds nothing")
-    found = checks.get(row["citation"].strip())
+    found = checks.get(citation)
     if found is None:
         return Check("citation_check_passes", False, "the citation wasn't checked")
     result, service = found["result"], found["match_service"]
@@ -153,7 +155,7 @@ def work_check(row: dict, checks: dict[str, dict]) -> Check:
 
 
 def publish(worktree: Worktree, build_dir: Path, run_id: str, summary: dict, proposals: Proposals, gh: str) -> str:
-    """Commit the rows with what goes with them, push the branch, and open a draft pull request. Returns its URL."""
+    """Commit the changes with what goes with them, push the branch, and open a draft pull request. Returns its URL."""
     root = worktree.root
     for dataset in (WIKIDATA, WIKIDATA_ITEMS, REFERENCES):
         back_up(dataset, root, build_dir)
@@ -161,7 +163,7 @@ def publish(worktree: Worktree, build_dir: Path, run_id: str, summary: dict, pro
     path = root / RUNS_DIR / f"{run_id}.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(summary, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    git(root, "add", "--", str(ORE_CROSSWALK), str(RUNS_DIR), "snapshots", "CREDITS.md")
+    git(root, "add", "--", *map(str, proposals.files), str(RUNS_DIR), "snapshots", "CREDITS.md")
     git(root, "commit", "-m", proposals.commit, "-m", f"Run summary: {RUNS_DIR / f'{run_id}.json'}. Every reference is "
         "unverified until a person reads it.")
     git(root, "push", "-u", "origin", worktree.branch)

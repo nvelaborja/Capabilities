@@ -1,14 +1,16 @@
-"""Finding a mineral's Wikidata item and the passages that might say how it was used, in code (ADR 0048).
+"""Finding the passages that might support a claim, in code (ADR 0048, ADR 0049), and a mineral's Wikidata item.
 
-A model is asked only to judge: which class the passages support, and which passage says so. Everything else is found
-and read here, the same way every time:
+A model is asked only to judge: which passage supports the claim. Everything else is found and read here, the same way
+every time:
 
-- **The item**: Wikidata's search for the mineral's name, keeping the item called exactly that (label or alias) that is
-  an instance of *mineral species*.
-- **The sources**: first the pages the repository already cites (its crosswalk rows and the curated layer's
-  references), then open-access works OpenAlex finds for the mineral and smelting. Each page is downloaded once a run.
-- **The passages**: the sentences of a source that name the mineral and speak of ore, smelting, roasting or a metal,
-  word for word as the page has them, with the sentence before and after for context.
+- **The item** (ore candidates): Wikidata's search for the mineral's name, keeping the item called exactly that (label or
+  alias) that is a mineral.
+- **The sources**: first those the task puts first (a route's own references), then the pages the repository already
+  cites (its crosswalk rows and the curated layer's references), then open-access works OpenAlex finds for the task's
+  searches. Each page is downloaded once a run.
+- **The passages**: the sentences of a source that say what the task wants (`Wanted`: for a mineral, that they name it
+  and speak of ore, smelting, roasting or a metal), word for word as the page has them, with the sentence before and
+  after for context.
 
 The quote, the citation and the URL of a proposal come from here, not from a model: a quote can't be a paraphrase, and
 a citation can't be invented.
@@ -65,6 +67,21 @@ NETWORK_ERRORS = (urllib.error.URLError, TimeoutError, ConnectionError, http.cli
 class SourcesUnavailable(Exception):
     """OpenAlex refuses searches (its daily allowance is spent, 429): every item after this one would find nothing,
     and look as if nothing speaks of it. The run stops instead, and the rest stay in the queue."""
+
+
+@dataclass(frozen=True)
+class Wanted:
+    """What a sentence must say to be offered, and what ranks it higher: it names one of `named` and speaks of one of
+    `subject`; each `boost` it names ranks it three higher, each word of the past two, and each subject one."""
+
+    named: re.Pattern
+    subject: re.Pattern
+    boost: re.Pattern
+
+    @classmethod
+    def mineral(cls, names: set[str]) -> Wanted:
+        """A sentence naming the mineral and speaking of ore or smelting; smelting itself ranks highest."""
+        return cls(re.compile("|".join(rf"\b{re.escape(n)}" for n in sorted(names)), re.IGNORECASE), SUBJECT, SMELTING)
 
 
 @dataclass(frozen=True)
@@ -187,9 +204,11 @@ class Library:
             return None
         return item.label if item else None
 
-    def passages(self, item: WikidataItem, name: str) -> Found:
-        names = {name, *((item.label,) if item.label else ())}
-        sources = self.known + self._openalex_sources(name)
+    def passages(self, wanted: Wanted, searches: list[str], first: tuple[Source, ...] = ()) -> Found:
+        """The passages that say what is wanted, from the sources given first, the repository's, and OpenAlex's works
+        for the searches."""
+        known = list(first) + [source for source in self.known if all(source.url != f.url for f in first)]
+        sources = known + self._openalex_sources(searches, known)
         # Ranked across every source, not source by source: otherwise the first sources' weaker sentences fill the places
         # before a better one is read (Magnetite, 2026-11-25). Ties keep the sources' order, the repository's first.
         candidates: list[tuple[int, int, Source, tuple[str, str, str]]] = []
@@ -199,7 +218,7 @@ class Library:
             if not page.loaded:
                 continue
             read += 1
-            found = _passages_in(page.text, names, lines_are_blocks=page.kind != "pdf")[:PASSAGES_PER_SOURCE]
+            found = _passages_in(page.text, wanted, lines_are_blocks=page.kind != "pdf")[:PASSAGES_PER_SOURCE]
             with_passages += bool(found)
             candidates += [(rank, order, source, sentence) for rank, *sentence in found]
         candidates.sort(key=lambda candidate: (-candidate[0], candidate[1]))
@@ -207,28 +226,28 @@ class Library:
                     for number, (_, _, source, sentence) in enumerate(candidates[:PASSAGES], start=1)]
         return Found(passages, read, with_passages)
 
-    def _openalex_sources(self, name: str) -> list[Source]:
+    def _openalex_sources(self, searches: list[str], known: list[Source]) -> list[Source]:
         sources: dict[str, Source] = {}
-        for search in OPENALEX_SEARCHES:
+        for search in searches:
             self.openalex_searches += 1
             try:
-                works = self.web.openalex_works(search.format(name=name), OPENALEX_WORKS)
+                works = self.web.openalex_works(search, OPENALEX_WORKS)
             except urllib.error.HTTPError as error:
                 if error.code == 429:
                     raise SourcesUnavailable(f"OpenAlex refused a search ({error}); its daily allowance is likely spent. "
                                              "Run again tomorrow, or set OPENALEX_API_KEY (ADR 0047).") from error
-                self.openalex_failures.append(f"{search.format(name=name)}: {error}")
+                self.openalex_failures.append(f"{search}: {error}")
                 continue
             except NETWORK_ERRORS as error:
                 # OpenAlex being down, or its daily allowance spent, costs this item its OpenAlex sources, not the run;
                 # it is recorded, so "no passages" can be told apart from "no answer".
-                self.openalex_failures.append(f"{search.format(name=name)}: {getattr(error, 'code', '')} {error}".strip())
+                self.openalex_failures.append(f"{search}: {getattr(error, 'code', '')} {error}".strip())
                 continue
             for work in works:
                 if work.get("type") in NOT_SOURCES or (work.get("display_name") or "").lower().startswith("correction"):
                     continue
                 url = _readable_copy(work)
-                if url and url not in sources and not any(s.url == url for s in self.known):
+                if url and url not in sources and not any(s.url == url for s in known):
                     sources[url] = Source(openalex_citation(work), url, "OpenAlex")
         return list(sources.values())
 
@@ -292,22 +311,22 @@ def _is_prose(sentence: str) -> bool:
             and not CAPTION.search(sentence) and not REFERENCE_ENTRY.search(sentence))
 
 
-def _passages_in(text: str, names: set[str], lines_are_blocks: bool) -> list[tuple[int, str, str, str]]:
-    """The sentences that name the mineral and speak of ore or smelting, most to the point first, each with its rank and
-    the sentences either side. A web page's lines are its blocks (a heading ends without a full stop); a PDF's lines are
+def _passages_in(text: str, wanted: Wanted, lines_are_blocks: bool) -> list[tuple[int, str, str, str]]:
+    """The sentences that say what is wanted, most to the point first, each with its rank and the sentences either
+    side. A web page's lines are its blocks (a heading ends without a full stop); a PDF's lines are
     where the text wrapped, so they are joined, and a word it broke across two lines is mended, as the quote check
     allows."""
     if not lines_are_blocks:
         text = re.sub(r"(\w)-\s*\n\s*(\w)", r"\1\2", text).replace("\n", " ")
     sentences = [s for block in text.split("\n") for s in _sentences(" ".join(block.split()))]
-    named = re.compile("|".join(rf"\b{re.escape(n)}" for n in names), re.IGNORECASE)
     shortest, longest = SENTENCE_LENGTH
     found = []
     for i, sentence in enumerate(sentences):
         after_a_label = i > 0 and CAPTION_LABEL.match(sentences[i - 1])
-        if shortest <= len(sentence) <= longest and named.search(sentence) and SUBJECT.search(sentence) \
+        if shortest <= len(sentence) <= longest and wanted.named.search(sentence) and wanted.subject.search(sentence) \
                 and _is_prose(sentence) and not after_a_label:
-            rank = 3 * len(SMELTING.findall(sentence)) + 2 * len(PAST.findall(sentence)) + len(SUBJECT.findall(sentence))
+            rank = (3 * len(wanted.boost.findall(sentence)) + 2 * len(PAST.findall(sentence))
+                    + len(wanted.subject.findall(sentence)))
             found.append((rank, i, sentence))
     found.sort(key=lambda hit: (-hit[0], hit[1]))
     return [(rank, sentence, sentences[i - 1] if i else "", sentences[i + 1] if i + 1 < len(sentences) else "")
