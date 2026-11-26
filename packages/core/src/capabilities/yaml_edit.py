@@ -1,4 +1,5 @@
-"""Changing a curated file's references as text, so nothing else in the file moves (ADR 0049).
+"""Changing a curated file's references as text, so nothing else in the file moves: agents adding references and
+quotes (ADR 0049), and withdrawing them (ADR 0050).
 
 A YAML library that round-trips files would be simpler to call, but ruamel.yaml rewrote every flow mapping in all 54
 route files (`{ role: tool }` to `{role: tool}`) on load and dump alone: a pull request adding one reference would
@@ -44,17 +45,13 @@ def add_reference(text: str, reference: dict) -> str:
 def quote_reference(text: str, index: int, fields: dict) -> str:
     """The file with `fields` (a quote, and who proposed it) added to its `index`th reference, which mustn't have them."""
     data = yaml.safe_load(text)
-    references = data.get("references") or []
-    if not 0 <= index < len(references):
-        raise EditError(f"there is no reference {index + 1}: the file has {len(references)}")
-    if present := [key for key in fields if key in references[index]]:
-        raise EditError(f"reference {index + 1} already has {', '.join(present)}")
     lines = text.splitlines(keepends=True)
-    start, end, indent = _references(lines)
-    items = [i for i in range(start + 1, end) if (m := ITEM.match(lines[i])) and len(m.group(1)) == indent]
-    item_end = items[index + 1] if index + 1 < len(items) else end
-    last = max(i for i in range(items[index], item_end) if lines[i].strip() and not lines[i].lstrip().startswith("#"))
-    status = next((i for i in range(items[index], last + 1) if re.match(rf"^\s{{{indent + 2}}}status:", lines[i])), None)
+    first, item_end = _item_lines(lines, data, index)
+    if present := [key for key in fields if key in data["references"][index]]:
+        raise EditError(f"reference {index + 1} already has {', '.join(present)}")
+    indent = len(ITEM.match(lines[first]).group(1))
+    last = max(i for i in range(first, item_end) if lines[i].strip() and not lines[i].lstrip().startswith("#"))
+    status = next((i for i in range(first, last + 1) if re.match(rf"^\s{{{indent + 2}}}status:", lines[i])), None)
     # Who proposed it comes last, after the status; the rest before the status, as the files order a reference's keys.
     # Inserted from the bottom up, so the place found for the second is still right after the first.
     first = {key: value for key, value in fields.items() if key != "proposed_by"}
@@ -75,6 +72,49 @@ def reference_citing(text: str, citation: str) -> int:
     if len(found) != 1:
         raise EditError(f"{len(found) or 'no'} references cite {citation!r}: expected one")
     return found[0]
+
+
+def remove_reference(text: str, index: int) -> str:
+    """The file without its `index`th reference."""
+    data = yaml.safe_load(text)
+    lines = text.splitlines(keepends=True)
+    first, last = _item_lines(lines, data, index)
+    expected = copy.deepcopy(data)
+    del expected["references"][index]
+    return _checked("".join(lines[:first] + lines[last:]), expected)
+
+
+def remove_fields(text: str, index: int, keys: tuple[str, ...]) -> str:
+    """The file with `keys` taken out of its `index`th reference; each must be there, on a line of its own."""
+    data = yaml.safe_load(text)
+    if missing := [key for key in keys if key not in data["references"][index]]:
+        raise EditError(f"reference {index + 1} has no {', '.join(missing)}")
+    lines = text.splitlines(keepends=True)
+    first, last = _item_lines(lines, data, index)
+    indent = len(ITEM.match(lines[first]).group(1))
+    dropped: set[int] = set()
+    for i in range(first, last):
+        if any(re.match(rf"^\s{{{indent + 2}}}{re.escape(key)}:", lines[i]) for key in keys):
+            dropped.add(i)
+            # A value that runs on to more lines, indented deeper, goes with it.
+            j = i + 1
+            while j < last and lines[j].strip() and len(lines[j]) - len(lines[j].lstrip()) > indent + 2:
+                dropped.add(j)
+                j += 1
+    expected = copy.deepcopy(data)
+    for key in keys:
+        del expected["references"][index][key]
+    return _checked("".join(line for i, line in enumerate(lines) if i not in dropped), expected)
+
+
+def _item_lines(lines: list[str], data: dict, index: int) -> tuple[int, int]:
+    """Where the `index`th reference's lines start, and where the next item (or the block's end) starts."""
+    references = (data or {}).get("references") or []
+    if not 0 <= index < len(references):
+        raise EditError(f"there is no reference {index + 1}: the file has {len(references)}")
+    start, end, indent = _references(lines)
+    items = [i for i in range(start + 1, end) if (m := ITEM.match(lines[i])) and len(m.group(1)) == indent]
+    return items[index], items[index + 1] if index + 1 < len(items) else end
 
 
 def _references(lines: list[str]) -> tuple[int | None, int, int]:

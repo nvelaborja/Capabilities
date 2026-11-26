@@ -369,6 +369,13 @@ class TestMechanicalChecks:
         checks, _ = check(Candidate("Malachite"), proposed(), context, FakeWeb())
         assert "id_is_new" in [c.name for c in checks if not c.passed]
 
+    def test_a_quote_a_person_withdrew_for_the_mineral_isnt_proposed_again(self, context):
+        from capabilities.withdraw import quote_key
+
+        withdrawn = replace(context, withdrawn=frozenset({quote_key(COVELLITE.name, f"  {QUOTE.upper()} ")}))
+        checks, _ = check(COVELLITE, proposed(), withdrawn, FakeWeb())
+        assert [c.name for c in checks if not c.passed] == ["quote_not_withdrawn"]
+
 
 class TestCurating:
     """Whole runs over the repository's queue, with nothing accepted: nothing reaches git."""
@@ -804,7 +811,9 @@ def _repository(repo_root: Path, directory: Path) -> Path:
 def _fake_gh(directory: Path) -> Path:
     gh = directory / "gh"
     gh.write_text(f'#!/bin/sh\nprintf "%s\\n" "$@" >> "{directory / "gh-calls.txt"}"\n'
-                  'if [ "$1" = "pr" ]; then echo "https://github.com/example/capabilities/pull/99"; fi\n')
+                  'if [ "$1" = "pr" ]; then echo "https://github.com/example/capabilities/pull/99"; fi\n'
+                  'if [ "$1 $2" = "issue list" ]; then echo "[]"; fi\n'
+                  'if [ "$1 $2" = "issue create" ]; then echo "https://github.com/example/capabilities/issues/7"; fi\n')
     gh.chmod(gh.stat().st_mode | stat.S_IEXEC)
     return gh
 
@@ -1098,7 +1107,7 @@ def route_task(root: Path, web=None, free_copies=None):
 
 class TestEditingRouteFiles:
     def test_every_route_file_takes_a_new_reference_and_nothing_else_in_it_moves(self, repo_root):
-        from capabilities_pipeline.agents.yaml_edit import add_reference
+        from capabilities.yaml_edit import add_reference
 
         reference = {"citation": 'A "quoted" title: with a colon', "url": WORK_URL, "supports": "Says # so.",
                      "quote": "Rope — twisted, \\ as ‘it’ says.", "status": "unverified", "proposed_by": "routes-1"}
@@ -1110,7 +1119,7 @@ class TestEditingRouteFiles:
             assert yaml.safe_load(edited)["references"][-1] == reference
 
     def test_a_quote_goes_on_the_reference_before_its_status_and_who_proposed_it_after(self):
-        from capabilities_pipeline.agents.yaml_edit import quote_reference
+        from capabilities.yaml_edit import quote_reference
 
         edited = quote_reference(TWIST_ROUTE, 0, {"url": COPY_URL, "quote": COPY_SENTENCE, "proposed_by": "routes-1"})
         lines = edited.splitlines()
@@ -1126,20 +1135,20 @@ class TestEditingRouteFiles:
         pytest.param(2, {"quote": "Q."}, "there is no reference 3", id="a reference that isn't there"),
     ])
     def test_an_edit_that_would_change_what_a_person_wrote_is_refused(self, index, fields, refused):
-        from capabilities_pipeline.agents.yaml_edit import EditError, quote_reference
+        from capabilities.yaml_edit import EditError, quote_reference
 
         with pytest.raises(EditError, match=refused):
             quote_reference(TWIST_ROUTE, index, fields)
 
     def test_a_reference_is_found_by_its_citation_wherever_it_is_in_the_file(self):
-        from capabilities_pipeline.agents.yaml_edit import EditError, reference_citing
+        from capabilities.yaml_edit import EditError, reference_citing
 
         assert reference_citing(TWIST_ROUTE, SITE_REPORT) == 1 and reference_citing(TWIST_ROUTE, f" {BOOK}") == 0
         with pytest.raises(EditError, match="no references cite"):
             reference_citing(TWIST_ROUTE, "Someone (2000). Another work.")
 
     def test_references_written_as_a_flow_list_are_refused_not_given_a_second_key(self):
-        from capabilities_pipeline.agents.yaml_edit import EditError, add_reference
+        from capabilities.yaml_edit import EditError, add_reference
 
         with pytest.raises(EditError, match="block list"):
             add_reference("id: x\nkind: route\nreferences: []\n", {"citation": "C.", "status": "unverified"})
@@ -1258,6 +1267,15 @@ class TestRouteProposals:
                            **change)
         checks, _ = task.check(route, proposal, finding)
         assert failed in [c.name for c in checks if not c.passed]
+
+    def test_a_quote_a_person_withdrew_for_the_route_isnt_proposed_again(self, found):
+        from capabilities.withdraw import quote_key
+        from capabilities_pipeline.agents.route_sources import RouteProposal
+
+        task, route, finding, _ = found
+        task.withdrawn = frozenset({quote_key(TWIST, SITE_SENTENCE)})
+        checks, _ = task.check(route, RouteProposal("propose", 1, SITE_REPORT, SITE_URL, SITE_SENTENCE, "R."), finding)
+        assert [c.name for c in checks if not c.passed] == ["quote_not_withdrawn"]
 
     def test_a_reference_that_already_has_a_quote_isnt_given_another(self, found):
         from capabilities_pipeline.agents.route_sources import RouteProposal
@@ -1384,3 +1402,129 @@ class TestTheRoutePullRequest:
                    if item["kind"] == "route_unverified"}
         assert details[TWIST].startswith("A quote is ready to check")
         assert details[BRAID].startswith("A quote is ready to check")
+
+
+# ------------------------------------------------------------------ re-checking merged facts (ADR 0050)
+#
+# Made-up facts, as if merged from made-up runs: Covellite's ore row, the quote on the twisting route's site report, and
+# a reference added to it whose page has changed since.
+
+RECHECKED_RUN = "routes-20260101-120000"
+RECHECKED_ORE_RUN = "ore-20260101-120000"
+CHANGED_URL = "https://example.org/changed"
+RECHECK_PAGES = ROUTE_PAGES | {CHANGED_URL: Page(CHANGED_URL, "200", "This page was rewritten. Rope is mentioned.",
+                                                 "Changed", "html")}
+MERGED_TWIST = TWIST_ROUTE.replace(f"""    url: {SITE_URL}
+    supports: Rope was twisted from plant fibers at the site.
+    status: unverified
+""", f"""    url: {SITE_URL}
+    supports: Rope was twisted from plant fibers at the site.
+    quote: "{SITE_SENTENCE}"
+    status: unverified
+    proposed_by: {RECHECKED_RUN}
+  - citation: "{CORD_CITATION}"
+    url: "{CHANGED_URL}"
+    supports: "Rope was braided from plant fibers in antiquity."
+    quote: "{WORK_SENTENCE}"
+    status: unverified
+    proposed_by: {RECHECKED_RUN}
+""")
+RECHECKED_SUMMARY = {"run": RECHECKED_RUN, "prompts": {"proposer": "aaaaaaaaaaaa", "reviewer": "bbbbbbbbbbbb"},
+                     "models": {"proposer": "sonnet", "reviewer": "sonnet"}, "items": [
+    {"item": TWIST, "outcome": "accepted", "change": {"route": TWIST, "reference": 1, "citation": SITE_REPORT}},
+    {"item": TWIST, "outcome": "accepted", "change": {"route": TWIST, "reference": None, "citation": CORD_CITATION}},
+]}
+
+
+@pytest.fixture
+def merged_root(repo_root, tmp_path) -> Path:
+    root = tmp_path / "repo"
+    for name in ("schema", "data"):
+        shutil.copytree(repo_root / name, root / name)
+    (root / "data" / "routes" / f"{TWIST}.yaml").write_text(MERGED_TWIST, encoding="utf-8")
+    runs = root / "data" / "agent_runs"
+    runs.mkdir(exist_ok=True)
+    (runs / f"{RECHECKED_RUN}.json").write_text(json.dumps(RECHECKED_SUMMARY), encoding="utf-8")
+    from capabilities_pipeline.agents.ore_candidates import COLUMNS, write_crosswalk
+
+    write_crosswalk(root, [{"mrds_ore": "Covellite", "id": "covellite", "wikidata": PROPOSED["wikidata"],
+                            "class": PROPOSED["class"], "mined_like": "mine-chalcopyrite", "citation": CITATION,
+                            "url": PAGE_URL, "supports": PROPOSED["supports"], "quote": QUOTE,
+                            "proposed_by": RECHECKED_ORE_RUN, "notes": PROPOSED["notes"]}])
+    return root
+
+
+def recheck_run(root, fake=None, gh=None, **changes):
+    from capabilities_pipeline.agents.recheck import RecheckSettings, recheck
+
+    changes.setdefault("runs", (RECHECKED_RUN, RECHECKED_ORE_RUN))
+    if fake:
+        changes["claude_command"] = str(fake.command)
+    if gh:
+        changes["gh_command"] = str(gh)
+    return recheck(root, RecheckSettings(**changes), web=FakeWeb(pages=RECHECK_PAGES), on_progress=lambda m: None,
+                   audit_dir=root / "audit")
+
+
+class TestRecheckingMergedFacts:
+    def test_code_checks_each_fact_again_as_it_was_proposed_and_finds_the_changed_page(self, merged_root):
+        summary = recheck_run(merged_root)
+        outcomes = {fact["fact"]: fact["outcome"] for fact in summary["facts"]}
+        assert outcomes == {
+            "Covellite's ore row": "holds",
+            f"the quote on {TWIST}'s reference to {SITE_REPORT}": "holds",
+            f"{TWIST}'s reference to {CORD_CITATION}": "fails",
+        }
+        changed = next(fact for fact in summary["facts"] if fact["outcome"] == "fails")
+        assert [check["name"] for check in changed["failed_checks"]] == ["quote_is_on_the_page"]
+
+    def test_without_the_reviewer_it_needs_no_claude_login_and_uses_none_of_the_plan(self, merged_root):
+        # given: no claude at all
+        summary = recheck_run(merged_root, claude_command="/nonexistent/claude")
+        assert summary["outcomes"] == {"holds": 2, "fails": 1}
+        assert all(usage["calls"] == 0 for usage in summary["usage"].values())
+
+    def test_it_changes_no_data(self, merged_root):
+        before = {path: path.read_bytes() for path in (merged_root / "data").rglob("*") if path.is_file()}
+        recheck_run(merged_root)
+        assert {path: path.read_bytes() for path in (merged_root / "data").rglob("*") if path.is_file()} == before
+
+    def test_facts_are_chosen_by_the_prompt_version_their_run_used(self, merged_root):
+        summary = recheck_run(merged_root, runs=(), prompt_versions=("bbbbbbbbbbbb",))
+        assert {fact["run"] for fact in summary["facts"]} == {RECHECKED_RUN}
+
+    def test_nothing_chosen_is_refused_rather_than_everything_rechecked(self):
+        from capabilities_pipeline.agents.recheck import RecheckSettings
+
+        with pytest.raises(ValueError, match="every_fact"):
+            RecheckSettings()
+
+    def test_the_reviewer_is_asked_only_when_the_admin_says_and_only_about_facts_that_pass(self, merged_root,
+                                                                                         fake_claude):
+        reject = {"output": {"verdict": "reject", "objections": [
+            {"about": "quote", "objection": "The quote is about another site."}], "summary": "Out of context."}}
+        fake_claude.script(reviewer=[answer(ACCEPT), reject])
+        summary = recheck_run(merged_root, fake_claude, reviewer=True)
+        outcomes = {fact["fact"]: fact["outcome"] for fact in summary["facts"]}
+        assert outcomes[f"the quote on {TWIST}'s reference to {SITE_REPORT}"] == "objected"
+        assert outcomes["Covellite's ore row"] == "holds"
+        assert len(fake_claude.calls("reviewer")) == 2
+
+    def test_each_fact_that_doesnt_hold_is_reported_once_in_the_report_forms_shape(self, merged_root, tmp_path):
+        from capabilities_pipeline.upstream import report_fields
+
+        gh = _fake_gh(tmp_path)
+        summary = recheck_run(merged_root, gh=gh, report_failures=True)
+        calls = (tmp_path / "gh-calls.txt").read_text()
+        body = calls.split("--body\n", 1)[1]
+        assert calls.count("issue\ncreate") == 1 and "--label\nreport" in calls
+        assert report_fields(body) == {"fact": TWIST, "kind": "reference", "reference": CORD_CITATION,
+                                       "run": RECHECKED_RUN}
+        assert [fact["reported"] for fact in summary["facts"] if fact["outcome"] == "fails"] == [
+            "https://github.com/example/capabilities/issues/7"]
+
+    def test_the_recheck_is_in_the_audit_log_like_a_run(self, merged_root):
+        summary = recheck_run(merged_root)
+        assert audit_rows(merged_root / "audit", "select task, mode from run_starts") == [("recheck", "checks")]
+        assert ("fails",) in audit_rows(merged_root / "audit", "select outcome from outcomes")
+        assert (merged_root / "audit" / "rechecks" / f"{summary['recheck']}.json").is_file()

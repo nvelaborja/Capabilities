@@ -12,6 +12,12 @@ models:
           - not_null:
               config:
                 where: "node_type <> 'override'"
+  - name: stg_github__reports
+    description: Readers' open reports from GitHub issues, typed, with empty fields as nulls.
+    columns:
+      # Only the number is tested: the rest is what a reader typed, and a typo in it mustn't stop the build.
+      - name: number
+        data_tests: [unique, not_null]
   - name: stg_mrds__deposits
     description: MRDS deposits with typed columns, and their ore minerals and commodities as lists.
     columns:

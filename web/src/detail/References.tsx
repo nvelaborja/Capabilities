@@ -1,5 +1,6 @@
 import type { Reference } from "../api/types";
 import { checkSegments, linkStateText } from "./referenceCheck";
+import { ReportLink } from "./ReportLink";
 
 const STATUS_TEXT: Record<NonNullable<Reference["status"]>, string> = {
   verified: "verified",
@@ -7,8 +8,14 @@ const STATUS_TEXT: Record<NonNullable<Reference["status"]>, string> = {
   unverified: "not yet checked",
 };
 
+interface ReferencesProps {
+  references: readonly Reference[];
+  /** The node or route citing them: what a report about one names. */
+  owner: { id: string; label: string };
+}
+
 /** Where a claim comes from, and how carefully it was checked (docs/data-format.md, evidence conventions). */
-export function References({ references }: { references: readonly Reference[] }) {
+export function References({ references, owner }: ReferencesProps) {
   if (references.length === 0) return <p className="muted">No sources recorded yet.</p>;
   return (
     <ol className="references">
@@ -40,6 +47,14 @@ export function References({ references }: { references: readonly Reference[] })
                   {linkState && ` (${linkState})`}
                 </span>
               )}
+              <ReportLink
+                text="Report"
+                fact={owner.id}
+                kind="reference"
+                label={`${owner.label}: ${ref.citation}`}
+                reference={ref.citation}
+                run={ref.proposed_by?.run}
+              />
             </span>
             {/* Where the work was found (ADR 0047): help for whoever reads it, never a verdict on the claim. */}
             {found.length > 0 && (

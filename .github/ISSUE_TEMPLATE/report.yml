@@ -1,0 +1,45 @@
+# The app's "Report a problem" links open this form with the fact filled in (ADR 0050). Open reports join the curation
+# queue at the next build: the field ids below are what pipeline/src/capabilities_pipeline/upstream.py reads.
+name: Report a problem with a fact
+description: Something in the graph is wrong, unsupported, or its source doesn't say what it is cited for.
+title: "Report: "
+labels: ["report"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you. Say what is wrong and, if you can, where a better answer is. A fact an agent proposed is withdrawn if the report holds; a person's is corrected.
+  - type: input
+    id: fact
+    attributes:
+      label: Fact
+      description: The node, route or line, as the app names it (filled in by the app).
+    validations:
+      required: true
+  - type: input
+    id: kind
+    attributes:
+      label: Kind
+      description: node, route, reference or line (filled in by the app).
+  - type: input
+    id: reference
+    attributes:
+      label: Reference
+      description: For a reference, its citation (filled in by the app).
+  - type: input
+    id: run
+    attributes:
+      label: Agent run
+      description: The agent run that proposed it, if one did (filled in by the app).
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is wrong
+      description: What the fact says that isn't so, or what its source doesn't say.
+    validations:
+      required: true
+  - type: textarea
+    id: source
+    attributes:
+      label: A better source
+      description: Optional. A work or page that says otherwise, with the passage if you have it.

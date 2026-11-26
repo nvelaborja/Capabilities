@@ -10,6 +10,7 @@ from jsonschema import Draft202012Validator
 from referencing import Registry, Resource
 
 from .graph import HELD_KINDS, THING_DIRS, Document, Graph, achieved_id, achieved_kind, load_documents, ore_crosswalk_rows
+from .withdraw import WITHDRAWALS, quote_key, withdrawn_quotes
 
 
 @dataclass(frozen=True)
@@ -38,7 +39,26 @@ def validate(root: Path) -> list[Issue]:
     graph = Graph.from_curated(root)
     # Some classes' members join only in the build, from the ore crosswalk (copper sulphide ore's are all upstream).
     upstream_classes = {row["class"] for row in ore_crosswalk_rows(root) if row["class"] != "none"}
-    return issues + _Checker(graph, upstream_classes).run()
+    return issues + _Checker(graph, upstream_classes).run() + _withdrawn_facts_back(root, graph)
+
+
+def _withdrawn_facts_back(root: Path, graph: Graph) -> list[Issue]:
+    """A withdrawn fact (ADR 0050) put back: the same quote for the same mineral or route. A person may still cite the
+    work again, with another passage they read."""
+    withdrawn = withdrawn_quotes(root)
+    if not withdrawn:
+        return []
+    issues = []
+    for row in ore_crosswalk_rows(root):
+        if quote_key(row["mrds_ore"], row.get("quote") or "") in withdrawn:
+            issues.append(Issue("error", "data/crosswalks/ore_minerals.csv",
+                                f"{row['mrds_ore']}: this quote was withdrawn (see {WITHDRAWALS})"))
+    for route_id, route in graph.routes.items():
+        for reference in route.get("references", []):
+            if reference.get("quote") and quote_key(route_id, reference["quote"]) in withdrawn:
+                issues.append(Issue("error", f"route {route_id}",
+                                    f"the quote for {reference['citation']!r} was withdrawn (see {WITHDRAWALS})"))
+    return issues
 
 
 def _schema_and_file_checks(root: Path, documents: list[Document]) -> list[Issue]:

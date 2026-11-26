@@ -24,6 +24,7 @@ from .built import (
 from .graph import Graph, LoadError, find_root
 from .reasoner import Backward, Selection, assess_job, closure, explore, need_tree
 from .validate import validate
+from .withdraw import WithdrawError, withdraw_ore_row, withdraw_reference
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -85,6 +86,21 @@ def build_parser() -> argparse.ArgumentParser:
         "backup", help="Make the latest download of each upstream dataset its cold backup in snapshots/ (commit it)."
     )
     cmd.set_defaults(handler=cmd_backup)
+
+    cmd = commands.add_parser(
+        "withdraw", help="Take a fact an agent proposed out of the data, recording why in data/withdrawals.csv (ADR 0050)."
+    )
+    kinds = cmd.add_subparsers(dest="kind", required=True)
+    ore = kinds.add_parser("ore", help="An agent's row in the ore crosswalk, by the mineral's MRDS name.")
+    ore.add_argument("mineral")
+    reference = kinds.add_parser(
+        "reference", help="What an agent added to a route's reference: the whole reference, or its quote.")
+    reference.add_argument("route")
+    reference.add_argument("--citation", required=True, help="The reference's citation, as the route's file has it.")
+    for sub in (ore, reference):
+        sub.add_argument("--reason", required=True, help="Why it is withdrawn: what is wrong with it.")
+        sub.add_argument("--report", default="", help="The GitHub issue that reported it (its number), if one did.")
+        sub.set_defaults(handler=cmd_withdraw)
 
     cmd = commands.add_parser("credits", help="Regenerate the list of works cited in CREDITS.md.")
     cmd.add_argument("--check", action="store_true", help="Only report whether CREDITS.md is up to date.")
@@ -174,6 +190,22 @@ def cmd_credits(args, root: Path) -> int:
         return 0
     path.write_text(updated, encoding="utf-8")
     print(f"Updated {path.relative_to(root)}.")
+    return 0
+
+
+def cmd_withdraw(args, root: Path) -> int:
+    try:
+        if args.kind == "ore":
+            withdrawal = withdraw_ore_row(root, args.mineral, args.reason, args.report)
+        else:
+            withdrawal = withdraw_reference(root, args.route, args.citation, args.reason, args.report)
+    except WithdrawError as exc:
+        raise UsageError(str(exc)) from exc
+    what = {"ore_row": "the ore crosswalk's row for", "reference": "the reference an agent added to",
+            "quote": "the quote an agent added to a reference of"}[withdrawal.kind]
+    print(f"Withdrew {what} {withdrawal.subject} (run {withdrawal.run}), recorded in data/withdrawals.csv.")
+    closes = f' Its body can say "Closes #{withdrawal.report}".' if withdrawal.report else ""
+    print(f"Run `uv run capabilities validate`, then open a pull request with the change.{closes}")
     return 0
 
 

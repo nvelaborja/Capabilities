@@ -12,6 +12,7 @@ import { ItemChips, type QuickAdd } from "./ItemChips";
 import { chipStatus, kindName, statusTri, waysHeading } from "./marks";
 import { nodeOrigin, sourceLines } from "./provenance";
 import { References } from "./References";
+import { ReportLink } from "./ReportLink";
 import { Routes, type StatusOf } from "./Routes";
 
 const SELECTABLE = new Set(["source", "material", "artifact", "action"]);
@@ -100,6 +101,7 @@ export function NodeDetail(props: NodeDetailProps) {
               {mapped === id ? "Back to the graph" : "Where it's found"}
             </button>
           )}
+          <ReportLink fact={id} kind="node" label={entry.label} run={data?.about.upstream?.proposed_by?.run} />
         </>
       }
     >
@@ -132,7 +134,7 @@ export function NodeDetail(props: NodeDetailProps) {
             {data.about.references.length > 0 && (
               <>
                 <h4>Sources</h4>
-                <References references={data.about.references} />
+                <References references={data.about.references} owner={{ id, label: entry.label }} />
               </>
             )}
           </section>

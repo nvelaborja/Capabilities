@@ -17,17 +17,18 @@ references unverified, until a person reads the quote.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 import duckdb
+from capabilities import yaml_edit
 from capabilities.built import CHECKS_FILE, graph_dir
 from capabilities.graph import Graph, load_documents, ore_crosswalk_rows
+from capabilities.withdraw import WithdrawError, change_in_run, withdrawn_quotes
 
 from .sources import Library, Passage, Source, Wanted
-from .task import ChangeError, Check, Evidence, Finding, Prompt, Skip, Task, cell, offered, page_checks
+from .task import ChangeError, Check, Evidence, Finding, Merged, Prompt, Skip, Task, cell, not_withdrawn, offered, page_checks
 from .web import excerpt
-from . import yaml_edit
 
 # OpenAlex searches built from a route: the archaeology of its process first, then experiments that redid it.
 OPENALEX_SEARCHES = ("{label} archaeology", "{label} experimental archaeology")
@@ -97,6 +98,7 @@ class RouteSources(Task):
 
     def __init__(self, root: Path, graph: Graph, library: Library, free_copies: dict[str, str]):
         self.root, self.graph, self.library, self.free_copies = root, graph, library, free_copies
+        self.withdrawn = frozenset(withdrawn_quotes(root))
         self.paths = {document.data["id"]: document.path.relative_to(root) for document in load_documents(root)[0]
                       if document.data.get("kind") == "route"}
         self.copies: dict[str, list[str]] = {}
@@ -108,6 +110,23 @@ class RouteSources(Task):
     def open(cls, root: Path, library: Library, build_dir: Path | None = None,
              leaving_out: frozenset[str] = frozenset()) -> RouteSources:
         return cls(root, Graph.from_curated(root), library, free_copies(build_dir) if build_dir else {})
+
+    def merged(self) -> list[Merged]:
+        """Each reference an agent added, and each quote it added to a person's, on the route as it was before: without
+        the reference, or with the reference as the person wrote it. What the run changed is in the summary its pull
+        request committed; a fact whose run left none can't be rebuilt, and is left out."""
+        facts = []
+        for route_id in self.paths:
+            route = self.route(route_id)
+            for index, reference in enumerate(route.document.get("references", [])):
+                if not reference.get("proposed_by"):
+                    continue
+                try:
+                    change = change_in_run(self.root, reference["proposed_by"], route_id, reference["citation"])
+                except WithdrawError:
+                    continue
+                facts.append(_merged(route, index, reference, change))
+        return facts
 
     def items(self, queue: list[dict]) -> list[Route]:
         # The routes copied for each ore mineral aren't in a file: they follow the route they were copied from.
@@ -219,7 +238,8 @@ class RouteSources(Task):
         on_page, page, found = page_checks(proposal.url, proposal.quote, self.library)
         named = bool(self.terms(route).wanted().named.search(proposal.quote))
         checks += on_page + [Check("quote_names_the_route", named, "the quote names what the route makes or uses"
-                                   if named else "the quote doesn't name what the route makes, or its tools")]
+                                   if named else "the quote doesn't name what the route makes, or its tools"),
+                             not_withdrawn(route.name, proposal.quote, self.withdrawn)]
         return checks, Evidence(page, excerpt(*found) if found else None)
 
     def reviewer_task(self, prompt: Prompt, route: Route, proposal: RouteProposal, evidence: Evidence) -> str:
@@ -304,6 +324,23 @@ def _edited(text: str, change: dict) -> str:
     fields = {"url": change["url"]} if change.get("adds_url") else {}
     return yaml_edit.quote_reference(text, yaml_edit.reference_citing(text, change["citation"]), fields | {
         "quote": change["quote"], "proposed_by": change["proposed_by"]})
+
+
+def _merged(route: Route, index: int, reference: dict, change: dict) -> Merged:
+    references = list(route.document["references"])
+    if change["reference"] is None:
+        del references[index]
+        proposal = RouteProposal("propose", None, reference["citation"], reference.get("url", ""), reference["quote"],
+                                 reference.get("supports", ""))
+        fact = f"{route.name}'s reference to {reference['citation']}"
+    else:
+        added = {"quote", "proposed_by"} | ({"url"} if change.get("adds_url") else set())
+        references[index] = {key: value for key, value in reference.items() if key not in added}
+        proposal = RouteProposal("propose", index, reference["citation"], reference.get("url", ""), reference["quote"],
+                                 reference.get("supports", ""), adds_url=bool(change.get("adds_url")))
+        fact = f"the quote on {route.name}'s reference to {reference['citation']}"
+    before = replace(route, document=route.document | {"references": references})
+    return Merged(before, proposal, reference["proposed_by"], fact, route.name, "reference", reference["citation"])
 
 
 def free_copies(build_dir: Path) -> dict[str, str]:

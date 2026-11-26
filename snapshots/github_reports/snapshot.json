@@ -1,0 +1,10 @@
+{
+  "dataset": "github_reports",
+  "url": "https://api.github.com/repos/nvelaborja/Capabilities/issues",
+  "retrieved_at": "2026-11-26T23:18:22Z",
+  "sha256": "bd801408a930d7cc5f1b5224293dffa794af7c002548ab584ba7158d981cf909",
+  "rows": 0,
+  "license": "The project's own issue tracker; only issue numbers, titles and the fields the app filled in are kept",
+  "label": "report",
+  "state": "open"
+}

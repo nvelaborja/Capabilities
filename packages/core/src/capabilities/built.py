@@ -217,7 +217,7 @@ def load_queue(build_dir: Path) -> list[dict]:
         return []
     rows = duckdb.sql(
         f"select {', '.join(QUEUE_COLUMNS)} from read_parquet(?) where id is not null "
-        "order by kind = 'unmatched_place', kind, priority desc nulls last, subject",
+        "order by kind <> 'reported', kind = 'unmatched_place', kind, priority desc nulls last, subject",
         params=[str(path)],
     ).fetchall()
     return [dict(zip(QUEUE_COLUMNS, row)) for row in rows]

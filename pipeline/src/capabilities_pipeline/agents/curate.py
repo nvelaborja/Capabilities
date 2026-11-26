@@ -17,7 +17,7 @@ from typing import Callable
 
 from .audit import AuditLog
 from .claude import EFFORTS, AgentError, Answer, ClaudeCode, UsageLimitReached
-from .task import Check, Finding, Item, Prompt, Skip, Task, review_schema
+from .task import Check, Evidence, Finding, Item, Prompt, Skip, Task, review_schema
 
 # Neither role has tools: one turn for the answer, one for the structured output, and one to spare.
 PROPOSER_TURNS = 3
@@ -196,14 +196,7 @@ class Curator:
         if failed:
             reason = "It failed these checks:\n" + "\n".join(f"- {c.name}: {c.detail}" for c in failed)
             return ItemResult(item, "sent_back", reason, attempt, proposal, checks=checks)
-        task = self.task.reviewer_task(self.reviewer_prompt, item, proposal, evidence)
-        if objected:
-            # Without them a second review starts afresh, and finds new, finer faults in a proposal that fixed the
-            # first ones: copper-from-ore took the reviewer's own wording and was sent back for its scope (run
-            # routes-20261126-191441).
-            task += f"\n\nYou reviewed this item's last proposal and asked for these changes:\n{objected}\n"
-        review = self._ask("reviewer", item, attempt, self.reviewer, self.reviewer_prompt, task,
-                           self.review_schema).output
+        review = self.review(item, attempt, proposal, evidence, objected)
         objections = _objections(review)
         if review["verdict"] == "accept":
             change = self.task.change(item, proposal, self.run_id)
@@ -213,6 +206,17 @@ class Curator:
                               proposal, checks=checks, review=review)
         return ItemResult(item, "sent_back", "The reviewer asked for changes:\n" + objections, attempt, proposal,
                           checks=checks, review=review)
+
+    def review(self, item: Item, attempt: int, proposal: object, evidence: Evidence, objected: str | None = None) -> dict:
+        """The reviewer's verdict on a proposal (accept, revise or reject, with objections), recorded in the audit log.
+        A re-check of a merged fact asks it too (recheck.py)."""
+        task = self.task.reviewer_task(self.reviewer_prompt, item, proposal, evidence)
+        if objected:
+            # Without them a second review starts afresh, and finds new, finer faults in a proposal that fixed the
+            # first ones: copper-from-ore took the reviewer's own wording and was sent back for its scope (run
+            # routes-20261126-191441).
+            task += f"\n\nYou reviewed this item's last proposal and asked for these changes:\n{objected}\n"
+        return self._ask("reviewer", item, attempt, self.reviewer, self.reviewer_prompt, task, self.review_schema).output
 
     def _ask(self, role: str, item: Item, attempt: int, claude: ClaudeCode, prompt: Prompt, task: str,
              schema: dict) -> Answer:

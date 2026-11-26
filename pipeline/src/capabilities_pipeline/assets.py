@@ -39,9 +39,10 @@ from dagster_dbt import (
 
 from .agents.branch import Downloads
 from .agents.curate import Settings
+from .agents.recheck import RecheckSettings, recheck as recheck_facts
 from .agents.run import run_agents
 from .build import DBT_PROJECT, dbt_environment, dbt_target_path, load_inputs, write_manifest
-from .upstream import MRDS, PLEIADES, REFERENCES, WIKIDATA, WIKIDATA_ITEMS, Dataset, fetch_or_fall_back
+from .upstream import MRDS, PLEIADES, REFERENCES, REPORTS, WIKIDATA, WIKIDATA_ITEMS, Dataset, fetch_or_fall_back
 
 
 class UpstreamDownloads(ConfigurableResource):
@@ -52,6 +53,7 @@ class UpstreamDownloads(ConfigurableResource):
     pleiades_url: str = PLEIADES.url
     openalex_url: str = REFERENCES.url
     crossref_url: str = REFERENCES.crossref_url
+    github_reports_url: str = REPORTS.url
     wikidata_site_url: str = "https://www.wikidata.org"  # Wikidata's items and search, where agents' runs find minerals
 
 
@@ -76,6 +78,25 @@ class AgentRunConfig(Config):
     base: str = "origin/main"
     names: list[str] = []  # these items (minerals by MRDS name, routes by id), instead of the top of the queue
     find_only: bool = False  # find the items and passages, ask no model: what a run would offer, for none of the plan
+
+
+class RecheckConfig(Config):
+    """Which merged agent facts to check again, and how (ADR 0050). Launched by hand, by an admin:
+
+        cd pipeline && uv run dg launch --job agent_recheck --config-json \\
+            '{"ops": {"recheck": {"config": {"runs": ["ore-20261125-222345"]}}}}'
+    """
+
+    runs: list[str] = []  # the facts these runs proposed
+    prompt_versions: list[str] = []  # or those of runs that used these prompts (their hashes, as summaries record them)
+    models: list[str] = []  # or those of runs that used these models
+    every_fact: bool = False  # or every merged agent fact
+    reviewer: bool = False  # ask the reviewer agent again too: uses your Claude plan. Off, only code's free checks run
+    reviewer_model: str = "sonnet"
+    reviewer_effort: str | None = "high"
+    stop_at_five_hour: float = 0.8
+    stop_at_seven_day: float = 0.9
+    report_failures: bool = False  # open a GitHub issue labelled `report` for each fact that doesn't hold
 
 
 def definitions(root: Path, build_dir: Path) -> Definitions:
@@ -137,6 +158,15 @@ def definitions(root: Path, build_dir: Path) -> Definitions:
     def reference_candidates_snapshot(context: AssetExecutionContext, downloads: UpstreamDownloads) -> MaterializeResult:
         return download(context, replace(REFERENCES, crossref_url=downloads.crossref_url), downloads.openalex_url)
 
+    @asset(
+        key=AssetKey(["upstream", REPORTS.name]),
+        group_name="upstream",
+        description="The repository's open GitHub issues labelled `report`: facts readers reported from the app's detail "
+        "pane. Each joins the curation queue, first (ADR 0050).",
+    )
+    def github_reports_snapshot(context: AssetExecutionContext, downloads: UpstreamDownloads) -> MaterializeResult:
+        return download(context, REPORTS, downloads.github_reports_url)
+
     def download(context: AssetExecutionContext, dataset: Dataset, url: str) -> MaterializeResult:
         """Download a dataset. Offline, or when its server is down, the build goes on with the cold backup (ADR 0044),
         and the run says so: the asset's metadata names the copy used and the error."""
@@ -161,6 +191,7 @@ def definitions(root: Path, build_dir: Path) -> Definitions:
         WIKIDATA_ITEMS.name: "The Wikidata items snapshot (labels, descriptions, formulas), loaded into DuckDB as text.",
         PLEIADES.name: "The Pleiades places snapshot, loaded into DuckDB as text.",
         REFERENCES.name: "What OpenAlex and Crossref hold for the works we cite, and our links' statuses, as text.",
+        REPORTS.name: "The open reports from GitHub issues, as text.",
         "pleiades_sources": "The hand-kept crosswalk of rules matching Pleiades mines and quarries to our sources and ore "
         "classes (data/crosswalks).",
         "upstream_snapshots": "Where and when each upstream snapshot was retrieved, and which copy was used, for provenance.",
@@ -172,8 +203,9 @@ def definitions(root: Path, build_dir: Path) -> Definitions:
         WIKIDATA_ITEMS.name: [wikidata_items_snapshot],
         PLEIADES.name: [pleiades_snapshot],
         REFERENCES.name: [reference_candidates_snapshot],
+        REPORTS.name: [github_reports_snapshot],
         "upstream_snapshots": [mrds_snapshot, wikidata_snapshot, wikidata_items_snapshot, pleiades_snapshot,
-                               reference_candidates_snapshot],
+                               reference_candidates_snapshot, github_reports_snapshot],
     }
 
     @multi_asset(
@@ -202,7 +234,7 @@ def definitions(root: Path, build_dir: Path) -> Definitions:
         yield MaterializeResult(
             asset_key=raw["pleiades_sources"], metadata={"rules": loaded["crosswalks"]["pleiades_sources"]}
         )
-        for dataset in (MRDS, WIKIDATA, WIKIDATA_ITEMS, PLEIADES, REFERENCES):
+        for dataset in (MRDS, WIKIDATA, WIKIDATA_ITEMS, PLEIADES, REFERENCES, REPORTS):
             snapshot = loaded["upstream"][dataset.name]
             yield MaterializeResult(asset_key=raw[dataset.name], metadata={"rows": snapshot["rows"], "copy": snapshot["copy"]})
         yield MaterializeResult(asset_key=raw["upstream_snapshots"], metadata={"datasets": len(loaded["upstream"])})
@@ -258,9 +290,27 @@ def definitions(root: Path, build_dir: Path) -> Definitions:
     def agent_curation():
         curate()
 
+    @op(description="Checks merged agent facts again, chosen by run, prompt version or model: code's checks (the page "
+        "still loads, the quote is still on it), and the reviewer agent if asked, which uses your Claude plan. Changes "
+        "no data; what fails is listed, and reported as GitHub issues if asked (ADR 0050).")
+    def recheck(context: OpExecutionContext, config: RecheckConfig, downloads: UpstreamDownloads) -> dict:
+        fields = config.model_dump()
+        settings = RecheckSettings(**(fields | {name: tuple(fields[name]) for name in ("runs", "prompt_versions", "models")}))
+        summary = recheck_facts(root, settings, Downloads(downloads.wikidata_url, downloads.openalex_url,
+                                                          downloads.crossref_url, downloads.wikidata_site_url),
+                                on_progress=context.log.info)
+        context.add_output_metadata({"recheck": summary["recheck"], "outcomes": summary["outcomes"],
+                                     "stopped_because": summary["stopped_because"] or ""})
+        return summary
+
+    @job(description="Started by hand only, by an admin: checks merged agent facts again (ADR 0050). Nothing in the app "
+         "starts it.")
+    def agent_recheck():
+        recheck()
+
     return Definitions(
         assets=[mrds_snapshot, wikidata_snapshot, wikidata_items_snapshot, pleiades_snapshot, reference_candidates_snapshot,
-                raw_tables, graph_models, graph_manifest],
-        jobs=[agent_curation],
+                github_reports_snapshot, raw_tables, graph_models, graph_manifest],
+        jobs=[agent_curation, agent_recheck],
         resources={"dbt": DbtCliResource(project_dir=project), "downloads": UpstreamDownloads()},
     )

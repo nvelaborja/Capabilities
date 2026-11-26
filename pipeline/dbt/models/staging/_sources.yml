@@ -186,6 +186,17 @@ sources:
             data_tests: [not_null]
           - name: status
             data_tests: [not_null]
+      - name: github_reports
+        description: >
+          The repository's open GitHub issues labelled `report`, as downloaded (ADR 0050): each issue's number, link,
+          title and date, and the fields the app's report link filled in (the fact, its kind, a reference's citation, the
+          agent run). Every column as text; a field left empty is ''. Who reported it, and what they wrote, stay on
+          GitHub.
+        columns:
+          - name: number
+            data_tests: [unique, not_null]
+          - name: url
+            data_tests: [not_null]
       - name: upstream_snapshots
         description: One row per upstream dataset loaded, with where and when it was retrieved, for provenance.
         columns:

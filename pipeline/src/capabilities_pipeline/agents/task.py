@@ -16,6 +16,8 @@ from pathlib import Path
 from string import Template
 from typing import Any, Protocol
 
+from capabilities.withdraw import quote_key
+
 from .sources import Found, Library, Passage
 from .web import Page, locate
 
@@ -76,6 +78,20 @@ class Evidence:
     page: Page | None = None
     excerpt: str | None = None
     item: Any = None  # anything else the task looked up (an ore candidate's Wikidata item)
+
+
+@dataclass(frozen=True)
+class Merged:
+    """A fact an agent proposed and a person merged, as the proposal it was, on its item as it was before: what a
+    re-check checks again (ADR 0050)."""
+
+    item: Any
+    proposal: Any
+    run: str
+    fact: str  # how a person names it: "Galena's ore row", "twist-test-cord's reference to Weaver (1990)"
+    subject: str  # what a report about it names (its mineral or route), as the report form's fact
+    kind: str  # the report form's kind: "ore row" or "reference"
+    citation: str = ""  # a reference's citation
 
 
 @dataclass(frozen=True)
@@ -140,6 +156,16 @@ class Task(ABC):
 
     def score(self, results: list, answers: dict[str, dict]) -> dict:
         return {}
+
+    @classmethod
+    def before_merging(cls, root: Path, library: Library, build_dir: Path | None = None) -> Task:
+        """The task as it was before its merged facts were: for a re-check, whose checks would otherwise find each fact
+        already taken (its id, its item, its citation on the route)."""
+        return cls.open(root, library, build_dir)
+
+    @abstractmethod
+    def merged(self) -> list[Merged]:
+        """Every fact of this task an agent proposed that is in the data now, by `proposed_by`."""
 
     @abstractmethod
     def items(self, queue: list[dict]) -> list[Item]:
@@ -225,6 +251,13 @@ def page_checks(url: str, quote: str, library: Library) -> tuple[list[Check], Pa
         checks.append(Check("quote_is_on_the_page", False, "not found word for word on the page" if page and page.loaded
                             else "the page couldn't be read, so the quote couldn't be checked"))
     return checks, page, found
+
+
+def not_withdrawn(subject: str, quote: str, withdrawn: frozenset[tuple[str, str]]) -> Check:
+    """A person withdrew this quote for this subject (ADR 0050): proposing it again would undo their decision."""
+    again = quote_key(subject, quote) in withdrawn
+    return Check("quote_not_withdrawn", not again, "this quote was withdrawn for it (data/withdrawals.csv)" if again
+                 else "the quote wasn't withdrawn for it")
 
 
 def _page_detail(page: Page | None, url: str) -> str:
