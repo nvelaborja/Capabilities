@@ -5,7 +5,7 @@ Every upstream dataset is required to build the graph ([ADR 0044](../docs/adr/00
 A build uses the newest copy of each dataset, the latest download in `build/upstream/` or the backup here, and stops if a dataset has neither. To refresh the backups after downloading:
 
 ```bash
-cd pipeline && uv run dg launch --assets 'upstream/mrds_deposits'          # or upstream/wikidata_quantities, upstream/pleiades_places, upstream/reference_candidates
+cd pipeline && uv run dg launch --assets 'upstream/mrds_deposits'          # or upstream/wikidata_quantities, upstream/pleiades_places, upstream/reference_candidates, upstream/github_reports
 cd .. && uv run capabilities backup                                       # copies newer downloads here
 ```
 
@@ -20,3 +20,4 @@ These copies are the datasets' own, not the project's: their licenses, below, ap
 | `wikidata_items/` | Wikidata: the English label, description and chemical formula of the same items | CC0 1.0 |
 | `pleiades_places/` | Pleiades: every place in the gazetteer of ancient places, from its daily dump. Credit: Pleiades contributors, *Pleiades: A Gazetteer of Past Places*, https://pleiades.stoa.org | CC BY 3.0 |
 | `reference_candidates/` | What OpenAlex and Crossref hold for each work the curated layer cites (bibliographic fields only, no abstracts), and the HTTP status of each cited link | OpenAlex: CC0 1.0. Crossref: bibliographic metadata, no restrictions |
+| `github_reports/` | The project's open GitHub issues labelled `report`: each issue's number, link, title and date, and the fact, kind, reference and run the app's link filled in. Not the reporter, nor what they wrote | Written by their reporters, under GitHub's Terms of Service |

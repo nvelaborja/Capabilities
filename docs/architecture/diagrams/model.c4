@@ -10,7 +10,7 @@ model {
   }
 
   github = external 'GitHub' {
-    description 'Hosts the repository and pull requests, agents\' draft pull requests among them, and runs CI (GitHub Actions): validate, build the graph, tests, lint and the web build.'
+    description 'Hosts the repository and pull requests, agents\' draft pull requests among them, and runs CI (GitHub Actions): validate, build the graph, tests, lint and the web build. Readers\' reports of wrong facts are issues labelled report, on the report form (ADR 0050).'
   }
 
   openfreemap = external 'OpenFreeMap' {
@@ -89,6 +89,10 @@ model {
         technology 'Python, Claude Code CLI, Dagster job agent_curation (capabilities_pipeline.agents)'
         description 'Started by hand with a task and a size: ore candidates (a crosswalk row each, ADR 0048) or routes whose references are all unverified (a quoted source each, ADR 0049). Code finds the passages; a proposer agent chooses one; code checks it; a reviewer agent challenges it. Accepted changes are validated, built and tested in a temporary worktree and opened as a draft pull request (ADR 0035).'
       }
+      recheck = component 'Re-check' {
+        technology 'Python, Dagster job agent_recheck (capabilities_pipeline.agents.recheck)'
+        description 'Started by hand by an admin, never by the app: checks merged agent facts again, chosen by run, prompt version or model. Code\'s checks always; the reviewer agent only if asked. Changes no data; reports what fails as issues if asked (ADR 0050).'
+      }
       dbt = component 'dbt project' {
         technology 'dbt Core with the DuckDB adapter'
         description 'pipeline/dbt: sources, staging views and marts, with data tests. Marts are written as Parquet; geometries use the DuckDB spatial extension.'
@@ -127,6 +131,9 @@ model {
       rawPleiades = table 'raw.pleiades_places' {
         description 'The Pleiades snapshot, all 26 columns as text.'
       }
+      rawReports = table 'raw.github_reports' {
+        description 'Open issues labelled report: number, link, title, date, and the fact, kind, reference and run the app\'s link filled in, as text. No reporter, no text.'
+      }
       rawReferenceCandidates = table 'raw.reference_candidates' {
         description 'What OpenAlex and Crossref answered for each cited work (a few candidates per lookup), and the HTTP status of each cited link, as text.'
       }
@@ -162,6 +169,10 @@ model {
       stgReferences = table 'stg_references__cited, __candidates' {
         technology 'dbt views'
         description 'Every reference in the graph, one row per use (found anywhere in each document with json_tree); and the candidates typed, with their titles reduced to words for comparing.'
+      }
+      stgReports = table 'stg_github__reports' {
+        technology 'dbt view'
+        description 'Readers\' open reports, typed, with empty fields as nulls.'
       }
       stgPleiades = table 'stg_pleiades__workings' {
         technology 'dbt view'
@@ -221,7 +232,11 @@ model {
       }
       cli = component 'CLI' {
         technology 'argparse (`capabilities`)'
-        description 'validate, build, backup, queue, need, explore, check, credits, serve.'
+        description 'validate, build, backup, queue, need, explore, check, credits, withdraw, serve.'
+      }
+      withdraw = component 'Withdrawal' {
+        technology 'capabilities.withdraw, capabilities.yaml_edit'
+        description 'Takes an agent\'s ore row, reference or quote out of the curated layer, as text, and records what it said and why in data/withdrawals.csv. Refuses a person\'s fact (ADR 0050).'
       }
     }
 
@@ -300,6 +315,10 @@ model {
   capabilities.artifact.checks -> capabilities.artifact.queue 'works not yet read'
   capabilities.pipeline.dbt -> capabilities.artifact.checks 'writes the mart as Parquet, with data tests'
   capabilities.core.built -> capabilities.artifact.checks 'reads each work\'s check, for the detail pane'
+  capabilities.pipeline.downloader -> github 'reads the open issues labelled report (HTTPS)'
+  capabilities.pipeline.loader -> capabilities.warehouse.rawReports 'loads the newest copy of the reports'
+  capabilities.warehouse.rawReports -> capabilities.warehouse.stgReports 'typed'
+  capabilities.warehouse.stgReports -> capabilities.artifact.queue 'reports, first, one item per fact'
   capabilities.pipeline.loader -> capabilities.warehouse.rawPleiades 'loads the newest copy of Pleiades'
   capabilities.pipeline.loader -> capabilities.warehouse.rawPleiadesRules 'loads the rules, as text'
   capabilities.warehouse.rawPleiades -> capabilities.warehouse.stgPleiades 'mines and quarries, typed'
@@ -354,12 +373,27 @@ model {
   capabilities.pipeline.agents -> github 'pushes agents/<run> and opens a draft pull request (gh)'
   github -> capabilities.curated 'a merged pull request adds the rows, or the routes\' references'
 
+  explorer -> github 'reports a wrong fact, on the report form'
+  capabilities.web -> github 'Report a problem: opens a new issue with the fact filled in'
+  contributor -> capabilities.pipeline.recheck 'starts a re-check by hand, choosing whether the reviewer is asked'
+  capabilities.pipeline.dagster -> capabilities.pipeline.recheck 'runs the agent_recheck job'
+  capabilities.pipeline.recheck -> capabilities.curated 'reads the agents\' facts and their runs\' summaries'
+  capabilities.pipeline.recheck -> theWeb 'downloads each fact\'s page again'
+  capabilities.pipeline.recheck -> claude 'asks the reviewer again, only if the admin says (claude -p, no tools)'
+  capabilities.pipeline.recheck -> capabilities.audit 'records the re-check as a run'
+  capabilities.pipeline.recheck -> github 'reports a fact that fails as an issue, if asked (gh)'
+  contributor -> capabilities.core.withdraw 'withdraws an agent\'s fact a report showed wrong'
+  capabilities.core.withdraw -> capabilities.curated 'removes the fact; appends to withdrawals.csv'
+
   // Lineage: the data, stage to stage, the way it flows (view pipeline).
   mrds -[lineage]-> capabilities.snapshots 'mrds-csv.zip, as Parquet'
   wikidata -[lineage]-> capabilities.snapshots 'two query results, as Parquet'
   pleiades -[lineage]-> capabilities.snapshots 'the daily dump, as Parquet'
   openalex -[lineage]-> capabilities.snapshots 'works found, as Parquet'
   crossref -[lineage]-> capabilities.snapshots 'works found, as Parquet'
+  github -[lineage]-> capabilities.snapshots 'open reports, as Parquet'
+  capabilities.snapshots -[lineage]-> capabilities.warehouse.rawReports 'the download, if newest'
+  capabilities.backups -[lineage]-> capabilities.warehouse.rawReports 'the backup, if newest'
   capabilities.snapshots -[lineage]-> capabilities.warehouse.rawReferenceCandidates 'the download, if newest'
   capabilities.backups -[lineage]-> capabilities.warehouse.rawReferenceCandidates 'the backup, if newest'
   capabilities.artifact.checks -[lineage]-> capabilities.artifact.manifest 'its row count'
