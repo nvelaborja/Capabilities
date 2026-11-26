@@ -39,7 +39,7 @@ from dagster_dbt import (
 
 from .agents.branch import Downloads
 from .agents.curate import Settings
-from .agents.run import run_ore_candidates
+from .agents.run import run_agents
 from .build import DBT_PROJECT, dbt_environment, dbt_target_path, load_inputs, write_manifest
 from .upstream import MRDS, PLEIADES, REFERENCES, WIKIDATA, WIKIDATA_ITEMS, Dataset, fetch_or_fall_back
 
@@ -56,14 +56,15 @@ class UpstreamDownloads(ConfigurableResource):
 
 
 class AgentRunConfig(Config):
-    """One agent run's size and settings (ADR 0048). Launched by hand:
+    """One agent run's task, size and settings (ADR 0048, ADR 0049). Launched by hand:
 
         cd pipeline && uv run dg launch --job agent_curation --config-json \\
-            '{"ops": {"curate_ore_candidates": {"config": {"items": 5}}}}'
+            '{"ops": {"curate": {"config": {"task": "route_sources", "items": 5}}}}'
     """
 
-    items: int = 5  # how many queue items to work through, most widely listed first
-    evaluate: bool = False  # ask again about the minerals a person decided, score the answers, open no pull request
+    task: str = "ore_candidates"  # ore_candidates (ADR 0048) or route_sources (ADR 0049)
+    items: int = 5  # how many queue items to work through, in the queue's order
+    evaluate: bool = False  # ask again about the items a person decided, score the answers, open no pull request
     proposer_model: str = "sonnet"  # chooses among passages code found (ADR 0048)
     reviewer_model: str = "sonnet"
     proposer_effort: str | None = "medium"  # low, medium, high, xhigh or max; unset is Claude Code's default
@@ -73,7 +74,7 @@ class AgentRunConfig(Config):
     stop_at_seven_day: float = 0.9
     pull_request: bool = True
     base: str = "origin/main"
-    minerals: list[str] = []  # these minerals (MRDS names), instead of the top of the queue
+    names: list[str] = []  # these items (minerals by MRDS name, routes by id), instead of the top of the queue
     find_only: bool = False  # find the items and passages, ask no model: what a run would offer, for none of the plan
 
 
@@ -226,12 +227,13 @@ def definitions(root: Path, build_dir: Path) -> Definitions:
             }
         )
 
-    @op(description="Agents propose ore crosswalk rows for the top ore candidates in the curation queue; code and a "
-        "reviewer agent check them; what passes becomes a draft pull request (ADR 0035, ADR 0048). Uses Claude Code on "
+    @op(description="Agents work through the top of the curation queue for one task: ore crosswalk rows for ore "
+        "candidates, or quoted sources for routes whose references are all unverified. Code and a reviewer agent check "
+        "each proposal; what passes becomes a draft pull request (ADR 0035, ADR 0048, ADR 0049). Uses Claude Code on "
         "your Claude login, so it draws on your plan's usage limits.")
-    def curate_ore_candidates(context: OpExecutionContext, config: AgentRunConfig, downloads: UpstreamDownloads) -> dict:
-        report = run_ore_candidates(
-            root, build_dir, Settings(**(config.model_dump() | {"minerals": tuple(config.minerals)})),
+    def curate(context: OpExecutionContext, config: AgentRunConfig, downloads: UpstreamDownloads) -> dict:
+        report = run_agents(
+            root, build_dir, Settings(**(config.model_dump() | {"names": tuple(config.names)})),
             Downloads(downloads.wikidata_url, downloads.openalex_url, downloads.crossref_url,
                       downloads.wikidata_site_url),
             on_progress=context.log.info,
@@ -251,10 +253,10 @@ def definitions(root: Path, build_dir: Path) -> Definitions:
         context.add_output_metadata(metadata)
         return report.summary
 
-    @job(description="Started by hand only, with a size: agents work through the curation queue's ore candidates "
-         "(ADR 0048).")
+    @job(description="Started by hand only, with a task and a size: agents work through the curation queue (ADR 0048, "
+         "ADR 0049).")
     def agent_curation():
-        curate_ore_candidates()
+        curate()
 
     return Definitions(
         assets=[mrds_snapshot, wikidata_snapshot, wikidata_items_snapshot, pleiades_snapshot, reference_candidates_snapshot,

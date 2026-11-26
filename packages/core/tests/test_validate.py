@@ -62,6 +62,13 @@ class TestBrokenData:
                 "unknown verb 'teleport'",
             ),
             (
+                # Who proposed a reference is an agent run, whose summary is data/agent_runs/<run>.json (ADR 0049).
+                "data/routes/proposed-by-someone.yaml",
+                BROKEN_ROUTE.replace("broken-route", "proposed-by-someone").replace("thing: unobtainium", "thing: charcoal")
+                .replace("status: unverified }", "status: unverified, proposed_by: someone }"),
+                "proposed_by: 'someone' does not match",
+            ),
+            (
                 "data/things/materials/wrong-name.yaml",
                 "id: something-else\nkind: material\nlabel: X\norigin: produced\n",
                 "does not match the file name",

@@ -1,11 +1,11 @@
-"""One agent run over ore candidates: find, choose, check, challenge, and gather what passed for a pull request
-(ADR 0035, ADR 0048).
+"""One agent run over a task's items: find, choose, check, challenge, and gather what passed for a pull request
+(ADR 0035, ADR 0048, ADR 0049).
 
-Per item: code finds the mineral's Wikidata item and candidate passages from sources (sources.py); a proposer agent, with
-no tools, chooses the class and the passage that supports it; code checks the proposal; a reviewer agent, with no tools
-and none of the proposer's reasoning, challenges it with the page around the passage. A failed check or a "revise" sends
-it back to the proposer with the reasons, a bounded number of times. An item with no item or no passages is skipped
-without asking a model anything. Items run one at a time, and the run stops before the next item once the plan's usage
+Per item: code finds candidate passages from sources (the task, with sources.py); a proposer agent, with no tools,
+chooses the passage that supports a claim; code checks the proposal; a reviewer agent, with no tools and none of the
+proposer's reasoning, challenges it with the page around the passage. A failed check or a "revise" sends it back to the
+proposer with the reasons, a bounded number of times. An item code finds nothing for is skipped without asking a model
+anything. Items run one at a time, and the run stops before the next item once the plan's usage
 passes a threshold, or at once if the limit is reached: the item in progress is lost, and the rest stay in the queue.
 """
 
@@ -17,21 +17,7 @@ from typing import Callable
 
 from .audit import AuditLog
 from .claude import EFFORTS, AgentError, Answer, ClaudeCode, UsageLimitReached
-from .ore_candidates import (
-    REVIEW_SCHEMA,
-    Candidate,
-    Check,
-    Context,
-    Prompt,
-    Proposal,
-    check,
-    crosswalk_row,
-    proposal_schema,
-    proposer_task,
-    reviewer_task,
-)
-from .sources import NETWORK_ERRORS, Found, Library
-from .web import WikidataItem
+from .task import Check, Finding, Item, Prompt, Skip, Task, review_schema
 
 # Neither role has tools: one turn for the answer, one for the structured output, and one to spare.
 PROPOSER_TURNS = 3
@@ -55,9 +41,10 @@ class Settings:
     stop_at_five_hour: float = 0.8
     stop_at_seven_day: float = 0.9
     pull_request: bool = True
-    # Run these minerals (by MRDS name), in this order, instead of the top of the queue; one the queue doesn't list is
-    # run all the same. For re-running chosen minerals, and for tests that mustn't depend on what the queue holds.
-    minerals: tuple[str, ...] = ()
+    task: str = "ore_candidates"  # TASKS in run.py: ore_candidates (ADR 0048) or route_sources (ADR 0049)
+    # Run these items, in this order, instead of the top of the queue: minerals by MRDS name, routes by id. For
+    # re-running chosen items, and for tests that mustn't depend on what the queue holds.
+    names: tuple[str, ...] = ()
     # Find the items and passages, record them, and ask no model: what a run would offer, for nothing of the plan.
     find_only: bool = False
     base: str = "origin/main"  # what the proposals' branch starts from
@@ -80,23 +67,23 @@ class Settings:
 
 @dataclass
 class ItemResult:
-    candidate: Candidate
+    item: Item
     outcome: str  # accepted, rejected, sent_back (attempts used up), unsure, skipped (nothing to ask about), failed,
     # or found (a find-only run)
     reason: str
     attempts: int = 0
-    proposal: Proposal | None = None
-    row: dict | None = None
+    proposal: object | None = None
+    change: dict | None = None  # what an accepted proposal changes in the repository's data
     checks: list[Check] = field(default_factory=list)
     review: dict | None = None
 
     def summary(self) -> dict:
         return {
-            "mineral": self.candidate.name,
+            "item": self.item.name,
             "outcome": self.outcome,
             "reason": self.reason,
             "attempts": self.attempts,
-            "row": self.row,
+            "change": self.change,
             "checks": [asdict(c) for c in self.checks],
             "review": self.review,
         }
@@ -132,18 +119,20 @@ class Usage:
 
 
 class Curator:
-    """Works through ore candidates for one run, recording everything in the audit log."""
+    """Works through a task's items for one run, recording everything in the audit log."""
 
-    def __init__(self, run_id: str, settings: Settings, context: Context, audit: AuditLog, library: Library,
+    def __init__(self, run_id: str, settings: Settings, task: Task, audit: AuditLog,
                  on_progress: Callable[[str], None] = lambda message: None):
-        self.run_id, self.settings, self.context, self.audit, self.library = run_id, settings, context, audit, library
+        self.run_id, self.settings, self.task, self.audit = run_id, settings, task, audit
         self.on_progress = on_progress
         self.proposer = ClaudeCode(settings.proposer_model, (), PROPOSER_TURNS, settings.claude_command,
                                    effort=settings.proposer_effort)
         self.reviewer = ClaudeCode(settings.reviewer_model, (), REVIEWER_TURNS, settings.claude_command,
                                    effort=settings.reviewer_effort)
-        self.proposer_prompt = Prompt.load("ore_proposer")
-        self.reviewer_prompt = Prompt.load("ore_reviewer")
+        proposer, reviewer = task.prompts
+        self.proposer_prompt = Prompt.load(proposer)
+        self.reviewer_prompt = Prompt.load(reviewer)
+        self.review_schema = review_schema(task.review_about)
         self.usage = Usage()
         self.model_ids: dict[str, str] = {}  # the model each role last ran on, as Claude Code reported it
 
@@ -159,107 +148,81 @@ class Curator:
                 return f"the plan's {window.replace('_', '-')} usage reached {used:.0%} (the run stops at {threshold:.0%})"
         return None
 
-    def curate(self, candidate: Candidate) -> ItemResult:
+    def curate(self, item: Item) -> ItemResult:
         """One item, to an outcome. A usage limit reached mid-item is raised: the run stops there."""
-        found = self._find(candidate)
-        if isinstance(found, ItemResult):
-            return self._finish(found)
-        item, passages = found
+        self.on_progress(f"{item.name}: finding sources")
+        finding = self.task.find(item)
+        if isinstance(finding, Skip):
+            for passed in finding.passed:
+                self._record(item, 0, passed)
+            self._record(item, 0, Check(finding.check, False, finding.reason))
+            return self._finish(ItemResult(item, "skipped", finding.reason, 0))
+        for passed in finding.checks:
+            self._record(item, 0, passed)
         if self.settings.find_only:
-            offered = "\n".join(f"[{p.number}] {p.source.citation}: {p.sentence}" for p in passages.passages)
-            return self._finish(ItemResult(candidate, "found", f"{item.id}; {passages.detail()}\n{offered}", 0))
+            offered = "\n".join(f"[{p.number}] {p.source.citation}: {p.sentence}" for p in finding.passages)
+            return self._finish(ItemResult(item, "found", f"{finding.found.detail()}\n{offered}", 0))
         feedback, last = None, None
         for attempt in range(1, self.settings.attempts + 1):
             try:
-                last = self._attempt(candidate, item, passages, attempt, feedback)
+                last = self._attempt(item, finding, attempt, feedback)
             except UsageLimitReached:
                 raise
             except AgentError as error:
-                return self._finish(ItemResult(candidate, "failed", str(error), attempt))
+                return self._finish(ItemResult(item, "failed", str(error), attempt))
             if last.outcome != "sent_back":
                 return self._finish(last)
             feedback = last.reason
         return self._finish(last)
 
-    def _find(self, candidate: Candidate) -> tuple[WikidataItem, Found] | ItemResult:
-        """The item and the passages for a mineral, found in code; or why the item is skipped, with no model asked."""
-        self.on_progress(f"{candidate.name}: finding its Wikidata item and sources")
-        try:
-            lookup = self.library.item_for(candidate.name)
-        except NETWORK_ERRORS as error:
-            return self._skipped(candidate, "wikidata_item_found", f"Wikidata couldn't be searched: {error}")
-        item = lookup.item
-        if item is None:
-            return self._skipped(candidate, "wikidata_item_found",
-                                 f"no Wikidata item is called {candidate.name!r} and is a mineral. The search found: "
-                                 + ("; ".join(lookup.seen) or "nothing"))
-        if item.id in self.context.decided_items:
-            return self._skipped(candidate, "wikidata_item_found",
-                                 f"{item.id} ({item.label}) is already decided: ore_minerals.csv has a row for it")
-        if item.id in self.context.taken_items:
-            # A curated thing's item (limonite): how MRDS's name maps onto that node is a person's call, not an agent's.
-            return self._skipped(candidate, "wikidata_item_found",
-                                 f"{item.id} ({item.label}) is a curated thing's item (wikidata_things.csv): a person "
-                                 "decides how MRDS's name maps to it")
-        found = self.library.passages(item, candidate.name)
-        # 5. the hits are recorded on success too: what else was there is part of why this one was taken
-        self.audit.check(self.run_id, candidate.name, 0, "wikidata_item_found", True,
-                         f"{item.id} ({item.label}). The search found: " + "; ".join(lookup.seen))
-        if not found.passages:
-            return self._skipped(candidate, "passages_found", "no source found speaks of it as an ore: " + found.detail())
-        self.audit.check(self.run_id, candidate.name, 0, "passages_found", True, found.detail())
-        return item, found
+    def _record(self, item: Item, attempt: int, check: Check) -> None:
+        self.audit.check(self.run_id, item.name, attempt, check.name, check.passed, check.detail)
 
-    def _skipped(self, candidate: Candidate, check_name: str, reason: str) -> ItemResult:
-        self.audit.check(self.run_id, candidate.name, 0, check_name, False, reason)
-        return ItemResult(candidate, "skipped", reason, 0)
-
-    def _attempt(self, candidate: Candidate, item: WikidataItem, found: Found, attempt: int,
-                 feedback: str | None) -> ItemResult:
-        passages = found.passages
-        task = proposer_task(self.proposer_prompt, candidate, item, passages, self.context, feedback)
-        answer = self._ask("proposer", candidate, attempt, self.proposer, self.proposer_prompt, task,
-                           proposal_schema(len(passages)))
+    def _attempt(self, item: Item, finding: Finding, attempt: int, feedback: str | None) -> ItemResult:
+        task = self.task.proposer_task(self.proposer_prompt, item, finding, feedback)
+        answer = self._ask("proposer", item, attempt, self.proposer, self.proposer_prompt, task,
+                           self.task.proposal_schema(finding))
         if answer.output.get("decision") == "propose" and not answer.output.get("passage"):
-            return ItemResult(candidate, "sent_back", "It proposed a class without choosing a passage.", attempt)
-        proposal = Proposal.from_choice(answer.output, item, passages)
+            return ItemResult(item, "sent_back", "It proposed without choosing a passage.", attempt)
+        proposal = self.task.proposal(answer.output, item, finding)
         if proposal.decision != "propose":
-            return ItemResult(candidate, "unsure", proposal.unsure_why or "the proposer couldn't decide", attempt, proposal)
-        checks, evidence = check(candidate, proposal, self.context, self.library)
+            return ItemResult(item, "unsure", proposal.unsure_why or "the proposer couldn't decide", attempt, proposal)
+        checks, evidence = self.task.check(item, proposal, finding)
         for c in checks:
-            self.audit.check(self.run_id, candidate.name, attempt, c.name, c.passed, c.detail)
+            self._record(item, attempt, c)
         failed = [c for c in checks if not c.passed]
         if failed:
             reason = "It failed these checks:\n" + "\n".join(f"- {c.name}: {c.detail}" for c in failed)
-            return ItemResult(candidate, "sent_back", reason, attempt, proposal, checks=checks)
-        task = reviewer_task(self.reviewer_prompt, candidate, proposal, evidence, self.context)
-        review = self._ask("reviewer", candidate, attempt, self.reviewer, self.reviewer_prompt, task, REVIEW_SCHEMA).output
+            return ItemResult(item, "sent_back", reason, attempt, proposal, checks=checks)
+        task = self.task.reviewer_task(self.reviewer_prompt, item, proposal, evidence)
+        review = self._ask("reviewer", item, attempt, self.reviewer, self.reviewer_prompt, task,
+                           self.review_schema).output
         objections = "\n".join(f"- {o['about']}: {o['objection']}" for o in review.get("objections") or [])
         if review["verdict"] == "accept":
-            row = crosswalk_row(candidate, proposal, self.context, self.run_id)
-            return ItemResult(candidate, "accepted", review.get("summary", ""), attempt, proposal, row, checks, review)
+            change = self.task.change(item, proposal, self.run_id)
+            return ItemResult(item, "accepted", review.get("summary", ""), attempt, proposal, change, checks, review)
         if review["verdict"] == "reject":
-            return ItemResult(candidate, "rejected", f"{review.get('summary', '')}\n{objections}".strip(), attempt,
+            return ItemResult(item, "rejected", f"{review.get('summary', '')}\n{objections}".strip(), attempt,
                               proposal, checks=checks, review=review)
-        return ItemResult(candidate, "sent_back", "The reviewer asked for changes:\n" + objections, attempt, proposal,
+        return ItemResult(item, "sent_back", "The reviewer asked for changes:\n" + objections, attempt, proposal,
                           checks=checks, review=review)
 
-    def _ask(self, role: str, candidate: Candidate, attempt: int, claude: ClaudeCode, prompt: Prompt, task: str,
+    def _ask(self, role: str, item: Item, attempt: int, claude: ClaudeCode, prompt: Prompt, task: str,
              schema: dict) -> Answer:
-        self.on_progress(f"{candidate.name}: asking the {role} (attempt {attempt})")
+        self.on_progress(f"{item.name}: asking the {role} (attempt {attempt})")
         try:
             answer = claude.ask(task, prompt.system, schema)
         except AgentError as error:
             # A failed call still used the plan (Tenorite's 30 turns used about 14 points of the five-hour window), so
             # what it spent is counted and recorded, and the next threshold check sees the plan's usage after it.
             spent = error.spent
-            self.audit.call(self.run_id, candidate.name, attempt, role, prompt.version,
+            self.audit.call(self.run_id, item.name, attempt, role, prompt.version,
                             claude.settings() | {"model_id": spent.model if spent else None}, task, spent,
                             error=f"{type(error).__name__}: {error}")
             if spent:
                 self.usage.add(spent)
             raise
-        self.audit.call(self.run_id, candidate.name, attempt, role, prompt.version,
+        self.audit.call(self.run_id, item.name, attempt, role, prompt.version,
                         claude.settings() | {"model_id": answer.model}, task, answer)
         self.usage.add(answer)
         if answer.model:
@@ -267,10 +230,10 @@ class Curator:
         return answer
 
     def _finish(self, result: ItemResult) -> ItemResult:
-        self.audit.outcome(self.run_id, result.candidate.name, result.outcome, result.reason, result.row)
-        self.on_progress(f"{result.candidate.name}: {result.outcome}")
+        self.audit.outcome(self.run_id, result.item.name, result.outcome, result.reason, result.change)
+        self.on_progress(f"{result.item.name}: {result.outcome}")
         return result
 
 
-def new_run_id(now: datetime | None = None) -> str:
-    return "ore-" + (now or datetime.now(timezone.utc)).strftime("%Y%m%d-%H%M%S")
+def new_run_id(prefix: str, now: datetime | None = None) -> str:
+    return f"{prefix}-" + (now or datetime.now(timezone.utc)).strftime("%Y%m%d-%H%M%S")

@@ -41,7 +41,7 @@ echo "The task…" | claude -p --safe-mode --strict-mcp-config --no-session-pers
 
 ## How we use it
 
-The Dagster job `agent_curation` ([ADR 0048](../../adr/0048-run-agents-through-claude-code-on-a-claude-subscription.md)), started by hand with a size, works through the curation queue's ore candidates one at a time. **Code does everything that can be done the same way every time; a model only judges.** Neither role has tools.
+The Dagster job `agent_curation` ([ADR 0048](../../adr/0048-run-agents-through-claude-code-on-a-claude-subscription.md)), started by hand with a task and a size, works through the curation queue one item at a time. There are two tasks: ore candidates, below, and route sources ([ADR 0049](../../adr/0049-have-agents-quote-sources-for-unverified-routes.md)), which finds a quotable passage for a route whose references are all unverified, and proposes it as a quote for a reference the route already cites or as a new reference. The steps are the same; a task supplies what is found, asked and checked (`agents/task.py`). **Code does everything that can be done the same way every time; a model only judges.** Neither role has tools.
 
 1. **Before anything:** `claude auth status` must say `claude.ai`, no API key may be set, and `gh` must be logged in.
 2. **Find, in code:** the mineral's Wikidata item (search, then the item called exactly its name that is a mineral species); the sources (pages the repository already cites, then OpenAlex's open-access works); and the passages: sentences naming the mineral and ore or smelting, word for word. Nothing found: the item is skipped, and no model is asked.
@@ -59,7 +59,9 @@ Every call, check and outcome is appended to `audit/agents.duckdb`. A run stops 
 | Calling Claude Code, reading its events, the login check | `pipeline/src/capabilities_pipeline/agents/claude.py` |
 | The prompts (versioned by their hash) | `pipeline/src/capabilities_pipeline/agents/prompts/` |
 | Finding the item, the sources and the passages | `pipeline/src/capabilities_pipeline/agents/sources.py` |
+| What every task supplies, and the checks they share | `pipeline/src/capabilities_pipeline/agents/task.py` |
 | The ore candidate task: schemas, checks, the crosswalk row | `pipeline/src/capabilities_pipeline/agents/ore_candidates.py` |
+| The route sources task, and editing a route's references as text | `agents/route_sources.py`, `agents/yaml_edit.py` |
 | Reading pages and Wikidata items, finding quotes | `pipeline/src/capabilities_pipeline/agents/web.py` |
 | One item's loop; a whole run; the worktree, gate and pull request | `agents/curate.py`, `agents/run.py`, `agents/branch.py` |
 | The audit log | `agents/audit.py`; the file is `audit/agents.duckdb` (not in git) |
@@ -70,8 +72,9 @@ Every call, check and outcome is appended to `audit/agents.duckdb`. A run stops 
 ```bash
 claude auth status                         # authMethod must be "claude.ai"
 cd pipeline
-uv run dg launch --job agent_curation --config-json '{"ops": {"curate_ore_candidates": {"config": {"items": 10, "evaluate": true}}}}'
-uv run dg launch --job agent_curation --config-json '{"ops": {"curate_ore_candidates": {"config": {"items": 5}}}}'
+uv run dg launch --job agent_curation --config-json '{"ops": {"curate": {"config": {"items": 10, "evaluate": true}}}}'
+uv run dg launch --job agent_curation --config-json '{"ops": {"curate": {"config": {"items": 5}}}}'
+uv run dg launch --job agent_curation --config-json '{"ops": {"curate": {"config": {"task": "route_sources", "items": 10}}}}'
 cd .. && python3 -c "import duckdb; duckdb.sql(\"select item, outcome, reason from 'audit/agents.duckdb'.outcomes\").show()"
 ```
 

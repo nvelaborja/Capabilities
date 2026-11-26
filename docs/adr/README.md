@@ -54,3 +54,4 @@ Each file records one significant design decision: the context, what we decided,
 | [0046](0046-place-ancient-mines-and-quarries-from-pleiades.md) | Place ancient mines and quarries from Pleiades | Accepted |
 | [0047](0047-check-citations-against-openalex-and-crossref.md) | Check citations against OpenAlex and Crossref | Accepted |
 | [0048](0048-run-agents-through-claude-code-on-a-claude-subscription.md) | Find sources in code, and ask Claude Code on a Claude subscription only to judge them; start with ore candidates | Accepted |
+| [0049](0049-have-agents-quote-sources-for-unverified-routes.md) | Have agents quote sources for routes whose references are all unverified | Accepted |

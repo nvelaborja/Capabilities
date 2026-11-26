@@ -118,6 +118,8 @@ export interface Reference {
   /** The passage of the work that supports the claim, word for word (an agent's proposal always gives one, ADR 0048). */
   quote?: string;
   status?: "unverified" | "secondary" | "verified";
+  /** The agent run that proposed the reference, or its quote (ADR 0049), and its summary in the repository. */
+  proposed_by?: { run: string; summary: string };
   /** What the citation check found for the work (ADR 0047); only in a built graph. */
   check?: ReferenceCheck;
 }

@@ -19,10 +19,10 @@ from pathlib import Path
 import duckdb
 import pytest
 import yaml
+from capabilities.graph import Graph
 
 from capabilities_pipeline.agents import claude as claude_module
 from capabilities_pipeline.agents.audit import AUDIT_FILE
-from capabilities_pipeline.agents import ore_candidates as ore_candidates_module
 from capabilities_pipeline.agents.branch import Downloads, Worktree
 from capabilities_pipeline.agents.claude import (
     AgentError,
@@ -33,18 +33,21 @@ from capabilities_pipeline.agents.claude import (
     parse,
 )
 from capabilities_pipeline.agents.curate import Settings
+from capabilities_pipeline.agents import task as task_module
 from capabilities_pipeline.agents.ore_candidates import (
     ORE_CLASSES,
     Candidate,
     Context,
-    Prompt,
+    OreCandidates,
     Proposal,
     check,
     evaluation_set,
+    score,
     write_crosswalk,
 )
-from capabilities_pipeline.agents.run import pull_request_body, run_ore_candidates, score
-from capabilities_pipeline.agents.sources import Library, Source, known_sources, openalex_citation
+from capabilities_pipeline.agents.run import pull_request_body, run_agents
+from capabilities_pipeline.agents.sources import Library, Source, Wanted, known_sources, openalex_citation
+from capabilities_pipeline.agents.task import Prompt
 from capabilities_pipeline.agents.web import (
     MINERAL_SPECIES,
     Page,
@@ -179,9 +182,15 @@ MINERALS = ("Galena", "Sphalerite", "Gold", "Chrysocolla", "Limonite")
 
 
 def run(root, build_dir, fake, web=None, audit_dir=None, **changes):
-    changes.setdefault("minerals", MINERALS)
-    return run_ore_candidates(root, build_dir, settings(fake, **changes), web=web or FakeWeb(),
-                              on_progress=lambda message: None, audit_dir=audit_dir)
+    changes.setdefault("names", MINERALS)
+    return run_agents(root, build_dir, settings(fake, **changes), web=web or FakeWeb(),
+                      on_progress=lambda message: None, audit_dir=audit_dir)
+
+
+def galena_passages(library: Library):
+    """The passages a run finds for Galena (OreCandidates.find, without the item lookup)."""
+    return library.passages(Wanted.mineral({"Galena", GALENA_ITEM.label}),
+                            ["Galena archaeometallurgy", "Galena ancient smelting"])
 
 
 def audit_rows(audit_dir: Path, query: str) -> list[tuple]:
@@ -367,7 +376,7 @@ class TestCurating:
     def test_an_unsure_proposer_ends_the_item_with_no_review(self, repo_root, built_dir, fake_claude, tmp_path):
         fake_claude.script(proposer=[answer(UNSURE)])
         report = run(repo_root, built_dir, fake_claude, audit_dir=tmp_path / "audit", items=1)
-        assert [(r.candidate.name, r.outcome, r.reason) for r in report.results] == [("Galena", "unsure", "No source says.")]
+        assert [(r.item.name, r.outcome, r.reason) for r in report.results] == [("Galena", "unsure", "No source says.")]
         assert fake_claude.calls("reviewer") == []
 
     def test_a_failed_check_goes_back_to_the_proposer_with_the_reasons(self, repo_root, built_dir, fake_claude, tmp_path):
@@ -415,7 +424,7 @@ class TestCurating:
     def test_reaching_the_plans_limit_stops_the_run_and_leaves_the_rest(self, repo_root, built_dir, fake_claude, tmp_path):
         fake_claude.script(proposer=[answer(UNSURE), {"limit": True}])
         report = run(repo_root, built_dir, fake_claude, audit_dir=tmp_path / "audit", items=5)
-        assert [r.candidate.name for r in report.results] == ["Galena"]
+        assert [r.item.name for r in report.results] == ["Galena"]
         assert "usage limit was reached" in report.stopped_because
         assert len(fake_claude.calls()) == 2
 
@@ -517,7 +526,7 @@ class TestFindingSources:
         limonite = WikidataItem("Q193565", "limonite", "hydrated iron oxide mineral")
         fake_claude.script()
         report = run(repo_root, built_dir, fake_claude, web=FakeWeb(items={limonite.id: limonite}),
-                     audit_dir=tmp_path / "audit", items=1, minerals=("Limonite",))
+                     audit_dir=tmp_path / "audit", items=1, names=("Limonite",))
         assert report.results[0].outcome == "skipped" and "a curated thing's item" in report.results[0].reason
         assert fake_claude.calls() == []
 
@@ -526,31 +535,31 @@ class TestFindingSources:
         azurite = WikidataItem("Q108212", "azurite", "copper carbonate mineral")
         fake_claude.script()
         report = run(repo_root, built_dir, fake_claude, web=FakeWeb(items={azurite.id: azurite}),
-                     audit_dir=tmp_path / "audit", items=1, minerals=("Azurite",))
+                     audit_dir=tmp_path / "audit", items=1, names=("Azurite",))
         assert report.results[0].reason == "Q108212 (azurite) is already decided: ore_minerals.csv has a row for it"
 
     def test_an_evaluation_says_which_named_minerals_it_has_no_answer_for(self, repo_root, built_dir, fake_claude,
                                                                           tmp_path):
         fake_claude.script()
         report = run(repo_root, built_dir, fake_claude, audit_dir=tmp_path / "audit", items=5, evaluate=True,
-                     find_only=True, minerals=("Pyrite", "Pyrrite"))
-        assert [r.candidate.name for r in report.results] == ["Pyrite"]
+                     find_only=True, names=("Pyrite", "Pyrrite"))
+        assert [r.item.name for r in report.results] == ["Pyrite"]
         assert report.summary["not_evaluated"] == ["Pyrrite"]
 
     def test_named_minerals_run_in_the_order_named_whether_or_not_the_queue_lists_them(self, repo_root, built_dir,
                                                                                     fake_claude, tmp_path):
         fake_claude.script()
         report = run(repo_root, built_dir, fake_claude, audit_dir=tmp_path / "audit", items=5, find_only=True,
-                     minerals=("Sphalerite", "Unobtanium", "Galena"))
-        assert [(r.candidate.name, r.outcome) for r in report.results] == [
+                     names=("Sphalerite", "Unobtanium", "Galena"))
+        assert [(r.item.name, r.outcome) for r in report.results] == [
             ("Sphalerite", "found"), ("Unobtanium", "skipped"), ("Galena", "found")]
-        assert report.results[1].candidate.detail == "Named for this run; the curation queue doesn't list it."
+        assert report.results[1].item.detail == "Named for this run; the curation queue doesn't list it."
 
     def test_passages_name_the_mineral_and_speak_of_ore_with_the_sentences_around_them(self):
         text = ("Galena is grey. It was mined near the river. Galena was roasted in heaps be-\nfore it was smelted for "
                 "silver and lead. The slag was dumped nearby.")
         web = FakeWeb(pages={GALENA_URL: Page(GALENA_URL, "200", text, None, "pdf")})
-        found = Library(web, []).passages(GALENA_ITEM, "Galena")
+        found = galena_passages(Library(web, []))
         [passage] = found.passages  # "Galena is grey." names it but says nothing of ore
         assert passage.sentence == "Galena was roasted in heaps before it was smelted for silver and lead."
         assert (passage.before, passage.after) == ("It was mined near the river.", "The slag was dumped nearby.")
@@ -562,7 +571,7 @@ class TestFindingSources:
         page = Page(known.url, "200", GALENA_SENTENCE, None, "text")  # as good a sentence as the OpenAlex work's
         web = FakeWeb(pages={known.url: page})
         library = Library(web, [known])
-        found = library.passages(GALENA_ITEM, "Galena")
+        found = galena_passages(library)
         library.page(GALENA_URL)  # as the checks read it again
         assert [(p.number, p.source.origin) for p in found.passages] == [(1, "cited in the repository"), (2, "OpenAlex")]
         assert web.asked.count(GALENA_URL) == 1 and web.searched == ["Galena archaeometallurgy", "Galena ancient smelting"]
@@ -573,7 +582,7 @@ class TestFindingSources:
         weak = " ".join(f"Galena grains number {n} were seen in the copper slag." for n in "ABC")
         known = [Source(f"Page {n}.", f"https://example.org/known-{n}", "cited in the repository") for n in range(12)]
         web = FakeWeb(pages={s.url: Page(s.url, "200", weak, None, "text") for s in known})
-        found = Library(web, known).passages(GALENA_ITEM, "Galena")
+        found = galena_passages(Library(web, known))
         assert len(found.passages) == 12 and found.passages[0].sentence == GALENA_SENTENCE
 
     @pytest.mark.parametrize("line", [
@@ -583,11 +592,17 @@ class TestFindingSources:
         pytest.param("Figure 9: Galena ore from the example mine, before and after roasting for smelting.", id="a caption"),
         pytest.param("Table IV. Galena, chalcopyrite and the other sulphide ores smelted at each of the sites.",
                      id="a table's title"),
+        pytest.param("6 Historical Metallurgy 36(1) 2002 6–16 Galena smelting in the Celtic oppidum of the valley.",
+                     id="a running header"),
+        pytest.param("(17) For galena smelting in antiquity see also the very recent work on the furnaces.",
+                     id="a footnote"),
+        pytest.param("Key words: galena, smelting, lead, slag, furnace, roasting, silver, cupellation.",
+                     id="key words"),
     ])
     def test_a_line_that_isnt_prose_isnt_offered(self, line):
         text = line + "\n" + "In antiquity galena was roasted and then smelted in small furnaces for its lead."
         web = FakeWeb(pages={GALENA_URL: Page(GALENA_URL, "200", text, None, "html")})
-        found = Library(web, []).passages(GALENA_ITEM, "Galena")
+        found = galena_passages(Library(web, []))
         assert [p.sentence for p in found.passages] == [
             "In antiquity galena was roasted and then smelted in small furnaces for its lead."]
 
@@ -602,7 +617,7 @@ class TestFindingSources:
         # Two accepted quotes ended mid-sentence at "(Fig." and "et al." (Chalcopyrite and Siderite, 2026-11-25)
         text = "The site lies in the hills. " + sentence + " The slag was dumped nearby."
         web = FakeWeb(pages={GALENA_URL: Page(GALENA_URL, "200", text, None, "html")})
-        assert [p.sentence for p in Library(web, []).passages(GALENA_ITEM, "Galena").passages] == [sentence]
+        assert [p.sentence for p in galena_passages(Library(web, [])).passages] == [sentence]
 
     @pytest.mark.parametrize("authors, citation", [
         pytest.param(["Ada Example"], "Ada Example (2021). Lead ores. Example Journal.", id="one author"),
@@ -622,7 +637,7 @@ class TestFindingSources:
         assert openalex_citation(work) == citation
 
     def test_the_proposal_takes_its_quote_citation_and_url_from_the_chosen_passage(self):
-        found = Library(FakeWeb(), []).passages(GALENA_ITEM, "Galena")
+        found = galena_passages(Library(FakeWeb(), []))
         proposal = Proposal.from_choice(GOOD, GALENA_ITEM, found.passages)
         assert (proposal.wikidata, proposal.quote, proposal.url) == (GALENA_ITEM.id, GALENA_SENTENCE, GALENA_URL)
         assert proposal.citation == "Ada Example (2021). Lead ores at an example site. Example Journal."
@@ -697,10 +712,10 @@ class TestThePullRequestText:
             "prompts": {"proposer": "a", "reviewer": "b"},
             "usage": {"calls": 2, "web_searches": 0, "web_fetches": 0, "first_limits": {}, "limits": {}},
             "sources": {"openalex_searches": 4, "pages_downloaded": 3},
-            "items": [{"mineral": "Covellite", "outcome": "accepted", "reason": "", "row": row},
-                      {"mineral": "Galena", "outcome": "rejected", "reason": "@reviewer said no", "row": None}],
+            "items": [{"item": "Covellite", "outcome": "accepted", "reason": "", "change": row},
+                      {"item": "Galena", "outcome": "rejected", "reason": "@reviewer said no", "change": None}],
         }
-        body = pull_request_body(summary)
+        body = pull_request_body(summary, OreCandidates(None, None))
         # then: no @ is followed by a name, so GitHub mentions nobody; a reader still sees "@someone"
         assert re.search(r"@\w", body) is None
         assert body.count("@\u2060someone") == 2 and "@\u2060reviewer" in body
@@ -710,7 +725,7 @@ class TestThePullRequestText:
 class TestPrompts:
     def test_a_prompt_without_its_task_is_refused(self, tmp_path, monkeypatch):
         (tmp_path / "broken.md").write_text("You review minerals.\n\nThe mineral: $name.\n")
-        monkeypatch.setattr(ore_candidates_module, "PROMPTS", tmp_path)
+        monkeypatch.setattr(task_module, "PROMPTS", tmp_path)
         with pytest.raises(ValueError, match="---task---"):
             Prompt.load("broken")
 
@@ -827,9 +842,9 @@ def published(repo_root, tmp_path_factory, wikidata_endpoint, scholarly_endpoint
             patch.delenv(name, raising=False)
         wikidata_endpoint.extra_items.extend(NEW_ITEMS)
         try:
-            report = run_ore_candidates(
+            report = run_agents(
                 repo, directory / "build",
-                replace(settings(fake, items=3, minerals=("Galena", "Sphalerite", "Gold")), pull_request=True,
+                replace(settings(fake, items=3, names=("Galena", "Sphalerite", "Gold")), pull_request=True,
                         gh_command=str(gh)),
                 Downloads(wikidata_endpoint.url, scholarly_endpoint.openalex_url, scholarly_endpoint.crossref_url),
                 web=FakeWeb(pages=pages, items=items, works=works), on_progress=lambda message: None, audit_dir=directory / "audit",
@@ -873,7 +888,7 @@ class TestThePullRequest:
         # Many books, reports and web pages are in neither OpenAlex nor Crossref (ADR 0047); the row's page was read and
         # its quote found, so the row goes in, with what the check found noted.
         assert "Gold" in published["show"]("data/crosswalks/ore_minerals.csv")
-        gold = next(r for r in published["report"].results if r.candidate.name == "Gold")
+        gold = next(r for r in published["report"].results if r.item.name == "Gold")
         assert gold.outcome == "accepted"
         assert gold.checks[-1].detail == "not_found; its page loaded and the quote is on it"
 
@@ -887,12 +902,12 @@ class TestThePullRequest:
     def test_only_a_wrong_doi_drops_a_row(self, result, passes):
         from capabilities_pipeline.agents.branch import work_check
 
-        row = {"class": "iron-ore", "citation": "Example, A. (2020). Ores."}
-        checks = {row["citation"]: {"result": result, "note": "Why.", "match_service": None, "links": []}}
-        assert work_check(row, checks).passed is passes
+        citation = "Example, A. (2020). Ores."
+        checks = {citation: {"result": result, "note": "Why.", "match_service": None, "links": []}}
+        assert work_check(citation, checks).passed is passes
 
     def test_a_rejected_minerals_reference_isnt_looked_up(self, published):
-        galena = next(r for r in published["report"].results if r.candidate.name == "Galena")
+        galena = next(r for r in published["report"].results if r.item.name == "Galena")
         assert galena.checks[-1].detail == "not looked up: a rejected mineral's reference builds nothing"
 
     def test_the_commit_carries_the_runs_summary_the_refreshed_backups_and_the_works_cited(self, published):
@@ -986,16 +1001,382 @@ class TestTheDagsterJob:
         fake_claude.script(proposer=[answer(UNSURE)])
         defs = definitions(repo_root, built_dir)
         # then: it is a job, not an asset, so materializing every asset never starts one
-        assert "curate_ore_candidates" not in {key.to_user_string() for key in defs.resolve_asset_graph().get_all_asset_keys()}
+        assert "curate" not in {key.to_user_string() for key in defs.resolve_asset_graph().get_all_asset_keys()}
         # when: launched for one item, with no pull request
         # (Wikidata's site and OpenAlex pointed at a local port with nothing on it: the item can't be found, so the run
         # skips it without asking a model, and nothing reaches the network)
         result = defs.get_job_def("agent_curation").execute_in_process(run_config={
-            "ops": {"curate_ore_candidates": {"config": {"items": 1, "pull_request": False, "minerals": ["Galena"]}}},
+            "ops": {"curate": {"config": {"items": 1, "pull_request": False, "names": ["Galena"]}}},
             "resources": {"downloads": {"config": {"wikidata_site_url": "http://127.0.0.1:9",
                                                    "openalex_url": "http://127.0.0.1:9"}}}})
         # then: the run's outcome is in its output and in the audit log
-        summary = result.output_for_node("curate_ore_candidates")
-        assert summary["outcomes"] == {"skipped": 1} and summary["items"][0]["mineral"] == "Galena"
+        summary = result.output_for_node("curate")
+        assert summary["outcomes"] == {"skipped": 1} and summary["items"][0]["item"] == "Galena"
         assert audit_rows(tmp_path / "audit", "select outcome from outcomes") == [("skipped",)]
         assert fake_claude.calls() == []
+
+
+# ------------------------------------------------------------------ route sources (ADR 0049)
+#
+# Made-up routes, written into a copy of the repository, so no test depends on what the curated routes cite today: an
+# agent's pull request adds quotes to them, and a person verifies them out of the queue.
+
+TWIST = "twist-test-cord"
+BRAID = "braid-test-cord"
+BOOK = "Weaver, A. (1990). Cordage of the ancients. Example Press."
+SITE_REPORT = "Spinner, B. (2001). Cord at an example site. Example Journal."
+SITE_URL = "https://example.org/cord-site"
+COPY_URL = "https://example.org/cordage.pdf"
+WORK_URL = "https://example.org/plant-fiber-rope"
+SITE_SENTENCE = "The rope found at the site was twisted from plant fibers before the Bronze Age."
+COPY_SENTENCE = "Ropes were twisted from plant fibers by hand in the Bronze Age, as the finds show."
+# Two words of the past: it outranks the site report's sentence, which the repository's copy also offers the braid.
+WORK_SENTENCE = "In the Bronze Age and later in antiquity, rope was braided from plant fibers by hand."
+ROUTE_PAGES = {
+    SITE_URL: Page(SITE_URL, "200", "The site lies by the river. " + SITE_SENTENCE + " The rope is long and sturdy "
+                   "enough for the boats used today.", "Cord at an example site", "html"),
+    COPY_URL: Page(COPY_URL, "200", "Cordage. " + COPY_SENTENCE + " More notes follow.", None, "pdf"),
+    WORK_URL: Page(WORK_URL, "200", "Introduction. " + WORK_SENTENCE + " The end.", "Plant fiber rope", "html"),
+}
+CORD_WORK = {"id": "W9", "display_name": "Plant fiber rope at an example site", "publication_year": 2019,
+             "authorships": [{"author": {"display_name": "Cy Braider"}}],
+             "primary_location": {"source": {"display_name": "Example Journal"}},
+             "best_oa_location": {"landing_page_url": WORK_URL}}
+CORD_CITATION = "Cy Braider (2019). Plant fiber rope at an example site. Example Journal."
+
+
+def _test_route(route_id: str, label: str, references: str) -> str:
+    return (f"id: {route_id}\nkind: route\nlabel: {label}\nachieves: {{ thing: rope }}\ntechniques: [rope-making]\n"
+            "requires:\n  - { role: consumed, thing: plant-fiber }\noutputs:\n  - { thing: rope }\n"
+            f"references:\n{references}")
+
+
+TWIST_ROUTE = _test_route(TWIST, "Twisting test cord", f"""  - citation: "{BOOK}"
+    supports: Rope was twisted from plant fibres.
+    status: unverified
+  - citation: "{SITE_REPORT}"
+    url: {SITE_URL}
+    supports: Rope was twisted from plant fibers at the site.
+    status: unverified
+""")
+BRAID_ROUTE = _test_route(BRAID, "Braiding test cord", f"""  - citation: "{BOOK}"
+    supports: Rope was braided.
+    status: unverified
+""")
+
+
+# On the base branch its site report is cited differently than in the run's copy: the quote can't be written there.
+PLAIT = "plait-test-cord"
+PLAIT_ROUTE = TWIST_ROUTE.replace(f"id: {TWIST}", f"id: {PLAIT}").replace("Twisting test cord", "Plaiting test cord")
+PLAIT_ON_MAIN = PLAIT_ROUTE.replace(SITE_REPORT, "Spinner, B. (2001). Cord at another example site. Example Journal.")
+
+
+def _with_test_routes(root: Path) -> None:
+    (root / "data" / "routes" / f"{TWIST}.yaml").write_text(TWIST_ROUTE, encoding="utf-8")
+    (root / "data" / "routes" / f"{BRAID}.yaml").write_text(BRAID_ROUTE, encoding="utf-8")
+
+
+@pytest.fixture(scope="module")
+def route_root(repo_root, tmp_path_factory) -> Path:
+    root = tmp_path_factory.mktemp("routes")
+    for name in ("schema", "data"):
+        shutil.copytree(repo_root / name, root / name)
+    _with_test_routes(root)
+    return root
+
+
+def route_task(root: Path, web=None, free_copies=None):
+    from capabilities_pipeline.agents.route_sources import RouteSources
+
+    web = web or FakeWeb(pages=ROUTE_PAGES, works={"braiding": [CORD_WORK]})
+    return RouteSources(root, Graph.from_curated(root), Library(web, []), free_copies or {})
+
+
+class TestEditingRouteFiles:
+    def test_every_route_file_takes_a_new_reference_and_nothing_else_in_it_moves(self, repo_root):
+        from capabilities_pipeline.agents.yaml_edit import add_reference
+
+        reference = {"citation": 'A "quoted" title: with a colon', "url": WORK_URL, "supports": "Says # so.",
+                     "quote": "Rope — twisted, \\ as ‘it’ says.", "status": "unverified", "proposed_by": "routes-1"}
+        for path in sorted((repo_root / "data" / "routes").glob("*.yaml")):
+            text = path.read_text(encoding="utf-8")
+            edited = add_reference(text, reference)
+            # then: the file's own lines are all still there, in order, and only the new reference follows them
+            assert edited.startswith(text), path.name
+            assert yaml.safe_load(edited)["references"][-1] == reference
+
+    def test_a_quote_goes_on_the_reference_before_its_status_and_who_proposed_it_after(self):
+        from capabilities_pipeline.agents.yaml_edit import quote_reference
+
+        edited = quote_reference(TWIST_ROUTE, 0, {"url": COPY_URL, "quote": COPY_SENTENCE, "proposed_by": "routes-1"})
+        lines = edited.splitlines()
+        start = lines.index(f'  - citation: "{BOOK}"')
+        assert lines[start:start + 6] == [
+            f'  - citation: "{BOOK}"', "    supports: Rope was twisted from plant fibres.",
+            f"    url: {json.dumps(COPY_URL)}", f"    quote: {json.dumps(COPY_SENTENCE)}", "    status: unverified",
+            "    proposed_by: routes-1"]
+        assert yaml.safe_load(edited)["references"][1] == yaml.safe_load(TWIST_ROUTE)["references"][1]
+
+    @pytest.mark.parametrize("index, fields, refused", [
+        pytest.param(1, {"url": COPY_URL}, "already has url", id="a field the reference already has"),
+        pytest.param(2, {"quote": "Q."}, "there is no reference 3", id="a reference that isn't there"),
+    ])
+    def test_an_edit_that_would_change_what_a_person_wrote_is_refused(self, index, fields, refused):
+        from capabilities_pipeline.agents.yaml_edit import EditError, quote_reference
+
+        with pytest.raises(EditError, match=refused):
+            quote_reference(TWIST_ROUTE, index, fields)
+
+    def test_a_reference_is_found_by_its_citation_wherever_it_is_in_the_file(self):
+        from capabilities_pipeline.agents.yaml_edit import EditError, reference_citing
+
+        assert reference_citing(TWIST_ROUTE, SITE_REPORT) == 1 and reference_citing(TWIST_ROUTE, f" {BOOK}") == 0
+        with pytest.raises(EditError, match="no references cite"):
+            reference_citing(TWIST_ROUTE, "Someone (2000). Another work.")
+
+    def test_references_written_as_a_flow_list_are_refused_not_given_a_second_key(self):
+        from capabilities_pipeline.agents.yaml_edit import EditError, add_reference
+
+        with pytest.raises(EditError, match="block list"):
+            add_reference("id: x\nkind: route\nreferences: []\n", {"citation": "C.", "status": "unverified"})
+
+
+class TestFindingRouteSources:
+    def test_the_queues_routes_are_the_curated_ones_not_the_copies_made_for_each_ore(self, repo_root, built_dir):
+        from capabilities.built import load_queue
+
+        queue = load_queue(built_dir)
+        task = route_task(repo_root)
+        files = {p.stem for p in (repo_root / "data" / "routes").glob("*.yaml")}
+        expected = [item["subject"] for item in queue if item["kind"] == "route_unverified" and item["subject"] in files]
+        assert [route.name for route in task.items(queue)] == expected
+        copies = [item["subject"] for item in queue if item["kind"] == "route_unverified" and item["subject"] not in files]
+        assert copies and not set(copies) & {route.name for route in task.items(queue)}
+
+    def test_a_route_that_makes_a_thing_is_found_by_it_and_what_it_takes(self, route_root):
+        task = route_task(route_root)
+        terms = task.terms(task.route(TWIST))
+        graph = Graph.from_curated(route_root)
+        assert graph.label("rope").lower() in terms.main and graph.label("plant-fiber").lower() in terms.others
+        assert "twisting" in terms.others  # what it does, from its label
+
+    def test_a_routes_technique_and_a_verb_as_broad_as_making_dont_name_it(self, route_root):
+        # "Pottery" and "make" matched "does not make up" for a blowpipe (find-only run, 2026-11-25)
+        task = route_task(route_root)
+        route = replace(task.route(TWIST), document=yaml.safe_load(TWIST_ROUTE) | {"label": "Making test cord"})
+        terms = task.terms(route)
+        graph = Graph.from_curated(route_root)
+        assert terms.main == (graph.label("rope").lower(),)
+        assert graph.label("rope-making").lower() in terms.others and "making" not in terms.others
+
+    def test_a_route_that_does_something_is_found_by_its_tools_and_technique(self, route_root):
+        task = route_task(route_root)
+        route = replace(task.route(TWIST), document=yaml.safe_load(TWIST_ROUTE) | {
+            "achieves": {"verb": "cut"}, "requires": [{"role": "tool", "category": "saw"},
+                                                       {"role": "consumed", "category": "abrasive"}]})
+        terms = task.terms(route)
+        graph = Graph.from_curated(route_root)
+        assert graph.label("saw").lower() in terms.main and graph.label("abrasive").lower() in terms.others
+
+    def test_its_own_references_pages_are_read_with_a_free_copy_for_a_book(self, route_root):
+        task = route_task(route_root, FakeWeb(pages=ROUTE_PAGES), free_copies={BOOK: COPY_URL})
+        finding = task.find(task.route(TWIST))
+        assert finding.about == {COPY_URL: 0, SITE_URL: 1}
+        assert [(p.sentence, p.source.citation, p.source.origin) for p in finding.passages] == [
+            (COPY_SENTENCE, BOOK, "cited by this route"), (SITE_SENTENCE, SITE_REPORT, "cited by this route")]
+        # then: "The rope is long and sturdy enough for the boats used today." names the rope and nothing it takes
+        assert all("sturdy" not in p.sentence for p in finding.passages)
+
+    @pytest.mark.parametrize("term, found, not_found", [
+        pytest.param("alloying", ["alloy", "Alloyed", "alloying"], ["allow", "allocation"], id="alloying"),
+        pytest.param("casting", ["cast bronze", "Casting", "casts"], ["a castle"], id="casting"),
+        pytest.param("smithing", ["a smith", "smithed", "Smithing"], ["Smith (1981)"], id="smithing"),
+        pytest.param("quarrying", ["a quarry", "quarried", "Quarries"], ["a quart"], id="quarrying"),
+        pytest.param("knapping", ["knapped", "a knapper"], ["a knapsack"], id="knapping"),
+        pytest.param("mining", ["mined", "miners", "Mining"], ["a mineral", "5 min"], id="mining"),
+    ])
+    def test_an_activity_is_found_by_its_verbs_forms_not_by_any_word_starting_like_it(self, term, found, not_found):
+        # "Alloying" found "allow", "Smithing" an author, "Casting" a castle (code review, 2026-11-26)
+        from capabilities_pipeline.agents.route_sources import _pattern
+
+        pattern = _pattern((term,))
+        assert [text for text in found if not pattern.search(text)] == []
+        assert [text for text in not_found if pattern.search(text)] == []
+
+    def test_a_route_nothing_speaks_of_is_skipped(self, route_root):
+        task = route_task(route_root, FakeWeb())
+        skipped = task.find(task.route(BRAID))
+        assert skipped.check == "passages_found" and skipped.reason.startswith("no source found says it")
+
+
+class TestRouteProposals:
+    @pytest.fixture
+    def found(self, route_root):
+        task = route_task(route_root, FakeWeb(pages=ROUTE_PAGES, works={"twisting": [CORD_WORK]}),
+                          free_copies={BOOK: COPY_URL})
+        route = task.route(TWIST)
+        finding = task.find(route)
+        number = {p.sentence: p.number for p in finding.passages}
+        return task, route, finding, number
+
+    def test_a_passage_from_a_book_the_route_cites_becomes_its_quote_with_the_copys_url(self, found):
+        task, route, finding, number = found
+        proposal = task.proposal({"decision": "propose", "passage": number[COPY_SENTENCE], "supports": "Ignored."},
+                                 route, finding)
+        assert (proposal.reference, proposal.citation, proposal.url, proposal.adds_url) == (0, BOOK, COPY_URL, True)
+        # then: what the reference supports stays as the person wrote it
+        assert proposal.supports == "Rope was twisted from plant fibres."
+        checks, evidence = task.check(route, proposal, finding)
+        assert [c.name for c in checks if not c.passed] == [] and COPY_SENTENCE in evidence.excerpt
+
+    def test_a_passage_from_another_work_becomes_a_new_reference_saying_what_it_supports(self, found):
+        task, route, finding, number = found
+        proposal = task.proposal({"decision": "propose", "passage": number[WORK_SENTENCE],
+                                  "supports": "Rope was made from plant fibers in antiquity."}, route, finding)
+        assert (proposal.reference, proposal.citation, proposal.url) == (None, CORD_CITATION, WORK_URL)
+        assert proposal.supports == "Rope was made from plant fibers in antiquity."
+
+    @pytest.mark.parametrize("change, failed", [
+        pytest.param({"reference": None, "citation": SITE_REPORT, "url": "https://example.org/elsewhere"},
+                     "citation_is_new", id="a work the route already cites"),
+        pytest.param({"reference": None, "citation": "New (2020). Work.", "supports": "Short."}, "supports_is_said",
+                     id="a new reference that doesn't say what it supports"),
+        pytest.param({"quote": "The site lies by the river and was dug in the summer of 1990."},
+                     "quote_names_the_route", id="a quote that doesn't name the rope"),
+        pytest.param({"quote": SITE_SENTENCE.replace("twisted", "spun")}, "quote_is_on_the_page", id="a paraphrase"),
+        pytest.param({"url": "https://www.mindat.org/cord"}, "source_may_be_used", id="Mindat"),
+    ])
+    def test_a_proposal_that_fails_a_check_says_which(self, found, change, failed):
+        from capabilities_pipeline.agents.route_sources import RouteProposal
+
+        task, route, finding, _ = found
+        proposal = replace(RouteProposal("propose", 1, SITE_REPORT, SITE_URL, SITE_SENTENCE, "Rope was twisted."),
+                           **change)
+        checks, _ = task.check(route, proposal, finding)
+        assert failed in [c.name for c in checks if not c.passed]
+
+    def test_a_reference_that_already_has_a_quote_isnt_given_another(self, found):
+        from capabilities_pipeline.agents.route_sources import RouteProposal
+
+        task, route, finding, _ = found
+        references = [dict(r) for r in route.document["references"]]
+        references[1]["quote"] = SITE_SENTENCE
+        quoted = replace(route, document=route.document | {"references": references})
+        checks, _ = task.check(quoted, RouteProposal("propose", 1, SITE_REPORT, SITE_URL, SITE_SENTENCE, "R."), finding)
+        assert "reference_has_no_quote" in [c.name for c in checks if not c.passed]
+
+    @pytest.mark.parametrize("status", ["verified", "secondary"])
+    def test_a_reference_a_person_has_read_isnt_given_an_agents_quote(self, found, status):
+        # A route named for a run needn't be in the queue, so one of its references may be verified.
+        from capabilities_pipeline.agents.route_sources import RouteProposal
+
+        task, route, finding, _ = found
+        references = [dict(r) for r in route.document["references"]]
+        references[1]["status"] = status
+        read = replace(route, document=route.document | {"references": references})
+        checks, _ = task.check(read, RouteProposal("propose", 1, SITE_REPORT, SITE_URL, SITE_SENTENCE, "R."), finding)
+        assert [c.name for c in checks if not c.passed] == ["reference_is_unverified"]
+
+    def test_the_proposer_reads_the_route_its_references_and_which_passages_are_its_own(self, found):
+        task, route, finding, _ = found
+        text = task.proposer_task(Prompt.load("route_proposer"), route, finding, None)
+        assert "Twisting test cord" in text and f"2. {SITE_REPORT}" in text
+        assert "(This is reference 2, which the route already cites for: Rope was twisted from plant fibers at the " \
+               "site.)" in text
+
+
+@pytest.fixture(scope="module")
+def routes_published(repo_root, tmp_path_factory, wikidata_endpoint, scholarly_endpoint, lookups_offline):
+    """One run over the two made-up routes of a throwaway repository: Twisting test cord gets a quote for the site
+    report it already cites, and Braiding test cord a new reference from an OpenAlex work. The agents accept both."""
+    directory = tmp_path_factory.mktemp("routes-published")
+    repo = _repository(repo_root, directory)
+    _with_test_routes(repo)
+    plait = repo / "data" / "routes" / f"{PLAIT}.yaml"
+    plait.write_text(PLAIT_ON_MAIN, encoding="utf-8")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "The test routes")
+    _git(repo, "push", "-q", "origin", "main")
+    plait.write_text(PLAIT_ROUTE, encoding="utf-8")  # the run's copy, not committed
+    fake = FakeClaude(directory / "fake-claude")
+    choice = {"decision": "propose", "passage": 1, "supports": "Rope was braided from plant fibers in antiquity.",
+              "unsure_why": ""}
+    fake.script(proposer=[answer(choice)] * 3, reviewer=[answer(ACCEPT)] * 3)
+    gh = _fake_gh(directory)
+    with pytest.MonkeyPatch.context() as patch, lookups_offline():
+        for name, value in fake.environment().items():
+            patch.setenv(name, value)
+        for name in claude_module.API_CREDENTIALS:
+            patch.delenv(name, raising=False)
+        report = run_agents(
+            repo, directory / "build",
+            replace(settings(fake, task="route_sources", items=3, names=(TWIST, BRAID, PLAIT)), pull_request=True,
+                    gh_command=str(gh)),
+            Downloads(wikidata_endpoint.url, scholarly_endpoint.openalex_url, scholarly_endpoint.crossref_url),
+            web=FakeWeb(pages=ROUTE_PAGES, works={"braiding": [CORD_WORK]}), on_progress=lambda message: None,
+            audit_dir=directory / "audit",
+        )
+    branch = f"agents/{report.run_id}"
+    show = lambda path: _git(directory / "origin.git", "show", f"{branch}:{path}")  # noqa: E731
+    return {"report": report, "repo": repo, "branch": branch, "show": show, "directory": directory,
+            "gh": (directory / "gh-calls.txt").read_text().splitlines(),
+            "subject": _git(directory / "origin.git", "log", "-1", "--format=%s", branch)}
+
+
+class TestTheRoutePullRequest:
+    def test_both_routes_are_accepted_and_opened_as_one_draft(self, routes_published):
+        report = routes_published["report"]
+        assert [(r.item.name, r.outcome) for r in report.results] == [
+            (TWIST, "accepted"), (BRAID, "accepted"), (PLAIT, "rejected")]
+        assert report.run_id.startswith("routes-")
+        assert routes_published["subject"] == f"feat(data): agent proposals for 2 routes (run {report.run_id})"
+        gh = routes_published["gh"]
+        assert gh[gh.index("--title") + 1] == f"Agent proposals: 2 routes (run {report.run_id})"
+
+    def test_a_quote_for_a_reference_the_base_branch_cites_differently_is_rejected_alone(self, routes_published):
+        # The run's copy numbers the references; the file written to is the base branch's, found by citation.
+        plait = next(r for r in routes_published["report"].results if r.item.name == PLAIT)
+        assert plait.reason.startswith("its change couldn't be written") and "no references cite" in plait.reason
+        assert routes_published["show"](f"data/routes/{PLAIT}.yaml") + "\n" == PLAIT_ON_MAIN
+
+    def test_the_pull_request_says_what_each_proposal_changes(self, routes_published, route_root):
+        body = pull_request_body(routes_published["report"].summary, route_task(route_root))
+        assert f"| `{TWIST}` | quote for reference 2 | [{SITE_REPORT}]({SITE_URL}) |" in body
+        assert f"| `{BRAID}` | new | [{CORD_CITATION}]({WORK_URL}) |" in body
+        assert "ADR 0049" in body and f"`data/routes/{BRAID}.yaml`" in body
+
+    def test_a_quote_is_added_to_the_reference_the_route_already_cites_and_nothing_else_moves(self, routes_published):
+        edited = routes_published["show"](f"data/routes/{TWIST}.yaml") + "\n"
+        site = yaml.safe_load(edited)["references"][1]
+        assert (site["quote"], site["status"], site["proposed_by"]) == (
+            SITE_SENTENCE, "unverified", routes_published["report"].run_id)
+        assert [line for line in edited.splitlines() if line not in TWIST_ROUTE.splitlines()] == [
+            f"    quote: {json.dumps(SITE_SENTENCE)}", f"    proposed_by: {routes_published['report'].run_id}"]
+
+    def test_a_new_reference_is_unverified_and_cites_openalexs_record(self, routes_published):
+        new = yaml.safe_load(routes_published["show"](f"data/routes/{BRAID}.yaml"))["references"][-1]
+        assert new == {"citation": CORD_CITATION, "url": WORK_URL, "quote": WORK_SENTENCE,
+                       "supports": "Rope was braided from plant fibers in antiquity.", "status": "unverified",
+                       "proposed_by": routes_published["report"].run_id}
+
+    def test_the_route_files_are_committed_with_the_runs_summary(self, routes_published):
+        run_id = routes_published["report"].run_id
+        changed = _git(routes_published["directory"] / "origin.git", "diff", "--name-only", "main",
+                       routes_published["branch"]).splitlines()
+        assert {f"data/routes/{TWIST}.yaml", f"data/routes/{BRAID}.yaml", f"data/agent_runs/{run_id}.json"} <= set(changed)
+        assert not [path for path in changed if path.startswith("data/crosswalks")]
+
+    def test_the_queue_says_a_quote_is_ready_once_it_is_merged(self, routes_published, tmp_path):
+        from capabilities.built import load_queue, run_build
+
+        repo = routes_published["repo"]
+        _git(repo, "fetch", "-q", "origin", routes_published["branch"])
+        _git(repo, "checkout", "-q", "FETCH_HEAD")
+        try:
+            run_build(repo, tmp_path / "build")
+        finally:
+            _git(repo, "checkout", "-q", "main")
+        details = {item["subject"]: item["detail"] for item in load_queue(tmp_path / "build")
+                   if item["kind"] == "route_unverified"}
+        assert details[TWIST].startswith("A quote is ready to check")
+        assert details[BRAID].startswith("A quote is ready to check")

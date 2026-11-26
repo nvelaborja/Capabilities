@@ -20,6 +20,11 @@ export function References({ references }: { references: readonly Reference[] })
             <span className="citation">{ref.citation}</span>
             {ref.supports && <span className="supports">{ref.supports}</span>}
             {ref.quote && <q className="quote">{ref.quote}</q>}
+            {ref.proposed_by && (
+              <span className="proposed-by">
+                Proposed by an agent, run <code>{ref.proposed_by.run}</code> (see <code>{ref.proposed_by.summary}</code>)
+              </span>
+            )}
             <span className="reference-meta">
               {ref.status && <span className={`source-status source-${ref.status}`}>{STATUS_TEXT[ref.status]}</span>}
               {ref.doi && (

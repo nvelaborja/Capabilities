@@ -430,6 +430,11 @@
   font-style: italic;
 }
 
+/* An agent's proposal (ADR 0049): said in words, so it never rests on a colour. */
+.references .proposed-by {
+  color: var(--text-muted);
+}
+
 .reference-meta {
   display: flex;
   flex-wrap: wrap;
