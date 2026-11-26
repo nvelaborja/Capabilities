@@ -515,6 +515,8 @@ def references(graph: Graph, item: dict) -> list[dict]:
     rows = []
     for ref in item.get("references", []):
         row = {field: ref[field] for field in fields if field in ref}
+        if ref.get("proposed_by"):
+            row["proposed_by"] = {"run": ref["proposed_by"], "summary": f"data/agent_runs/{ref['proposed_by']}.json"}
         if check := graph.reference_checks.get(ref["citation"].strip()):
             row["check"] = reference_check(check, ref.get("url"))
         rows.append(row)

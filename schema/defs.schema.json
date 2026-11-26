@@ -57,6 +57,11 @@
         "status": {
           "description": "unverified = cited but not checked; secondary = taken from a secondary summary of the source; verified = a reviewer read the source and confirmed the claim.",
           "enum": ["unverified", "secondary", "verified"]
+        },
+        "proposed_by": {
+          "description": "The agent run that proposed this reference, or its quote (ADR 0049); its summary is data/agent_runs/<run>.json. A person's own reference has none.",
+          "type": "string",
+          "pattern": "^[a-z]+-[0-9]{8}-[0-9]{6}$"
         }
       }
     },

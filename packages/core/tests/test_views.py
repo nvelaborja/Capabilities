@@ -11,6 +11,7 @@ from capabilities.views import (
     graph_view,
     implied_by,
     quantity_source,
+    references,
 )
 
 
@@ -403,3 +404,16 @@ class TestQuantitySource:
 
     def test_a_value_with_no_fact_is_curated(self, workshop):
         assert quantity_source(workshop, "knife", "hardness_mohs") == {"layer": "curated"}
+
+
+class TestReferences:
+    def test_a_reference_an_agent_proposed_says_which_run_and_where_its_summary_is(self, curated_graph):
+        item = {"references": [
+            {"citation": "Example, A. (2020). Rope.", "quote": "Rope was twisted.", "status": "unverified",
+             "proposed_by": "routes-20261125-120000"},
+            {"citation": "Person, B. (2001). Cord.", "status": "unverified"},
+        ]}
+        proposed, written = references(curated_graph, item)
+        assert proposed["proposed_by"] == {"run": "routes-20261125-120000",
+                                           "summary": "data/agent_runs/routes-20261125-120000.json"}
+        assert "proposed_by" not in written

@@ -20,8 +20,9 @@ from pathlib import Path
 
 import duckdb
 from capabilities.built import CHECKS_FILE, graph_dir
+from capabilities.validate import validate
 
-from ..build import build
+from ..build import BuildError, build
 from ..upstream import REFERENCES, WIKIDATA, WIKIDATA_ITEMS, back_up, fetch
 from .task import Check
 
@@ -116,8 +117,11 @@ def check_gh(gh: str = "gh") -> None:
 
 
 def gate(root: Path, build_dir: Path, downloads: Downloads) -> dict[str, dict]:
-    """Download what the crosswalk's rows need and build the graph from `root`, as a person adding the rows would.
-    Returns the citation checks by citation. A build that fails raises BuildError."""
+    """Validate the data, download what the changes need, and build the graph from `root`, as a person adding them
+    would. Returns the citation checks by citation. Data that doesn't validate, or a build that fails, raises
+    BuildError."""
+    if errors := [str(issue) for issue in validate(root) if issue.severity == "error"]:
+        raise BuildError("the data doesn't validate: " + "; ".join(errors))
     fetch(WIKIDATA, build_dir, downloads.wikidata_url, root=root)
     fetch(WIKIDATA_ITEMS, build_dir, downloads.wikidata_url, root=root)
     fetch(replace(REFERENCES, crossref_url=downloads.crossref_url), build_dir, downloads.openalex_url, root=root)

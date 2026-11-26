@@ -87,7 +87,7 @@ model {
       }
       agents = component 'Agent curation' {
         technology 'Python, Claude Code CLI, Dagster job agent_curation (capabilities_pipeline.agents)'
-        description 'Started by hand with a size: a proposer agent researches each ore candidate and proposes a crosswalk row; code checks it, downloading the cited page; a reviewer agent challenges it. Accepted rows are built and tested in a temporary worktree and opened as a draft pull request (ADR 0035, ADR 0048).'
+        description 'Started by hand with a task and a size: ore candidates (a crosswalk row each, ADR 0048) or routes whose references are all unverified (a quoted source each, ADR 0049). Code finds the passages; a proposer agent chooses one; code checks it; a reviewer agent challenges it. Accepted changes are validated, built and tested in a temporary worktree and opened as a draft pull request (ADR 0035).'
       }
       dbt = component 'dbt project' {
         technology 'dbt Core with the DuckDB adapter'
@@ -343,16 +343,16 @@ model {
 
   contributor -> capabilities.pipeline.agents 'launches an agent run by hand, and merges or closes its pull request'
   capabilities.pipeline.dagster -> capabilities.pipeline.agents 'runs the agent_curation job'
-  capabilities.pipeline.agents -> capabilities.artifact.queue 'takes the top ore candidates'
+  capabilities.pipeline.agents -> capabilities.artifact.queue 'takes the top ore candidates, or the unverified routes'
   capabilities.pipeline.agents -> claude 'asks the proposer to choose and the reviewer to challenge (claude -p, no tools)'
-  capabilities.pipeline.agents -> theWeb 'downloads each source once, and finds the passages naming the mineral'
+  capabilities.pipeline.agents -> theWeb 'downloads each source once, and finds the passages naming the mineral or the route\'s thing'
   capabilities.pipeline.agents -> wikidata 'searches for the mineral\'s item, and reads it'
-  capabilities.pipeline.agents -> openalex 'searches open-access works on the mineral and smelting'
-  capabilities.pipeline.agents -> capabilities.pipeline.downloader 'gate: downloads what the new rows need'
-  capabilities.pipeline.agents -> capabilities.pipeline.loader 'gate: builds and tests the worktree'
+  capabilities.pipeline.agents -> openalex 'searches open-access works on the mineral and smelting, or the route\'s process'
+  capabilities.pipeline.agents -> capabilities.pipeline.downloader 'gate: downloads what the changes need'
+  capabilities.pipeline.agents -> capabilities.pipeline.loader 'gate: validates, builds and tests the worktree'
   capabilities.pipeline.agents -> capabilities.audit 'appends every call, check and outcome'
   capabilities.pipeline.agents -> github 'pushes agents/<run> and opens a draft pull request (gh)'
-  github -> capabilities.curated 'a merged pull request adds the rows'
+  github -> capabilities.curated 'a merged pull request adds the rows, or the routes\' references'
 
   // Lineage: the data, stage to stage, the way it flows (view pipeline).
   mrds -[lineage]-> capabilities.snapshots 'mrds-csv.zip, as Parquet'

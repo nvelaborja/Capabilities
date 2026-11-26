@@ -28,11 +28,12 @@ from .branch import BranchError, Downloads, Proposals, Worktree, check_gh, gate,
 from .claude import UsageLimitReached, check_login
 from .curate import Curator, ItemResult, Settings, new_run_id
 from .ore_candidates import OreCandidates
+from .route_sources import RouteSources
 from .sources import Library, SourcesUnavailable, known_sources
 from .task import Item, Task, cell
 from .web import Web
 
-TASKS = {task.name: task for task in (OreCandidates,)}
+TASKS = {task.name: task for task in (OreCandidates, RouteSources)}
 
 
 @dataclass

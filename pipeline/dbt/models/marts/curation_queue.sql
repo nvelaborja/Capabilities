@@ -75,8 +75,14 @@ sources_without_places as (
 ),
 
 routes_unverified as (
+    -- A quote an agent proposed (ADR 0049) doesn't verify anything, but it is where a person's reading starts.
     select 'route_unverified', id, label,
-        'Every reference is unverified: read one and confirm what it supports.',
+        case when exists (
+            select 1 from json_each(coalesce(nodes.document -> 'references', '[]')) as reference
+            where reference.value ->> 'quote' is not null
+        )
+        then 'A quote is ready to check: read it on its page, and mark the reference verified if it says what it supports.'
+        else 'Every reference is unverified: read one and confirm what it supports.' end,
         null::bigint, json_object('references', json_array_length(coalesce(document -> 'references', '[]')))
     from nodes
     where node_type = 'route'
