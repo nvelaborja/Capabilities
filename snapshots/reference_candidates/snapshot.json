@@ -1,11 +1,11 @@
 {
   "dataset": "reference_candidates",
   "url": "https://api.openalex.org",
-  "retrieved_at": "2026-11-24T21:45:44Z",
-  "sha256": "54e3559a4676dec5550da3ea23f83e7709eec0c31efb902d0c9938ce90462dbe",
-  "rows": 242,
+  "retrieved_at": "2026-11-25T22:33:36Z",
+  "sha256": "0e8f6770d3f5c98a3767c8aacffbd6995d39589b6ceb96beb3888ef4f50d956a",
+  "rows": 264,
   "license": "CC0 1.0 (OpenAlex); Crossref's bibliographic metadata, which has no restrictions (no abstracts are kept)",
   "crossref_url": "https://api.crossref.org",
-  "works": 43,
-  "searched": 27
+  "works": 45,
+  "searched": 29
 }
