@@ -29,6 +29,6 @@ Then give:
 - decision: "propose", or "unsure" (then passage 0, fill unsure_why, and leave the rest empty).
 - class: one of the classes above.
 - passage: the number of the passage that supports it.
-- supports: one sentence in your own words: what the chosen sentence supports, as it bears on the class you chose. Say no more than it says.
+- supports: one sentence in your own words: what the chosen sentence supports, as it bears on the class you chose. Say no more than it says. It is shown on the row as the claim the source backs, so write only the claim: no caveats, and nothing about what the sentence leaves out.
 - notes: one short sentence describing the mineral for the graph, such as "A copper carbonate." or "A copper sulphide: roasted before it is smelted."
 $feedback
