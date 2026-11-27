@@ -1,6 +1,6 @@
 # 0050. Report facts as GitHub issues, withdraw agents' facts into a file, and re-check them only when an admin asks
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-26
 
 ## Context
