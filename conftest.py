@@ -226,6 +226,56 @@ def github_endpoint():
     server.shutdown()
 
 
+# Seshat's codings of the five variables the crosswalk compares, for the Middle Kingdom and the Saite Period of Egypt, as
+# its API answered on 2026-11-27 (CC BY-SA 4.0, Seshat Databank, https://seshat-db.com; ADR 0053).
+SESHAT_SAMPLE = REPO_ROOT / "pipeline" / "tests" / "fixtures" / "seshat-sample.json"
+
+
+class _SeshatApi(BaseHTTPRequestHandler):
+    """Answers /api/<section>/<variable>/ with the recorded codings, one per page, linking each page to the next as the
+    real API does, so the download must follow the links."""
+
+    def do_GET(self):
+        self.server.requests.append(self.path)
+        url = urlparse(self.path)
+        variable = url.path.removeprefix("/api/").strip("/")
+        codings = json.loads(SESHAT_SAMPLE.read_text(encoding="utf-8")).get(variable)
+        if codings is None:
+            self.send_error(404)
+            return
+        page = int(parse_qs(url.query).get("page", ["1"])[0])
+        more = page < len(codings)
+        root = f"http://127.0.0.1:{self.server.server_port}/api/{variable}/"
+        body = json.dumps({
+            "count": len(codings),
+            "next": f"{root}?page={page + 1}&page_size=1" if more else None,
+            "previous": f"{root}?page={page - 1}&page_size=1" if page > 1 else None,
+            "results": codings[page - 1:page],
+        }).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *args):
+        pass
+
+
+@pytest.fixture(scope="session")
+def seshat_endpoint():
+    """A local stand-in for Seshat's API, answering with the recording, so tests never use the network or accept its
+    terms. `dataset` is the Seshat dataset with no pause between pages."""
+    from capabilities_pipeline.upstream import SESHAT
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _SeshatApi)
+    server.requests = []
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    yield SimpleNamespace(url=f"http://127.0.0.1:{server.server_port}/api", requests=server.requests,
+                          dataset=replace(SESHAT, pause_s=0))
+    server.shutdown()
+
+
 # What OpenAlex and Crossref answered for every work cited on 2026-11-24, and how every cited link answered: the backup
 # as it was that day (OpenAlex CC0; Crossref's bibliographic metadata, no abstracts), kept as a fixture. The stand-in
 # rebuilds each response from it, and nothing in the tests asks the real services (ADR 0047). It is a fixed recording,
@@ -357,7 +407,7 @@ def fetch_references(scholarly_endpoint):
 
 @pytest.fixture(scope="session")
 def upstream_built_dir(tmp_path_factory, mrds_zip, wikidata_endpoint, pleiades_gz, pleiades_periods_ttl,
-                       cliopatria_release, fetch_references, github_endpoint) -> Path:
+                       cliopatria_release, seshat_endpoint, fetch_references, github_endpoint) -> Path:
     """The repository's graph built once with snapshots of the MRDS and Wikidata samples, so it has source occurrences
     and upstream quantity values."""
     from capabilities.built import run_build
@@ -370,6 +420,7 @@ def upstream_built_dir(tmp_path_factory, mrds_zip, wikidata_endpoint, pleiades_g
     fetch(PLEIADES, build_dir, pleiades_gz)
     fetch(PLEIADES_PERIODS, build_dir, pleiades_periods_ttl)
     fetch(cliopatria_release.dataset, build_dir, cliopatria_release.url)
+    fetch(seshat_endpoint.dataset, build_dir, seshat_endpoint.url, root=REPO_ROOT)
     fetch_references(build_dir)
     fetch(REPORTS, build_dir, github_endpoint.url)
     run_build(REPO_ROOT, build_dir)

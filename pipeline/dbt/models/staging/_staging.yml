@@ -49,3 +49,14 @@ models:
         data_tests: [not_null]
       - name: to_year
         data_tests: [not_null]
+  - name: stg_seshat__codings
+    description: Seshat's codings of polities, typed, with year 0 read as Cliopatria's is (ADR 0053).
+    columns:
+      - name: record_id
+        data_tests: [not_null]
+      - name: value
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [present, absent, unknown, uncoded]

@@ -14,6 +14,7 @@ import hashlib
 import json
 import re
 import tempfile
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -277,6 +278,87 @@ class CliopatriaPolities(Dataset):
             return connection.execute("select count(*) from read_parquet(?)", [str(parquet)]).fetchall()[0][0]
 
 
+# What every Seshat coding carries besides its value, which is in a field named for the variable ("copper").
+SESHAT_FIELDS = {"id", "polity", "year_from", "year_to", "tag", "is_disputed", "is_uncertain", "name", "comment",
+                 "description"}
+SESHAT_PAGE = 100
+
+
+@dataclass(frozen=True)
+class SeshatCodings(Dataset):
+    """Seshat's codings of the variables `data/crosswalks/seshat_variables.csv` names, from its public API (ADR 0053):
+    one row per coding, with its polity and the polity's years, the years it covers if fewer, its value, Seshat's tag
+    (TRS confident, SSP suspected, IFR inferred, UND undecided), and its description, which holds Seshat's references.
+    `url` is the API's root. CC BY-SA 4.0: kept as published, and nothing derived from it enters data/."""
+
+    pause_s: float = 1.0  # between pages: Seshat is a research project's server, and nothing here is urgent
+
+    def download(self, url: str, scratch: Path, root: Path) -> tuple[Path, Path, dict]:
+        variables = seshat_variables(root)
+        rows = []
+        for variable in variables:
+            rows += [seshat_row(variable, coding) for coding in self.codings(url, variable)]
+        download = scratch / "codings.csv"
+        with download.open("w", newline="", encoding="utf-8") as file:
+            writer = csv.DictWriter(file, fieldnames=self.columns, lineterminator="\n")
+            writer.writeheader()
+            writer.writerows(rows)
+        return download, download, {"variables": variables}
+
+    def codings(self, url: str, variable: str):
+        """Every coding of one variable, page by page as the API links them."""
+        page = f"{url.rstrip('/')}/{variable}/?{urllib.parse.urlencode({'page_size': SESHAT_PAGE})}"
+        while page:
+            request = urllib.request.Request(page, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
+            with urllib.request.urlopen(request, timeout=TIMEOUT_S) as response:
+                answer = json.load(response)
+            yield from answer["results"]
+            page = answer.get("next")
+            if page:
+                time.sleep(self.pause_s)
+
+
+def seshat_variables(root: Path) -> list[str]:
+    """The API paths of the variables the crosswalk compares ("wf/bronzes")."""
+    with (root / "data" / "crosswalks" / "seshat_variables.csv").open(newline="", encoding="utf-8") as file:
+        variables = sorted({row["variable"].strip() for row in csv.DictReader(file)})
+    if not variables:
+        raise ValueError("Nothing to ask Seshat: data/crosswalks/seshat_variables.csv names no variable.")
+    return variables
+
+
+def as_text(value) -> str:
+    """A JSON value as the CSV keeps it: empty for null."""
+    return "" if value is None else str(value)
+
+
+def seshat_row(variable: str, coding: dict) -> dict:
+    """One coding as a row of text. Its value is in the one field named for the variable; if there isn't exactly one,
+    the API's format changed, and the download fails rather than guess. A coding of no polity (one, on 2026-11-27) is
+    kept as published, with its polity's fields empty; staging leaves it out."""
+    values = [key for key in coding if key not in SESHAT_FIELDS]
+    if len(values) != 1:
+        raise ValueError(f"seshat_codings: a coding of {variable} has fields {sorted(coding)}; the format changed")
+    polity = coding.get("polity") or {}
+    text = as_text
+    return {
+        "variable": variable,
+        "record_id": text(coding["id"]),
+        "polity_id": text(polity.get("id")),
+        "polity_name": text(polity.get("name")),
+        "polity_long_name": text(polity.get("long_name")),
+        "polity_start_year": text(polity.get("start_year")),
+        "polity_end_year": text(polity.get("end_year")),
+        "year_from": text(coding.get("year_from")),
+        "year_to": text(coding.get("year_to")),
+        "value": text(coding[values[0]]),
+        "tag": text(coding.get("tag")),
+        "is_disputed": text(coding.get("is_disputed")),
+        "is_uncertain": text(coding.get("is_uncertain")),
+        "description": text(coding.get("description")),
+    }
+
+
 # The fields of the report form (.github/ISSUE_TEMPLATE/report.yml), by the heading GitHub gives each in the issue.
 REPORT_FIELDS = {"Fact": "fact", "Kind": "kind", "Reference": "reference", "Agent run": "run"}
 REPORT_WRITTEN = "What is wrong"  # the first field the reader writes, after all of the app's
@@ -388,6 +470,16 @@ CLIOPATRIA = CliopatriaPolities(
     ),
 )
 
+SESHAT = SeshatCodings(
+    name="seshat_codings",
+    url="https://seshat-db.com/api",
+    license="CC BY-SA 4.0 (Seshat Databank, https://seshat-db.com, public data under its user agreement)",
+    columns=(
+        "variable", "record_id", "polity_id", "polity_name", "polity_long_name", "polity_start_year",
+        "polity_end_year", "year_from", "year_to", "value", "tag", "is_disputed", "is_uncertain", "description",
+    ),
+)
+
 REFERENCES = ReferenceCandidates(
     name="reference_candidates",
     url="https://api.openalex.org",
@@ -403,7 +495,7 @@ REPORTS = GitHubReports(
     columns=("number", "url", "title", "created_at", *REPORT_FIELDS.values()),
 )
 
-DATASETS = (MRDS, WIKIDATA, WIKIDATA_ITEMS, PLEIADES, PLEIADES_PERIODS, CLIOPATRIA, REFERENCES, REPORTS)
+DATASETS = (MRDS, WIKIDATA, WIKIDATA_ITEMS, PLEIADES, PLEIADES_PERIODS, CLIOPATRIA, SESHAT, REFERENCES, REPORTS)
 
 
 def fetch(dataset: Dataset, build_dir: Path, url: str | None = None, root: Path | None = None) -> dict:

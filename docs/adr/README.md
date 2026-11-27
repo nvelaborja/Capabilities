@@ -58,3 +58,4 @@ Each file records one significant design decision: the context, what we decided,
 | [0050](0050-report-withdraw-and-recheck-agent-facts.md) | Report facts as GitHub issues, withdraw agents' facts into a file, and re-check them only when an admin asks | Accepted |
 | [0051](0051-write-dates-as-signed-years-and-date-workings-from-periods-and-curated-dates.md) | Write dates as signed years, and date workings from Pleiades' periods and curated dates | Accepted |
 | [0052](0052-give-profiles-a-cliopatria-place-and-years-and-find-their-sources-on-the-map.md) | Give profiles a Cliopatria place and years, and find their sources on the map | Accepted |
+| [0053](0053-compare-the-graph-with-seshats-codings-of-polities-in-the-build-only.md) | Compare the graph with Seshat's codings of polities, in the build only | Proposed |

@@ -1,0 +1,15 @@
+{
+  "dataset": "seshat_codings",
+  "url": "https://seshat-db.com/api",
+  "retrieved_at": "2026-11-27T19:40:21Z",
+  "sha256": "be5042246195d3b9244980e0f698ec8842745efce801b7699eae6c513ac3b8db",
+  "rows": 1820,
+  "license": "CC BY-SA 4.0 (Seshat Databank, https://seshat-db.com, public data under its user agreement)",
+  "variables": [
+    "sc/mines-or-quarries",
+    "wf/bronzes",
+    "wf/coppers",
+    "wf/irons",
+    "wf/steels"
+  ]
+}

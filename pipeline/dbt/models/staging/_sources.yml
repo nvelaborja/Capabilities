@@ -103,6 +103,37 @@ sources:
             data_tests: [not_null]
           - name: geometry
             data_tests: [not_null]
+      - name: seshat_codings
+        description: >
+          Seshat's codings of the variables the crosswalk names, as its API answered (ADR 0053): one row per coding,
+          with its polity and the polity's years, the years it covers if fewer, its value, tag and description, every
+          column as text. A coding of no polity has its polity's fields empty. CC BY-SA 4.0.
+        columns:
+          - name: variable
+            data_tests: [not_null]
+          - name: record_id
+            data_tests: [not_null]
+      - name: seshat_variables
+        description: >
+          The crosswalk from Seshat's variables to what the graph says about them (data/crosswalks/seshat_variables.csv,
+          ADR 0053): a thing the graph can make or not, or whether the map gives a source worked by then.
+        columns:
+          - name: variable
+            data_tests: [unique, not_null]
+          - name: compares
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: [thing, worked_source]
+          - name: thing
+            data_tests:
+              - relationships:
+                  arguments:
+                    to: ref('stg_curated__documents')
+                    field: id
+          - name: notes
+            data_tests: [not_null]
       - name: wikidata_things
         description: >
           The crosswalk from our things to Wikidata items (data/crosswalks/wikidata_things.csv, ADR 0043). It says which

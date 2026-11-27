@@ -33,6 +33,10 @@ model {
     description 'Seshat\'s borders of the world\'s polities from 3400 BCE to 2024 CE, CC BY 4.0: one GeoJSON in a zip in its GitHub repository, released with tags. Each row is an entity\'s polygons for a range of years. A profile\'s place is one of its entities (ADR 0052).'
   }
 
+  seshat = external 'Seshat' {
+    description 'Seshat: Global History Databank. Its public API (seshat-db.com/api) gives each polity\'s codings: here, military use of copper, bronze, iron and steel, and mines or quarries. CC BY-SA 4.0; the project\'s owner accepted its user agreement (ADR 0053).'
+  }
+
   openalex = external 'OpenAlex' {
     description 'An open index of scholarly works, CC0. Its API finds each work we cite, by DOI or by searching its title, and knows where free copies are (ADR 0047).'
   }
@@ -141,6 +145,9 @@ model {
       rawCliopatria = table 'raw.cliopatria_polities' {
         description 'The Cliopatria snapshot: each row\'s ten properties as text, and its polygons as WKB.'
       }
+      rawSeshat = table 'raw.seshat_codings, raw.seshat_variables' {
+        description 'Seshat\'s codings of the crosswalked variables as text, and the crosswalk (data/crosswalks/seshat_variables.csv) saying what each means in the graph.'
+      }
       rawReports = table 'raw.github_reports' {
         description 'Open issues labelled report: number, link, title, date, and the fact, kind, reference and run the app\'s link filled in, as text. No reporter, no text.'
       }
@@ -200,6 +207,10 @@ model {
         technology 'dbt view'
         description 'Each profile\'s place (a Cliopatria entity) and years, for profiles that have one (ADR 0052).'
       }
+      stgSeshat = table 'stg_seshat__codings' {
+        technology 'dbt view'
+        description 'Seshat\'s codings typed: polity, its years, the value, tag and references (ADR 0053).'
+      }
       stgPleiades = table 'stg_pleiades__workings' {
         technology 'dbt view'
         description 'Pleiades mines and quarries: the kinds of place, the materials they name (tags) and their text, location and precision, attested years and periods.'
@@ -235,6 +246,14 @@ model {
         technology 'dbt marts, external materialization, GeoParquet'
         description 'Each profile\'s area (the union of its entity\'s polygons in its years, also as GeoJSON, with the Cliopatria release), the places inside it, and each source kind found there: had (worked there by the profile\'s last year) or maybe (ADR 0052).'
       }
+      history = file 'history_codings.parquet' {
+        technology 'dbt mart, external materialization'
+        description 'What Seshat says each polity with a generated profile had: present, absent or unknown, per compared variable. CC BY-SA 4.0, in the build only (ADR 0053).'
+      }
+      backtest = file 'backtest_results, graph_gaps (.parquet), backtest.json' {
+        technology 'Python (capabilities.history), written after the build'
+        description 'The comparison with history: per polity and variable, the graph\'s answer, Seshat\'s, the outcome and, for a no, what stops it and why (absent, undated, ore unrecorded); the gaps grouped; the build compared (ADR 0053).'
+      }
       manifest = file 'manifest.json' {
         description 'Format version, input fingerprint, build time, git commit, row counts and the upstream snapshots used. A build is current when its fingerprint matches the inputs.'
       }
@@ -263,6 +282,10 @@ model {
       cli = component 'CLI' {
         technology 'argparse (`capabilities`)'
         description 'validate, build, backup, queue, need, explore, check, credits, withdraw, serve.'
+      }
+      history = component 'Comparison with history' {
+        technology 'capabilities.history'
+        description 'Runs the reasoner for each polity Seshat codes, from the sources worked in its area by then, and compares its answers with Seshat\'s; names what stops each no. Writes to the build only (ADR 0053).'
       }
       withdraw = component 'Withdrawal' {
         technology 'capabilities.withdraw, capabilities.yaml_edit'
@@ -362,6 +385,20 @@ model {
   capabilities.warehouse.rawPleiadesPeriods -> capabilities.warehouse.stgPleiadesPeriods 'years, typed'
   capabilities.warehouse.stgPleiadesPeriods -> capabilities.artifact.occurrences 'the year each place was worked by'
   capabilities.pipeline.downloader -> cliopatria 'asks for the latest release, downloads the zip at its tag (HTTPS)'
+  capabilities.pipeline.downloader -> seshat 'pages through the crosswalked variables\' codings (HTTPS)'
+  capabilities.pipeline.loader -> capabilities.warehouse.rawSeshat 'loads the newest copy of the codings, and the crosswalk'
+  capabilities.warehouse.rawSeshat -> capabilities.warehouse.stgSeshat 'codings, typed'
+  capabilities.warehouse.stgSeshat -> capabilities.artifact.profiles 'a generated profile for each polity with borders'
+  capabilities.warehouse.stgSeshat -> capabilities.artifact.history 'what each polity had'
+  capabilities.artifact.profiles -> capabilities.artifact.history 'the generated profiles'
+  capabilities.pipeline.dbt -> capabilities.artifact.history 'writes the mart as Parquet, with data tests'
+  capabilities.core.history -> capabilities.artifact.history 'reads what Seshat says'
+  capabilities.core.history -> capabilities.artifact.profiles 'reads the sources each polity had'
+  capabilities.core.history -> capabilities.core.reasoner 'explores from each polity\'s sources'
+  capabilities.core.history -> capabilities.artifact.backtest 'writes the comparison and the gaps'
+  capabilities.core.built -> capabilities.artifact.backtest 'adds current gaps to the queue'
+  capabilities.pipeline.dagster -> capabilities.core.history 'the backtest asset, after the build'
+  capabilities.core.cli -> capabilities.core.history 'backtest: runs and prints it'
   capabilities.pipeline.loader -> capabilities.warehouse.rawCliopatria 'loads the newest copy of Cliopatria'
   capabilities.warehouse.rawCliopatria -> capabilities.warehouse.stgCliopatria 'borders, typed'
   capabilities.warehouse.stgDocuments -> capabilities.warehouse.stgProfilePlaces 'profiles\' places and years'
@@ -451,6 +488,11 @@ model {
   capabilities.snapshots -[lineage]-> capabilities.warehouse.rawPleiadesPeriods 'the download, if newest'
   capabilities.snapshots -[lineage]-> capabilities.warehouse.rawCliopatria 'the download, if newest'
   capabilities.backups -[lineage]-> capabilities.warehouse.rawCliopatria 'the backup, if newest'
+  seshat -[lineage]-> capabilities.snapshots 'the codings, as Parquet'
+  capabilities.snapshots -[lineage]-> capabilities.warehouse.rawSeshat 'the download, if newest'
+  capabilities.backups -[lineage]-> capabilities.warehouse.rawSeshat 'the backup, if newest'
+  capabilities.curated -[lineage]-> capabilities.warehouse.rawSeshat 'seshat_variables.csv'
+  capabilities.artifact.history -[lineage]-> capabilities.artifact.backtest 'compared with the graph\'s answers'
   cliopatria -[lineage]-> capabilities.snapshots 'the latest release\'s borders, as Parquet'
   capabilities.artifact.profiles -[lineage]-> capabilities.artifact.manifest 'their row counts'
   capabilities.backups -[lineage]-> capabilities.warehouse.rawPleiadesPeriods 'the backup, if newest'
@@ -488,7 +530,7 @@ model {
   }
   stageDownload = stage '1b Download upstream' {
     technology 'Dagster'
-    description 'Dagster only: downloads MRDS, the two Wikidata queries, Pleiades (places and periods) and Cliopatria\'s borders, and looks up every cited work in OpenAlex and Crossref (Downloader). If the network fails, it uses the cold backup instead.'
+    description 'Dagster only: downloads MRDS, the two Wikidata queries, Pleiades (places and periods), Cliopatria\'s borders and Seshat\'s codings, and looks up every cited work in OpenAlex and Crossref (Downloader). If the network fails, it uses the cold backup instead.'
   }
   stageLoad = stage '2 Load' {
     technology 'Python, DuckDB'
