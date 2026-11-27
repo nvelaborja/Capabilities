@@ -10,8 +10,8 @@ with chosen as (
 curated as (
     select ordinal, node_type, id, kind, label, document, json_object('layer', 'curated', 'path', path) as provenance
     from {{ ref('stg_curated__documents') }}
-    -- Overrides are applied through graph_facts, not nodes of their own.
-    where node_type <> 'override'
+    -- Overrides are applied through graph_facts, and working dates through source_occurrences: neither is a node.
+    where node_type not in ('override', 'date')
 ),
 
 upstream as (

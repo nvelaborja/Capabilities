@@ -59,13 +59,13 @@ views {
       include capabilities.warehouse.rawOreMinerals, capabilities.warehouse.rawWikidataItems, capabilities.warehouse.rawSuppressions
       include capabilities.warehouse.rawWikidata, capabilities.warehouse.rawMrds, capabilities.warehouse.rawSnapshots, capabilities.warehouse.rawLoads
       include capabilities.warehouse.rawPleiades, capabilities.warehouse.rawPleiadesRules, capabilities.warehouse.rawReferenceCandidates
-      include capabilities.warehouse.rawReports
+      include capabilities.warehouse.rawReports, capabilities.warehouse.rawPleiadesPeriods
     }
     group '3a/3b Transform and test (dbt)' {
       include capabilities.pipeline.dbt
       include capabilities.warehouse.stgDocuments, capabilities.warehouse.stgCuratedQuantities, capabilities.warehouse.stgWikidata
       include capabilities.warehouse.stgOreNodes, capabilities.warehouse.stgMrds, capabilities.warehouse.stgPleiades, capabilities.warehouse.stgReferences
-      include capabilities.warehouse.stgReports
+      include capabilities.warehouse.stgReports, capabilities.warehouse.stgPleiadesPeriods, capabilities.warehouse.stgDates
       include capabilities.artifact.graphNodes, capabilities.artifact.graphFacts, capabilities.artifact.queue, capabilities.artifact.occurrences, capabilities.artifact.checks
     }
     group '4 Publish' {

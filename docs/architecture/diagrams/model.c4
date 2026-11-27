@@ -26,7 +26,7 @@ model {
   }
 
   pleiades = external 'Pleiades' {
-    description 'A community-built gazetteer of ancient places, CC BY 3.0. Its daily dump (pleiades-places-latest.csv.gz) holds every place, with its types, tags, location and the periods it is attested in; its mines and quarries place our sources and ore classes (ADR 0046).'
+    description 'A community-built gazetteer of ancient places, CC BY 3.0. Its daily dump (pleiades-places-latest.csv.gz) holds every place, with its types, tags, location and the periods it is attested in; its mines and quarries place our sources and ore classes (ADR 0046). Its vocabulary of time periods (time-periods.ttl) gives each period\'s years, which date when they were worked by (ADR 0051).'
   }
 
   openalex = external 'OpenAlex' {
@@ -131,6 +131,9 @@ model {
       rawPleiades = table 'raw.pleiades_places' {
         description 'The Pleiades snapshot, all 26 columns as text.'
       }
+      rawPleiadesPeriods = table 'raw.pleiades_periods' {
+        description 'Pleiades\' time periods, read from the Turtle: key, label, scope note and the years it gives, as text.'
+      }
       rawReports = table 'raw.github_reports' {
         description 'Open issues labelled report: number, link, title, date, and the fact, kind, reference and run the app\'s link filled in, as text. No reporter, no text.'
       }
@@ -173,6 +176,14 @@ model {
       stgReports = table 'stg_github__reports' {
         technology 'dbt view'
         description 'Readers\' open reports, typed, with empty fields as nulls.'
+      }
+      stgPleiadesPeriods = table 'stg_pleiades__periods' {
+        technology 'dbt view'
+        description 'Pleiades\' periods with their years as signed integers (negative BCE, no year 0), or none (ADR 0051).'
+      }
+      stgDates = table 'stg_curated__dates' {
+        technology 'dbt view'
+        description 'Curated working dates (data/dates): the record each dates, the year it was worked by, the reason and references (ADR 0051).'
       }
       stgPleiades = table 'stg_pleiades__workings' {
         technology 'dbt view'
@@ -304,7 +315,7 @@ model {
   capabilities.pipeline.dagster -> capabilities.pipeline.downloader 'downloads MRDS and Wikidata as assets'
   capabilities.pipeline.downloader -> mrds 'downloads mrds-csv.zip (HTTPS)'
   capabilities.pipeline.downloader -> wikidata 'one SPARQL query for the crosswalked items (HTTPS)'
-  capabilities.pipeline.downloader -> pleiades 'downloads the daily dump of places (HTTPS)'
+  capabilities.pipeline.downloader -> pleiades 'downloads the daily dump of places, and the time periods (HTTPS)'
   capabilities.pipeline.downloader -> openalex 'looks up each cited work, by DOI or title (HTTPS)'
   capabilities.pipeline.downloader -> crossref 'looks up each cited work, by DOI or citation (HTTPS)'
   capabilities.pipeline.loader -> capabilities.warehouse.rawReferenceCandidates 'loads the newest copy of the reference candidates'
@@ -325,6 +336,11 @@ model {
   capabilities.warehouse.stgPleiades -> capabilities.artifact.occurrences 'ancient mines and quarries, as points'
   capabilities.warehouse.rawPleiadesRules -> capabilities.artifact.occurrences 'match rules'
   capabilities.warehouse.stgPleiades -> capabilities.artifact.queue 'unmatched mines and quarries'
+  capabilities.pipeline.loader -> capabilities.warehouse.rawPleiadesPeriods 'loads the newest copy of the periods'
+  capabilities.warehouse.rawPleiadesPeriods -> capabilities.warehouse.stgPleiadesPeriods 'years, typed'
+  capabilities.warehouse.stgPleiadesPeriods -> capabilities.artifact.occurrences 'the year each place was worked by'
+  capabilities.warehouse.stgDocuments -> capabilities.warehouse.stgDates 'working dates'
+  capabilities.warehouse.stgDates -> capabilities.artifact.occurrences 'curated dates, over the datasets\''
   capabilities.pipeline.downloader -> capabilities.curated 'reads the crosswalks, quantities and references to build the queries'
   capabilities.pipeline.downloader -> capabilities.snapshots 'writes Parquet, then snapshot.json'
   capabilities.pipeline.dagster -> capabilities.pipeline.loader 'runs the load and manifest as assets'
@@ -388,7 +404,7 @@ model {
   // Lineage: the data, stage to stage, the way it flows (view pipeline).
   mrds -[lineage]-> capabilities.snapshots 'mrds-csv.zip, as Parquet'
   wikidata -[lineage]-> capabilities.snapshots 'two query results, as Parquet'
-  pleiades -[lineage]-> capabilities.snapshots 'the daily dump, as Parquet'
+  pleiades -[lineage]-> capabilities.snapshots 'the daily dump and the periods, as Parquet'
   openalex -[lineage]-> capabilities.snapshots 'works found, as Parquet'
   crossref -[lineage]-> capabilities.snapshots 'works found, as Parquet'
   github -[lineage]-> capabilities.snapshots 'open reports, as Parquet'
@@ -401,6 +417,8 @@ model {
   capabilities.curated -[lineage]-> capabilities.warehouse.rawPleiadesRules 'pleiades_sources.csv'
   capabilities.snapshots -[lineage]-> capabilities.warehouse.rawPleiades 'the download, if newest'
   capabilities.backups -[lineage]-> capabilities.warehouse.rawPleiades 'the backup, if newest'
+  capabilities.snapshots -[lineage]-> capabilities.warehouse.rawPleiadesPeriods 'the download, if newest'
+  capabilities.backups -[lineage]-> capabilities.warehouse.rawPleiadesPeriods 'the backup, if newest'
   capabilities.snapshots -[lineage]-> capabilities.backups 'capabilities backup, when newer'
   capabilities.curated -[lineage]-> capabilities.warehouse.rawDocuments 'every document, whole'
   capabilities.curated -[lineage]-> capabilities.warehouse.rawCrosswalk 'mrds_sources.csv'
@@ -435,7 +453,7 @@ model {
   }
   stageDownload = stage '1b Download upstream' {
     technology 'Dagster'
-    description 'Dagster only: downloads MRDS, the two Wikidata queries and Pleiades, and looks up every cited work in OpenAlex and Crossref (Downloader). If the network fails, it uses the cold backup instead.'
+    description 'Dagster only: downloads MRDS, the two Wikidata queries and Pleiades (places and periods), and looks up every cited work in OpenAlex and Crossref (Downloader). If the network fails, it uses the cold backup instead.'
   }
   stageLoad = stage '2 Load' {
     technology 'Python, DuckDB'

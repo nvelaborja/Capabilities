@@ -14,7 +14,7 @@ sources:
               - not_null
               - accepted_values:
                   arguments:
-                    values: [quantity, thing, verb, route, profile, job, override]
+                    values: [quantity, thing, verb, route, profile, job, override, date]
           - name: id
             data_tests: [not_null]
           - name: path
@@ -79,6 +79,16 @@ sources:
         columns:
           - name: id
             data_tests: [unique, not_null]
+      - name: pleiades_periods
+        description: >
+          Pleiades' vocabulary of time periods, read from its Turtle (ADR 0051): each period's key, as places name it in
+          `timePeriodsKeys`, its label and scope note, and the years the note gives (negative is BCE). A period whose
+          note gives no years has none. CC BY 3.0.
+        columns:
+          - name: key
+            data_tests: [unique, not_null]
+          - name: label
+            data_tests: [not_null]
       - name: wikidata_things
         description: >
           The crosswalk from our things to Wikidata items (data/crosswalks/wikidata_things.csv, ADR 0043). It says which

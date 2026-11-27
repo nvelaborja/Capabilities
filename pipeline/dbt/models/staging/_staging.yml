@@ -7,11 +7,11 @@ models:
       - name: kind
         data_tests: [not_null]
       - name: label
-        description: Every node has a label; overrides aren't nodes, and have none.
+        description: Every node has a label; overrides and dates aren't nodes, and have none.
         data_tests:
           - not_null:
               config:
-                where: "node_type <> 'override'"
+                where: "node_type not in ('override', 'date')"
   - name: stg_github__reports
     description: Readers' open reports from GitHub issues, typed, with empty fields as nulls.
     columns:

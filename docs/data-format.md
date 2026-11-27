@@ -25,6 +25,7 @@ data/
   profiles/              curated starting sets (e.g. Middle Kingdom Egypt)
   crosswalks/            CSV tables matching upstream records to our ids (MRDS deposits to source kinds, things to Wikidata items, ore minerals that join the graph, rules placing Pleiades mines and quarries)
   overrides/             replacements for upstream values we believe are wrong, with the reason and references
+  dates/                 the year an upstream mine, quarry or deposit is known to have been worked by, from a cited work
   suppressions/          upstream records left out of the build, with why
   withdrawals.csv        agents' facts taken out, with what they said and why (ADR 0050)
   agent_runs/            the summary of each agent run whose pull request was merged
@@ -233,6 +234,24 @@ references:                                  # at least one
 ```
 
 There are none yet. The thing must be in the Wikidata crosswalk and the quantity read from Wikidata: a value only the curated layer gives is corrected in the thing's own file. If upstream changes, the build marks the override stale for review. A value can be overridden once.
+
+### Working date (`data/dates/*.yaml`)
+
+The year an upstream record is known to have been worked by, from a cited work. The build uses it instead of the year its dataset gives (MRDS's first production, or the end of a Pleiades place's earliest dated period), keeps the dataset's beside it, and the map's popup says where the year came from ([ADR 0051](adr/0051-write-dates-as-signed-years-and-date-workings-from-periods-and-curated-dates.md)).
+
+```yaml
+id: <place>-worked
+kind: date
+occurrence: { dataset: pleiades, record: "707452" }   # mrds (its dep_id) or pleiades (the number in the place's address)
+worked_by: -1200                             # a signed year: worked then or earlier
+reason: What the work says that dates it, in a sentence.
+references:                                  # at least one
+  - { citation: "...", supports: "...", status: unverified }
+```
+
+There are none yet. A record has one date. A date that names no occurrence (a typo, or a record the dataset has since dropped or we suppress) does nothing, and the build warns.
+
+**Years** are signed integers everywhere in the data: negative is BCE, positive CE, and there is no year 0 (1 BCE is followed by 1 CE), as Pleiades and Cliopatria write them. A range is `[from, to]`, inclusive. The app writes them as 550 BC, AD 300, 1860.
 
 ### Suppression (`data/suppressions/suppressed_records.csv`)
 

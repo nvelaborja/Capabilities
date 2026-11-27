@@ -278,6 +278,14 @@ export interface ExplainRequest extends SelectionRequest {
 /** Worked: known to have been worked (by a year, or in its attested periods). Present: no known working date (ADR 0041). */
 export type OccurrenceState = "worked" | "present";
 
+export type WorkedByBasis = "first production" | "period" | "curated";
+
+export interface WorkingDateReference {
+  citation: string;
+  url?: string;
+  status: string;
+}
+
 export interface PlaceProperties {
   id: string;
   source_id: string;
@@ -288,7 +296,22 @@ export interface PlaceProperties {
   admin_area: string | null;
   development_status: string | null;
   deposit_type: string | null;
+  /** Signed: negative is BC, and there is no year 0 (ADR 0051). */
   worked_by_year: number | null;
+  /** Where the year came from: MRDS's first production, the end of the earliest Pleiades period it is attested in, or a
+   * curated date with references (ADR 0051). Null with no year. */
+  worked_by_basis: WorkedByBasis | null;
+  /** The period's label, or the curated date's reason. */
+  worked_by_note: string | null;
+  /** A curated date's references: a list from the API, a JSON string once MapLibre has handled the feature. */
+  worked_by_references: WorkingDateReference[] | string | null;
+  /** The end of the period that dated it: later than worked_by_year when the period hadn't ended when the data was
+   * taken (Modern, to 2100). */
+  worked_by_period_end: number | null;
+  /** What the dataset said, when a curated date replaces it: its year, and the note it came with (for Pleiades, the
+   * period it was the end of). */
+  upstream_worked_by_year: number | null;
+  upstream_worked_by_note: string | null;
   state: OccurrenceState;
   /** Pleiades: the years it is attested from and to (negative is BC), and the named periods (ADR 0046). */
   attested_from: number | null;

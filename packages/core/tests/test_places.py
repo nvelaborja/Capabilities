@@ -8,7 +8,9 @@ def occurrence(source_id: str, record_id: str, state: str = "present", worked_by
         "id": f"{source_id}/mrds/{record_id}", "source_id": source_id, "dataset": "mrds", "record_id": record_id,
         "name": f"Deposit {record_id}", "longitude": -106.26, "latitude": 39.24, "country": "United States",
         "admin_area": "Colorado", "development_status": "Past Producer", "deposit_type": None,
-        "worked_by_year": worked_by_year, "state": state, "attested_from": None, "attested_to": None, "periods": None,
+        "worked_by_year": worked_by_year, "worked_by_basis": "first production" if worked_by_year else None,
+        "worked_by_note": None, "worked_by_references": None, "worked_by_period_end": None, "upstream_worked_by_year": None,
+        "upstream_worked_by_note": None, "state": state, "attested_from": None, "attested_to": None, "periods": None,
         "approximate": None, "matched_on": "ore: Hematite",
         "url": f"https://mrdata.usgs.gov/mrds/show-mrds.php?dep_id={record_id}",
     }

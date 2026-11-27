@@ -176,8 +176,9 @@ def load_reference_checks(build_dir: Path) -> dict[str, dict]:
 # and reading them needs no spatial extension.
 OCCURRENCE_COLUMNS = (
     "id", "source_id", "dataset", "record_id", "name", "longitude", "latitude", "country", "admin_area",
-    "development_status", "deposit_type", "worked_by_year", "state", "attested_from", "attested_to", "periods",
-    "approximate", "matched_on", "url",
+    "development_status", "deposit_type", "worked_by_year", "worked_by_basis", "worked_by_note", "worked_by_date",
+    "worked_by_references", "worked_by_period_end", "upstream_worked_by_year", "upstream_worked_by_note", "state",
+    "attested_from", "attested_to", "periods", "approximate", "matched_on", "url",
 )
 
 
@@ -193,7 +194,13 @@ def load_occurrences(build_dir: Path) -> list[dict]:
         f"select {', '.join(OCCURRENCE_COLUMNS)} from read_parquet(?) where id is not null order by source_id, record_id",
         params=[str(path)],
     )
-    return [dict(zip(OCCURRENCE_COLUMNS, row)) for row in relation.fetchall()]
+    return [occurrence(dict(zip(OCCURRENCE_COLUMNS, row))) for row in relation.fetchall()]
+
+
+def occurrence(row: dict) -> dict:
+    # A curated date's references are kept as JSON text: Parquet has no type for a list of differing objects.
+    row["worked_by_references"] = json.loads(row["worked_by_references"]) if row["worked_by_references"] else None
+    return row
 
 
 def current_graph(root: Path, build_dir: Path | None = None) -> Graph:

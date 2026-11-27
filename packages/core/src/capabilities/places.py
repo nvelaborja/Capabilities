@@ -35,8 +35,9 @@ DATASETS = {
 
 # What each feature carries to the map: enough for its popup, and no more, since a material can have thousands.
 FEATURE_PROPERTIES = (
-    "id", "source_id", "dataset", "name", "country", "admin_area", "development_status", "deposit_type", "worked_by_year", "state",
-    "attested_from", "attested_to", "periods", "approximate", "record_id", "url",
+    "id", "source_id", "dataset", "name", "country", "admin_area", "development_status", "deposit_type", "worked_by_year",
+    "worked_by_basis", "worked_by_note", "worked_by_references", "worked_by_period_end", "upstream_worked_by_year",
+    "upstream_worked_by_note", "state", "attested_from", "attested_to", "periods", "approximate", "record_id", "url",
 )
 
 

@@ -146,6 +146,96 @@ class ReferenceCandidates(Dataset):
         }
 
 
+@dataclass(frozen=True)
+class PleiadesPeriods(Dataset):
+    """Pleiades' vocabulary of time periods, published as Turtle (ADR 0051): each period's key (what a place's
+    `timePeriodsKeys` names), label and scope note, and the years the note gives as `[[from, to]]`. A period whose note
+    gives no years keeps empty years: they are left unknown, not worked out from its name."""
+
+    def download(self, url: str, scratch: Path, root: Path) -> tuple[Path, Path, dict]:
+        download = scratch / "time-periods.ttl"
+        headers = save(urllib.request.Request(url, headers={"User-Agent": USER_AGENT}), download)
+        rows = period_rows(download.read_text(encoding="utf-8"))
+        converted = scratch / "periods.csv"
+        with converted.open("w", newline="", encoding="utf-8") as file:
+            writer = csv.DictWriter(file, fieldnames=self.columns, lineterminator="\n")
+            writer.writeheader()
+            writer.writerows(rows)
+        undated = sorted(row["key"] for row in rows if not row["from_year"])
+        return download, converted, {"last_modified": headers.get("Last-Modified"), "undated": undated}
+
+
+# Every subject in the Turtle starts a line with its IRI: a period's is a term, the scheme's the vocabulary itself.
+TURTLE_SUBJECT = re.compile(r"^<([^>]*)>", re.MULTILINE)
+PERIOD_IRI = re.compile(r"https://pleiades\.stoa\.org/vocabularies/([^>/]+)")
+PERIOD_TYPING = re.compile(r"<http://www\.w3\.org/2004/02/skos/core#Concept>|\bskos:Concept\b")
+# A Turtle string, with the escapes Turtle allows; Pleiades writes labels and notes as plain quoted strings.
+PERIOD_TEXT = r'"((?:[^"\\\n]|\\.)*)"'
+# The years a scope note gives, `[[from, to]]`. One note lacks its last bracket ("[[1, 1000]"), so that one is optional.
+PERIOD_YEARS = re.compile(r"\[\[\s*(-?\d+)\s*,\s*(-?\d+)\s*\]\]?")
+
+
+def period_rows(turtle: str) -> list[dict]:
+    """One row per period in Pleiades' time-periods Turtle. Every period must come out whole, with its label, its note
+    and the years the note gives: if the format changes so that one doesn't, the download fails (ADR 0051), so that the
+    copy the build already has stays the newest rather than one with periods dropped or undated."""
+    blocks = turtle_subjects(turtle)
+    periods = [(match.group(1), block) for iri, block in blocks if (match := PERIOD_IRI.fullmatch(iri))]
+    if not periods:
+        raise ValueError("pleiades_periods: no periods found; the Turtle's format changed")
+    typed = len(PERIOD_TYPING.findall(turtle))
+    if typed != len(periods):
+        raise ValueError(f"pleiades_periods: {typed} concepts, {len(periods)} periods read; the format changed")
+    return [period_row(key, block) for key, block in periods]
+
+
+def turtle_subjects(turtle: str) -> list[tuple[str, str]]:
+    """Each subject's IRI and the statements about it, up to the next subject."""
+    starts = list(TURTLE_SUBJECT.finditer(turtle))
+    ends = [start.start() for start in starts[1:]] + [len(turtle)]
+    return [(start.group(1), turtle[start.start():end]) for start, end in zip(starts, ends)]
+
+
+def period_row(key: str, block: str) -> dict:
+    label = period_text(key, block, "skos:prefLabel")
+    if not label:
+        raise ValueError(f"pleiades_periods: period {key} has no label; the Turtle's format changed")
+    note = period_text(key, block, "skos:scopeNote") or ""
+    years = PERIOD_YEARS.search(note)
+    if years:
+        check_period_years(key, int(years.group(1)), int(years.group(2)))
+    return {
+        "key": key,
+        "label": label,
+        "scope_note": note,
+        "from_year": years.group(1) if years else "",
+        "to_year": years.group(2) if years else "",
+    }
+
+
+def period_text(key: str, block: str, predicate: str) -> str | None:
+    """The text a period gives for a predicate, or None when it gives none. Text this parser can't read, such as a
+    long string in triple quotes, is an error rather than an empty label or a note without its years."""
+    if predicate not in block:
+        return None
+    text = re.search(re.escape(predicate) + " " + PERIOD_TEXT, block)
+    if not text or '"""' in block:
+        raise ValueError(f"pleiades_periods: period {key}'s {predicate} can't be read; the Turtle's format changed")
+    return turtle_unescape(text.group(1))
+
+
+def check_period_years(key: str, from_year: int, to_year: int) -> None:
+    """Signed years with no year 0, running forward (ADR 0051): anything else is a note to read again, not a date."""
+    if from_year == 0 or to_year == 0:
+        raise ValueError(f"pleiades_periods: period {key} gives year 0, which signed years don't have")
+    if from_year > to_year:
+        raise ValueError(f"pleiades_periods: period {key} runs backwards, {from_year} to {to_year}")
+
+
+def turtle_unescape(text: str) -> str:
+    return re.sub(r"\\(.)", lambda match: {"n": "\n", "t": "\t"}.get(match.group(1), match.group(1)), text)
+
+
 # The fields of the report form (.github/ISSUE_TEMPLATE/report.yml), by the heading GitHub gives each in the issue.
 REPORT_FIELDS = {"Fact": "fact", "Kind": "kind", "Reference": "reference", "Agent run": "run"}
 REPORT_WRITTEN = "What is wrong"  # the first field the reader writes, after all of the app's
@@ -238,6 +328,13 @@ PLEIADES = GzipCsvDataset(
     ),
 )
 
+PLEIADES_PERIODS = PleiadesPeriods(
+    name="pleiades_periods",
+    url="https://atlantides.org/downloads/pleiades/rdf/time-periods.ttl",
+    license="CC BY 3.0 (Pleiades: a gazetteer of past places, https://pleiades.stoa.org)",
+    columns=("key", "label", "scope_note", "from_year", "to_year"),
+)
+
 REFERENCES = ReferenceCandidates(
     name="reference_candidates",
     url="https://api.openalex.org",
@@ -253,7 +350,7 @@ REPORTS = GitHubReports(
     columns=("number", "url", "title", "created_at", *REPORT_FIELDS.values()),
 )
 
-DATASETS = (MRDS, WIKIDATA, WIKIDATA_ITEMS, PLEIADES, REFERENCES, REPORTS)
+DATASETS = (MRDS, WIKIDATA, WIKIDATA_ITEMS, PLEIADES, PLEIADES_PERIODS, REFERENCES, REPORTS)
 
 
 def fetch(dataset: Dataset, build_dir: Path, url: str | None = None, root: Path | None = None) -> dict:

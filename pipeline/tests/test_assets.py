@@ -29,6 +29,10 @@ PLEIADES_SNAPSHOT = AssetKey(["upstream", "pleiades_places"])
 PLEIADES_RAW = AssetKey(["raw", "pleiades_places"])
 PLEIADES_RULES = AssetKey(["raw", "pleiades_sources"])
 PLEIADES_STAGING = AssetKey("stg_pleiades__workings")
+PERIODS_SNAPSHOT = AssetKey(["upstream", "pleiades_periods"])
+PERIODS_RAW = AssetKey(["raw", "pleiades_periods"])
+PERIODS_STAGING = AssetKey("stg_pleiades__periods")
+DATES_STAGING = AssetKey("stg_curated__dates")
 ITEMS_RAW = AssetKey(["raw", "wikidata_items"])
 CROSSWALKED_ITEMS = AssetKey("stg_crosswalk__wikidata_items")
 QUEUE = AssetKey("curation_queue")
@@ -68,6 +72,7 @@ class TestDefinitions:
         assert graph.get(CROSSWALK).parent_keys == set()
         assert graph.get(OCCURRENCES).parent_keys == {
             MRDS_STAGING, CROSSWALK, ORE_RAW, SNAPSHOTS_RAW, SUPPRESSIONS, PLEIADES_STAGING, PLEIADES_RULES,
+            PERIODS_STAGING, DATES_STAGING,
         }
 
     def test_the_lineage_runs_from_the_pleiades_download_and_its_rules_to_the_occurrences(self, dagster_build):
@@ -75,6 +80,12 @@ class TestDefinitions:
         assert graph.get(PLEIADES_RAW).parent_keys == {PLEIADES_SNAPSHOT}
         assert graph.get(PLEIADES_STAGING).parent_keys == {PLEIADES_RAW}
         assert PLEIADES_STAGING in graph.get(QUEUE).parent_keys
+
+    def test_the_lineage_runs_from_the_periods_download_and_the_curated_dates_to_the_occurrences(self, dagster_build):
+        graph = asset_graph(dagster_build[0])
+        assert graph.get(PERIODS_RAW).parent_keys == {PERIODS_SNAPSHOT}
+        assert graph.get(PERIODS_STAGING).parent_keys == {PERIODS_RAW}
+        assert {PERIODS_STAGING, DATES_STAGING} <= graph.get(OCCURRENCES).parent_keys
 
     def test_the_lineage_runs_from_the_wikidata_download_and_its_crosswalk_to_the_facts(self, dagster_build):
         graph = asset_graph(dagster_build[0])
@@ -117,15 +128,15 @@ class TestDefinitions:
 
 class TestMaterializing:
     def test_materializing_everything_downloads_every_dataset_and_builds_a_current_graph(
-        self, dagster_build, repo_root, tmp_path, mrds_zip, wikidata_endpoint, pleiades_gz, scholarly_endpoint,
-        lookups_offline,
+        self, dagster_build, repo_root, tmp_path, mrds_zip, wikidata_endpoint, pleiades_gz, pleiades_periods_ttl,
+        scholarly_endpoint, lookups_offline,
     ):
         from capabilities_pipeline.assets import UpstreamDownloads
 
         defs, build_dir = dagster_build
         downloads = UpstreamDownloads(
             mrds_url=mrds_zip(tmp_path / "download"), wikidata_url=wikidata_endpoint.url, pleiades_url=pleiades_gz,
-            openalex_url=scholarly_endpoint.openalex_url, crossref_url=scholarly_endpoint.crossref_url,
+            pleiades_periods_url=pleiades_periods_ttl, openalex_url=scholarly_endpoint.openalex_url, crossref_url=scholarly_endpoint.crossref_url,
         )
         with lookups_offline():
             result = materialize(list(defs.assets), resources={**defs.resources, "downloads": downloads})
@@ -143,6 +154,7 @@ class TestMaterializing:
         # mine is a place of both copper ore classes (ADR 0046).
         assert manifest["tables"][OCCURRENCES_FILE] == 18 + 15
         assert manifest["upstream"]["pleiades_places"]["rows"] == 13
+        assert manifest["upstream"]["pleiades_periods"]["rows"] == 26
         assert manifest["upstream"]["mrds_deposits"]["rows"] == 14
         assert manifest["upstream"]["wikidata_quantities"]["rows"] == 4
         materialized = {event.asset_key for event in result.get_asset_materialization_events()}
@@ -150,6 +162,7 @@ class TestMaterializing:
         assert {WIKIDATA_SNAPSHOT, WIKIDATA_RAW, WIKIDATA_CROSSWALK, SUPPRESSIONS, FACTS} <= materialized
         assert {ITEMS_SNAPSHOT, ITEMS_RAW, ORE_RAW, ORE_NODES, QUEUE} <= materialized
         assert {PLEIADES_SNAPSHOT, PLEIADES_RAW, PLEIADES_RULES, PLEIADES_STAGING} <= materialized
+        assert {PERIODS_SNAPSHOT, PERIODS_RAW, PERIODS_STAGING} <= materialized
         assert {REFERENCES_SNAPSHOT, REFERENCES_RAW, CHECKS} <= materialized
 
     def test_offline_a_download_falls_back_to_the_cold_backup_and_says_so(self, dagster_build, wikidata_endpoint):

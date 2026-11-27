@@ -19,6 +19,7 @@ SCHEMA_BY_DIR = {
     "profiles": "profile",
     "jobs": "job",
     "overrides": "override",
+    "dates": "date",
 }
 
 # Thing kinds and the subdirectory of data/things/ they live in.
@@ -118,6 +119,9 @@ class Graph:
     # Curated replacements for upstream values (ADR 0043). The build applies them; the built graph's documents already
     # carry the result, so only the curated graph has them.
     overrides: dict[str, dict] = field(default_factory=dict)
+    # Curated working dates of upstream records (ADR 0051), applied in the build to the occurrences they date. As with
+    # overrides, only the curated graph has them.
+    dates: dict[str, dict] = field(default_factory=dict)
     # Where each quantity value of a built graph came from, by fact id ("granite/quantities.hardness_mohs", ADR 0043).
     # Empty for the curated graph, where every value is curated.
     facts: dict[str, dict] = field(default_factory=dict)
@@ -161,7 +165,7 @@ class Graph:
             root,
             quantities=buckets["quantity"], things=buckets["thing"], verbs=buckets["verb"],
             routes=buckets["route"], profiles=buckets["profile"], jobs=buckets["job"],
-            overrides=buckets["override"],
+            overrides=buckets["override"], dates=buckets["date"],
         )
 
     # ------------------------------------------------------------------ lookups

@@ -5,6 +5,8 @@ import {
   bounds,
   canMap,
   classLevelText,
+  attestedText,
+  datingText,
   emptyReason,
   periodsText,
   placesUnder,
@@ -141,6 +143,68 @@ describe("placesUnder", () => {
   });
 });
 
+describe("working dates (ADR 0051)", () => {
+  const undated = {
+    worked_by_year: null,
+    worked_by_note: null,
+    worked_by_references: null,
+    worked_by_period_end: null,
+    upstream_worked_by_year: null,
+    upstream_worked_by_note: null,
+  };
+
+  it("writes years as historians do: BC, AD before 1000, and plain after", () => {
+    expect([yearText(-2500), yearText(1), yearText(999), yearText(1860)]).toEqual(["2500 BC", "AD 1", "AD 999", "1860"]);
+    expect(stateText({ state: "worked", worked_by_year: -550 })).toBe("Known to have been worked by 550 BC");
+  });
+
+  it("says where a year came from", () => {
+    expect(datingText({ ...undated, worked_by_basis: "first production" })).toBe("From its first production, as MRDS records it");
+    const archaic = { worked_by_year: -550, worked_by_note: "Archaic (Greco-Roman; 750-550 BCE/BC)", worked_by_period_end: -550 };
+    expect(datingText({ ...undated, ...archaic, worked_by_basis: "period" })).toBe(
+      "Attested in Archaic (Greco-Roman; 750-550 BCE/BC), which had ended by then",
+    );
+    expect(datingText({ ...undated, worked_by_basis: null })).toBeNull();
+  });
+
+  it("never says a period had ended when it was still running when the data was taken", () => {
+    // given: a place attested only in the Modern period, which Pleiades runs to 2100, dated by the snapshot's year
+    const modern = { worked_by_year: 2026, worked_by_note: "Modern (AD 1700-Present)", worked_by_period_end: 2100 };
+    expect(datingText({ ...undated, ...modern, worked_by_basis: "period" })).toBe(
+      "Attested in Modern (AD 1700-Present), which hadn't ended when the data was taken",
+    );
+  });
+
+  it("gives a dated place's attested years beside its year, and leaves them to the state for an undated one", () => {
+    expect(attestedText({ worked_by_year: -550, attested_from: -750, attested_to: 300 })).toBe("Attested 750 BC – AD 300");
+    expect(attestedText({ worked_by_year: null, attested_from: -750, attested_to: 300 })).toBeNull();
+    expect(attestedText({ worked_by_year: 1860, attested_from: null, attested_to: null })).toBeNull();
+  });
+
+  it("gives a curated date's reason and citations, and what the dataset said, as the API or MapLibre hands them", () => {
+    const references = [{ citation: "Test, A. (2026). A work.", status: "unverified" }];
+    // given: a reason written as a sentence, replacing the year Pleiades' Archaic period gave
+    const curated = {
+      ...undated,
+      worked_by_year: -1200,
+      worked_by_basis: "curated" as const,
+      worked_by_note: "Slag dated to 1200 BC.",
+      upstream_worked_by_year: -550,
+      upstream_worked_by_note: "Archaic (Greco-Roman; 750-550 BCE/BC)",
+    };
+    const expected =
+      "Curated date: Slag dated to 1200 BC (Test, A. (2026). A work.). The dataset says 550 BC, from Archaic (Greco-Roman; 750-550 BCE/BC).";
+    expect(datingText({ ...curated, worked_by_references: references })).toBe(expected);
+    expect(datingText({ ...curated, worked_by_references: JSON.stringify(references) })).toBe(expected);
+    expect(datingText({ ...curated, worked_by_references: null, upstream_worked_by_year: null })).toBe(
+      "Curated date: Slag dated to 1200 BC.",
+    );
+    expect(datingText({ ...curated, worked_by_references: null, upstream_worked_by_year: 1860, upstream_worked_by_note: null })).toBe(
+      "Curated date: Slag dated to 1200 BC. The dataset says 1860.",
+    );
+  });
+});
+
 describe("Pleiades places (ADR 0046)", () => {
   it("says a working was worked, with the years it is attested, BC and AD", () => {
     const place = { state: "worked" as const, worked_by_year: null, attested_from: -330, attested_to: 640 };
@@ -153,7 +217,7 @@ describe("Pleiades places (ADR 0046)", () => {
 
   it("says a range that runs into Pleiades' modern periods runs to the present, never to a year to come", () => {
     expect(untilText(2100, 2026)).toBe("the present");
-    expect([untilText(2026, 2026), untilText(1999, 2026)]).toEqual(["AD 2026", "AD 1999"]);
+    expect([untilText(2026, 2026), untilText(1999, 2026)]).toEqual(["2026", "1999"]);
   });
 
   it("names the periods in words, whether the API's list or MapLibre's JSON string", () => {

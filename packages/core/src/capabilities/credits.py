@@ -57,7 +57,8 @@ def credits_path(root: Path) -> Path:
 
 
 def all_documents(graph: Graph) -> Iterator[tuple[str, dict]]:
-    for bucket in (graph.quantities, graph.things, graph.verbs, graph.routes, graph.profiles, graph.jobs, graph.overrides):
+    for bucket in (graph.quantities, graph.things, graph.verbs, graph.routes, graph.profiles, graph.jobs, graph.overrides,
+                   graph.dates):
         yield from bucket.items()
     yield from ore_crosswalk_references(graph.root)
 
