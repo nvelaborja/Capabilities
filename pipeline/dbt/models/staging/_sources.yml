@@ -89,6 +89,20 @@ sources:
             data_tests: [unique, not_null]
           - name: label
             data_tests: [not_null]
+      - name: cliopatria_polities
+        description: >
+          Cliopatria, Seshat's borders of the world's polities from 3400 BCE to 2024 CE, as downloaded from its latest
+          release (ADR 0052): one row per entity and range of years (FromYear to ToYear, inclusive, negative BCE), its
+          properties as text and its polygons as WKB. CC BY 4.0.
+        columns:
+          - name: Name
+            data_tests: [not_null]
+          - name: FromYear
+            data_tests: [not_null]
+          - name: ToYear
+            data_tests: [not_null]
+          - name: geometry
+            data_tests: [not_null]
       - name: wikidata_things
         description: >
           The crosswalk from our things to Wikidata items (data/crosswalks/wikidata_things.csv, ADR 0043). It says which
@@ -208,7 +222,9 @@ sources:
           - name: url
             data_tests: [not_null]
       - name: upstream_snapshots
-        description: One row per upstream dataset loaded, with where and when it was retrieved, for provenance.
+        description: >
+          One row per upstream dataset loaded, with where and when it was retrieved, for provenance, and the release it
+          is for a dataset published in numbered releases (Cliopatria).
         columns:
           - name: dataset
             data_tests: [unique, not_null]

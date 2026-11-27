@@ -73,6 +73,46 @@
   font-size: 0.8rem;
 }
 
+/* Where the preset is, and the sources found there (ADR 0052). Folded at first, and kept short when open, so it doesn't
+   push the selection out of view. */
+.map-place {
+  flex: none;
+  max-height: 40%;
+  overflow-y: auto;
+  padding: 0.5rem 1rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.map-place summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.map-place-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.map-place-counts {
+  color: var(--text-muted);
+}
+
+.map-place p {
+  margin: 0.2rem 0 0;
+  font-size: 0.8rem;
+}
+
+.map-place-borders {
+  color: var(--text-muted);
+}
+
+.map-place .chip-section h3 {
+  margin: 0.5rem 0 0.25rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
 .edited-badge {
   flex: none;
   padding: 0 0.4rem;

@@ -3,6 +3,8 @@ kind: profile
 label: Middle Kingdom Egypt
 period: c. 2050–1650 BCE
 region: Nile valley
+place: { cliopatria: Middle Kingdom of Egypt }
+years: [-2050, -1650]
 description: Things Middle Kingdom Egypt is known to have made or done. In the tool these are "selected"; everything that follows from them is "reachable". A first draft for testing the model; every item still needs its own reference.
 includes:
   # Resources they had access to

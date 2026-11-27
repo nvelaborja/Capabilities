@@ -18,11 +18,40 @@
       "const": "profile"
     },
     "region": {
-      "description": "Used only for regional-availability warnings.",
+      "description": "A label for where the group lived, for people to read. The profile's area comes from `place` (ADR 0052).",
       "type": "string"
     },
     "period": {
+      "description": "A label for when, for people to read (\"c. 2050–1650 BCE\"). The years the reasoning uses are `years` (ADR 0052).",
       "type": "string"
+    },
+    "place": {
+      "description": "Where the group lived: a Cliopatria entity, by its name as Cliopatria writes it. The profile's area is the union of the entity's polygons in the rows whose years overlap `years`, and the sources found inside it, worked by the profile's last year, count as had (ADR 0052).",
+      "type": "object",
+      "required": [
+        "cliopatria"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "cliopatria": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "years": {
+      "description": "When: [from, to], signed years, inclusive (negative is BCE, no year 0; ADR 0051). A source counts as had when one of its occurrences in the area was worked by `to`.",
+      "type": "array",
+      "prefixItems": [
+        {
+          "$ref": "urn:capabilities:schema:defs#/$defs/year"
+        },
+        {
+          "$ref": "urn:capabilities:schema:defs#/$defs/year"
+        }
+      ],
+      "items": false,
+      "minItems": 2
     },
     "includes": {
       "type": "array",
@@ -81,5 +110,13 @@
         "description": "Something the group is known to have made or done: a thing ({id}) or an action ({verb, target})."
       }
     }
+  },
+  "dependentRequired": {
+    "place": [
+      "years"
+    ],
+    "years": [
+      "place"
+    ]
   }
 }

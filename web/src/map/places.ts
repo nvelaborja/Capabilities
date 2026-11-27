@@ -1,4 +1,4 @@
-import type { OccurrencesResponse, PlaceProperties, SourceSummary, WorkingDateReference } from "../api/types";
+import type { AreaGeometry, OccurrencesResponse, PlaceProperties, SourceSummary, WorkingDateReference } from "../api/types";
 
 /** Whether a node can be shown on the map: a source, or a material taken from one (ADR 0032). */
 export function canMap(kind: string, origin?: string | null): boolean {
@@ -183,4 +183,59 @@ export function placesUnder<T extends { properties: Record<string, unknown> }>(f
   const name = (feature: T) => String(feature.properties.name ?? "");
   const unique = new Map(features.map((feature) => [feature.properties.id, feature]));
   return [...unique.values()].sort((a, b) => name(a).localeCompare(name(b)));
+}
+
+/** A place against a profile's area and a year (ADR 0052): worked there by then, there but not known to be worked by
+ * then, or outside the area. Without an area, a place is worked or present as its state says. */
+export type Then = "worked" | "present" | "outside";
+
+export function thenState(place: Pick<PlaceProperties, "state" | "worked_by_year" | "in_area">, year: number | null): Then {
+  if (year === null) return place.state === "worked" ? "worked" : "present";
+  if (place.in_area === false) return "outside";
+  return place.worked_by_year != null && place.worked_by_year <= year ? "worked" : "present";
+}
+
+/** The features with each one's `then`, which the map's layers draw by. */
+export function withThen(features: OccurrencesResponse["features"], year: number | null): OccurrencesResponse["features"] {
+  return {
+    ...features,
+    features: features.features.map((feature) => ({
+      ...feature,
+      properties: { ...feature.properties, then: thenState(feature.properties, year) },
+    })),
+  };
+}
+
+/** What the popup says about a place and the profile's area: never by colour or shape alone (ADR 0019). */
+export function areaText(place: Pick<PlaceProperties, "state" | "worked_by_year" | "in_area">, label: string, year: number): string {
+  const then = thenState(place, year);
+  if (then === "outside") return `Outside the area of ${label}`;
+  if (then === "worked") return `Inside the area of ${label}, and worked by ${yearText(year)}`;
+  return `Inside the area of ${label}, not known to be worked by ${yearText(year)}`;
+}
+
+/** The corners of an area, [[west, south], [east, north]], to fit the map to; null for an empty one. */
+export function areaBounds(area: AreaGeometry): [[number, number], [number, number]] | null {
+  const points = areaPoints(area);
+  if (points.length === 0) return null;
+  const xs = points.map((point) => point[0] ?? 0);
+  const ys = points.map((point) => point[1] ?? 0);
+  return [
+    [Math.min(...xs), Math.min(...ys)],
+    [Math.max(...xs), Math.max(...ys)],
+  ];
+}
+
+function areaPoints(area: AreaGeometry): number[][] {
+  if (area.type === "Polygon") return area.coordinates.flat();
+  if (area.type === "MultiPolygon") return area.coordinates.flat(2);
+  return area.geometries.flatMap(areaPoints);
+}
+
+/** A year chosen on a slider, which passes through 0: signed years have none (ADR 0051), so 0 is passed over in the
+ * direction the slider moved, from AD 1 down to 1 BC or from 1 BC up to AD 1. Keys move one step, so it must never
+ * stick. */
+export function skipYearZero(next: number, current: number): number {
+  if (next !== 0) return next;
+  return current > 0 ? -1 : 1;
 }

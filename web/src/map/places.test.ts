@@ -5,6 +5,8 @@ import {
   bounds,
   canMap,
   classLevelText,
+  areaBounds,
+  areaText,
   attestedText,
   datingText,
   emptyReason,
@@ -12,10 +14,13 @@ import {
   placesUnder,
   recordLinkText,
   safeLink,
+  skipYearZero,
   sourceLine,
   stateText,
+  thenState,
   untilText,
   whereText,
+  withThen,
   yearText,
 } from "./places";
 
@@ -231,5 +236,56 @@ describe("Pleiades places (ADR 0046)", () => {
     expect(classLevelText("Copper ore")).toBe("Copper ore mined here; which ore isn't recorded");
     const copper: SourceSummary = { id: "copper-ore", label: "Copper ore", regions: [], places: 118, worked: 118, class_level: true };
     expect(sourceLine(copper, true)).toBe("Copper ore, which ore isn't recorded: 118 ancient mines.");
+  });
+});
+
+describe("places against a preset's area and a year (ADR 0052)", () => {
+  const inside = { state: "worked" as const, worked_by_year: -1086, in_area: true };
+
+  it("marks a place inside as worked by then only when its year is no later", () => {
+    expect(thenState(inside, -1000)).toBe("worked");
+    expect(thenState(inside, -1086)).toBe("worked");
+    expect(thenState(inside, -1650)).toBe("present");
+    expect(thenState({ ...inside, worked_by_year: null }, 2026)).toBe("present");
+  });
+
+  it("marks a place outside the area as outside, whatever its year", () => {
+    expect(thenState({ ...inside, in_area: false }, 2026)).toBe("outside");
+  });
+
+  it("without an area, marks places by their state", () => {
+    expect([thenState({ state: "worked", worked_by_year: null }, null), thenState({ state: "present", worked_by_year: null }, null)]).toEqual([
+      "worked",
+      "present",
+    ]);
+  });
+
+  it("gives every feature its mark, for the map's layers", () => {
+    const features = {
+      type: "FeatureCollection" as const,
+      features: [{ type: "Feature" as const, geometry: { type: "Point" as const, coordinates: [32.89, 24.09] as [number, number] }, properties: { ...inside } as never }],
+    };
+    expect(withThen(features, -1650).features[0]?.properties).toMatchObject({ then: "present" });
+  });
+
+  it("says it in words in the popup", () => {
+    expect(areaText(inside, "Middle Kingdom Egypt", -1650)).toBe("Inside the area of Middle Kingdom Egypt, not known to be worked by 1650 BC");
+    expect(areaText(inside, "Middle Kingdom Egypt", -1000)).toBe("Inside the area of Middle Kingdom Egypt, and worked by 1000 BC");
+    expect(areaText({ ...inside, in_area: false }, "Middle Kingdom Egypt", -1650)).toBe("Outside the area of Middle Kingdom Egypt");
+  });
+
+  it("fits the map to the area, whether one polygon or several", () => {
+    const square = [[[0, 0], [2, 0], [2, 1], [0, 1], [0, 0]]];
+    expect(areaBounds({ type: "Polygon", coordinates: square })).toEqual([[0, 0], [2, 1]]);
+    expect(areaBounds({ type: "MultiPolygon", coordinates: [square, [[[5, -3], [6, -3], [6, -2], [5, -3]]]] })).toEqual([[0, -3], [6, 1]]);
+    expect(areaBounds({ type: "Polygon", coordinates: [] })).toBeNull();
+  });
+});
+
+describe("the year slider (ADR 0051, ADR 0019)", () => {
+  it("passes over year 0 in the direction it moved, so keys never stick", () => {
+    expect(skipYearZero(0, 1)).toBe(-1);
+    expect(skipYearZero(0, -1)).toBe(1);
+    expect([skipYearZero(-1650, -1651), skipYearZero(300, 299)]).toEqual([-1650, 300]);
   });
 });

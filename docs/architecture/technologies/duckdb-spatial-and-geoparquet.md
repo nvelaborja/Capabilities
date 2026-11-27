@@ -31,7 +31,9 @@
 - **Making occurrences.** The `source_occurrences` mart turns each matched MRDS deposit's longitude and latitude into `ST_Point(longitude, latitude)` ([data pipeline](../data-pipeline.md), [ADR 0041](../../adr/0041-place-sources-with-mrds-deposits-through-a-crosswalk.md)).
 - **Checking them.** The `occurrences_are_valid_points` test fails the build if any geometry is invalid or out of range.
 - **Publishing them.** dbt-duckdb writes the mart to `build/graph/source_occurrences.parquet`. With the extension loaded, that is a GeoParquet file with CRS84 points and a bounding box, so any GIS tool can open it.
-- **Next.** The occurrences API and map (M1) read this file. In M4, profile areas (polygons) and polity borders will use `ST_Contains` to work out which occurrences lie inside a profile ([ADR 0036](../../adr/0036-place-sources-and-profiles-in-space-and-time.md)).
+- **Reading Cliopatria's borders.** The download reads Cliopatria's GeoJSON with `ST_Read` (GDAL underneath) and keeps each row's polygons as WKB with `ST_AsWKB`, every coordinate unchanged; staging turns them back into geometries with `ST_GeomFromWKB` ([ADR 0052](../../adr/0052-give-profiles-a-cliopatria-place-and-years-and-find-their-sources-on-the-map.md)).
+- **Making profile areas.** The `profile_areas` mart joins each profile's place to Cliopatria's rows that overlap its years and unions their polygons with `ST_Union_Agg`. It also writes the area as GeoJSON (`ST_AsGeoJSON`), so the app can draw it without a spatial library. `profile_areas_are_valid` checks each with `ST_IsValid`.
+- **Finding what is inside.** The `profile_occurrences` mart keeps each occurrence for which `ST_Contains(area, point)` holds, and `profile_sources` counts them by source kind: had, or maybe ([ADR 0052](../../adr/0052-give-profiles-a-cliopatria-place-and-years-and-find-their-sources-on-the-map.md)).
 
 Why: [ADR 0036](../../adr/0036-place-sources-and-profiles-in-space-and-time.md) chose DuckDB spatial so that spatial work stays in the same engine and the same dbt project, with no PostGIS server. GeoParquet is the open format the rest of the geospatial world reads. In M5 the same data moves to Iceberg tables ([ADR 0036](../../adr/0036-place-sources-and-profiles-in-space-and-time.md) allows GeoParquet or Iceberg geometry columns).
 
@@ -41,9 +43,11 @@ Why: [ADR 0036](../../adr/0036-place-sources-and-profiles-in-space-and-time.md) 
 |---|---|
 | Loading the extension for dbt | `pipeline/dbt/profiles.yml` (`extensions: [spatial]`) |
 | Making the points | `pipeline/dbt/models/marts/source_occurrences.sql` |
-| The geometry test | `pipeline/dbt/tests/occurrences_are_valid_points.sql` |
-| The output | `build/graph/source_occurrences.parquet` (generated) |
-| Tests that read it back | `pipeline/tests/test_upstream.py` |
+| Reading Cliopatria's GeoJSON | `CliopatriaPolities.convert` in `pipeline/src/capabilities_pipeline/upstream.py` |
+| Areas, and what is inside them | `pipeline/dbt/models/marts/profile_areas.sql`, `profile_occurrences.sql`, `profile_sources.sql` |
+| The geometry tests | `pipeline/dbt/tests/occurrences_are_valid_points.sql`, `profile_areas_are_valid.sql` |
+| The output | `build/graph/source_occurrences.parquet`, `profile_areas.parquet` (generated) |
+| Tests that read it back | `pipeline/tests/test_upstream.py`, `pipeline/tests/test_profiles.py` |
 
 ```python
 import duckdb
@@ -63,6 +67,8 @@ con.sql("select * from parquet_kv_metadata('build/graph/source_occurrences.parqu
 - **The first build on a new machine downloads the extension** (a one-time network call, then cached). If it can't, the build fails at the first spatial function.
 - **An empty file has no GeoParquet metadata.** DuckDB writes `geo` metadata only when there are rows, so with no MRDS snapshot `geometry` reads back as plain WKB bytes. Cast it, `geometry::geometry`, before using `ST_` functions; the cast also works on a real geometry. Skip the row of nulls that dbt-duckdb writes for an empty model (`where id is not null`).
 - **Longitude first**, always: `ST_Point(longitude, latitude)`.
+- **A Python connection loads the extension itself.** dbt-duckdb loads it for the models; code that calls `ST_` functions on its own connection (the Cliopatria download, a test) runs `install_extension("spatial")` and `load_extension("spatial")` first.
+- **Repeated polygons compress well.** An entity's rows often share most of their borders: Cliopatria's 64 MB of WKB is 1.7 MB as Parquet with zstd.
 - **Degrees aren't distances.** Don't compare `ST_Distance` results on CRS84 points with kilometres.
 - Our `longitude` and `latitude` columns duplicate the point, so readers without a spatial library (the web app's JSON, a quick query) don't need one.
 

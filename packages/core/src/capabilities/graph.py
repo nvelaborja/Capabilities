@@ -129,6 +129,9 @@ class Graph:
     upstream_nodes: dict[str, dict] = field(default_factory=dict)
     # Each cited work checked against OpenAlex and Crossref (ADR 0047), by citation. Empty for the curated graph.
     reference_checks: dict[str, dict] = field(default_factory=dict)
+    # Each profile's area, and the sources found inside it with their availability (ADR 0052), by profile id: what a
+    # build works out from the profile's place and years. Empty for the curated graph, whose profiles are their lists.
+    profile_places: dict[str, dict] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         self.routes_achieving: dict[str, list[str]] = {}

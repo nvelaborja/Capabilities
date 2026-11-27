@@ -20,7 +20,7 @@ import { useTheme } from "./state/theme";
 import { current, trailReducer } from "./state/trail";
 import { decodeSelection, encodeSelection } from "./state/url";
 import { useExplore } from "./state/useExplore";
-import { usePresetItems } from "./state/usePresetItems";
+import { usePresetProfile } from "./state/usePresetProfile";
 import { useSelectionHistory } from "./state/useSelectionHistory";
 
 // MapLibre is large, so the map loads only when it is first opened.
@@ -38,7 +38,7 @@ export function App() {
   const [graphActions, setGraphActions] = useState<string[]>(linkedActions);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const { selection, canUndo, canRedo, dispatch } = useSelectionHistory();
-  const presetItems = usePresetItems(selection.preset);
+  const { profile: presetProfile, items: presetItems } = usePresetProfile(selection.preset);
   const request = useMemo(() => toRequest(selection), [selection]);
   const explore = useExplore(request);
   const { preference, choose, theme } = useTheme();
@@ -174,7 +174,7 @@ export function App() {
             }
           >
             <Suspense fallback={<p className="notice">Loading the map…</p>}>
-              <MapView id={mapped} theme={theme} onClose={() => setMapped(null)} />
+              <MapView id={mapped} profile={presetProfile?.map ? presetProfile.id : null} theme={theme} onClose={() => setMapped(null)} />
             </Suspense>
           </ErrorBoundary>
         )}
@@ -206,6 +206,7 @@ export function App() {
         <SidePane
           profiles={profiles}
           preset={selection.preset}
+          presetProfile={presetProfile}
           edited={isEdited(selection)}
           explore={explore.data}
           catalog={catalog}

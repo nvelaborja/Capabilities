@@ -69,6 +69,25 @@ class TestBrokenData:
                 "proposed_by: 'someone' does not match",
             ),
             (
+                # A profile's years are signed and run forward (ADR 0051, ADR 0052).
+                "data/profiles/backwards.yaml",
+                "id: backwards\nkind: profile\nlabel: X\nplace: { cliopatria: Middle Kingdom of Egypt }\n"
+                "years: [-1650, -2050]\nincludes: [{ id: copper }]\n",
+                "has low > high",
+            ),
+            (
+                "data/profiles/year-zero.yaml",
+                "id: year-zero\nkind: profile\nlabel: X\nplace: { cliopatria: Roman Empire }\nyears: [0, 14]\n"
+                "includes: [{ id: copper }]\n",
+                "schema",
+            ),
+            (
+                # A place needs its years, and years their place: neither means anything alone.
+                "data/profiles/placeless.yaml",
+                "id: placeless\nkind: profile\nlabel: X\nyears: [-2050, -1650]\nincludes: [{ id: copper }]\n",
+                "schema",
+            ),
+            (
                 "data/things/materials/wrong-name.yaml",
                 "id: something-else\nkind: material\nlabel: X\norigin: produced\n",
                 "does not match the file name",

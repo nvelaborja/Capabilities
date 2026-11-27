@@ -137,6 +137,15 @@ references:                           # at least one
 
 A curated set of things a group is known to have made (`{ id: copper-saw }`) or done (`{ verb: cut, target: granite }`), including natural resources they had access to. Each item can carry its own references.
 
+A profile can also say where and when the group was ([ADR 0052](adr/0052-give-profiles-a-cliopatria-place-and-years-and-find-their-sources-on-the-map.md)), always both:
+
+```yaml
+place: { cliopatria: Middle Kingdom of Egypt }   # an entity of Cliopatria, by its name as Cliopatria writes it
+years: [-2050, -1650]                            # signed years, inclusive (negative is BCE, no year 0)
+```
+
+The profile's area is the union of the entity's polygons in every Cliopatria row whose years overlap the profile's; the build stops if there is none (a misspelt name, or years when the entity had no borders). Each source kind with a mapped place inside the area is **had** (`yes`) if one of those places was worked by the profile's last year, and a **maybe** if none is known to have been. A had source joins the profile's selection as though it were listed; a maybe is shown, never assumed. An ore class (a mine that doesn't say which ore) is shown but never added. The list still wins: a listed source is had wherever the map puts it. `period` and `region` stay as labels for people.
+
 ### Crosswalk (`data/crosswalks/*.csv`)
 
 A hand-kept table that matches records in an upstream dataset to our ids ([ADR 0034](adr/0034-build-the-graph-from-upstream-datasets-and-a-curated-layer.md)). It is CSV rather than YAML because it is a table, and the build loads it as written. There are three:
@@ -318,7 +327,7 @@ The reasoner in `src/capabilities/reasoner.py` follows these rules.
 
 ### Selected, implied, reachable
 
-- **Selected:** what the user says was made or done (from a profile, plus or minus their own choices).
+- **Selected:** what the user says was made or done (from a profile, plus or minus their own choices). A profile with a place also starts with the sources worked inside its area by its last year ([ADR 0052](adr/0052-give-profiles-a-cliopatria-place-and-years-and-find-their-sources-on-the-map.md)).
 - **Hypothetical:** what-if additions. They are treated like selections but reported separately.
 - **Implied:** what every route to a selected item needs, recursively. For example, anyone who had tin bronze had copper, a crucible, and heat of at least 1085 °C. Having something also implies the capability of making it: the techniques shared by all its routes are listed as implied.
 - **Reachable:** everything that can be made or extracted from selected + implied + ubiquitous sources and materials, repeating until nothing new appears. Cycles (heat needs charcoal, charcoal needs a fire) are fine.

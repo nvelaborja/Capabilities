@@ -57,3 +57,4 @@ Each file records one significant design decision: the context, what we decided,
 | [0049](0049-have-agents-quote-sources-for-unverified-routes.md) | Have agents quote sources for routes whose references are all unverified | Accepted |
 | [0050](0050-report-withdraw-and-recheck-agent-facts.md) | Report facts as GitHub issues, withdraw agents' facts into a file, and re-check them only when an admin asks | Accepted |
 | [0051](0051-write-dates-as-signed-years-and-date-workings-from-periods-and-curated-dates.md) | Write dates as signed years, and date workings from Pleiades' periods and curated dates | Accepted |
+| [0052](0052-give-profiles-a-cliopatria-place-and-years-and-find-their-sources-on-the-map.md) | Give profiles a Cliopatria place and years, and find their sources on the map | Accepted |

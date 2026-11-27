@@ -1,15 +1,18 @@
 import type { ReactNode } from "react";
 
-import type { ExploreResponse, Profile } from "../api/types";
+import type { ExploreResponse, Profile, ProfileDetail } from "../api/types";
 import type { Catalog } from "../catalog";
 import { CapabilityList } from "./CapabilityList";
 import { selectedChips, withinReach } from "./groups";
+import { MapPlace } from "./MapPlace";
 import { PresetPicker } from "./PresetPicker";
 import "./panes.css";
 
 interface SidePaneProps {
   profiles: Profile[];
   preset: string | null;
+  /** The preset's profile, with its area and the sources found there, once loaded. */
+  presetProfile: ProfileDetail | null;
   edited: boolean;
   explore: ExploreResponse | null;
   catalog: Catalog;
@@ -27,7 +30,7 @@ interface SidePaneProps {
  * its own, and the gap between them resizes them.
  */
 export function SidePane(props: SidePaneProps) {
-  const { profiles, preset, edited, explore, catalog, onChoosePreset, onClear, onRemove, onPick, splitter } = props;
+  const { profiles, preset, presetProfile, edited, explore, catalog, onChoosePreset, onClear, onRemove, onPick, splitter } = props;
   const chosen = explore ? selectedChips(explore, catalog) : [];
   const following = explore ? withinReach(explore, catalog) : [];
 
@@ -35,6 +38,7 @@ export function SidePane(props: SidePaneProps) {
     <div className="side-column">
       <aside className="selection-pane" aria-label="Selection">
         <PresetPicker profiles={profiles} preset={preset} edited={edited} onChoose={onChoosePreset} />
+        {presetProfile?.map && <MapPlace place={presetProfile.map} explore={explore} onPick={onPick} />}
         {explore && explore.warnings.length > 0 && (
           <ul className="warnings" aria-label="Warnings">
             {explore.warnings.map((warning) => (

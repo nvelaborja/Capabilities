@@ -217,6 +217,9 @@ class _Checker:
 
     def check_profile(self, profile_id: str, profile: dict) -> None:
         where = f"profile {profile_id}"
+        # Whether the place names a Cliopatria entity with borders in these years needs the snapshot: the build checks.
+        if "years" in profile:
+            self.check_range(where, profile["years"])
         for item in profile["includes"]:
             if "id" in item:
                 if self.g.kind(item["id"]) not in HELD_KINDS:
