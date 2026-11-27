@@ -1,6 +1,6 @@
 # 0052. Give profiles a Cliopatria place and years, and find their sources on the map
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-27
 
 ## Context
