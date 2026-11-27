@@ -2,8 +2,9 @@
 -- One row per item, most valuable first within each kind:
 --   reported                  a fact readers reported as wrong on GitHub, one item per fact. First: a report is someone
 --                             telling us the graph is wrong (ADR 0050)
---   date_unknown              a mine, quarry or deposit inside a profile's area, of a source the profile only "maybe" had:
---                             a cited date that it was worked by the profile's last year would make it a yes (ADR 0052)
+--   date_unknown              a mine, quarry or deposit inside a profile's area, of a source the profile only "maybe" had
+--                             and doesn't list: a cited date that it was worked by the profile's last year would make it a
+--                             yes (ADR 0052)
 --   ore_candidate             a mineral MRDS lists as an ore on many copper, iron or tin deposits, not yet reviewed
 --   extracted_without_route   a material said to be extracted that no route extracts
 --   source_without_places     a regional source with no mapped places
@@ -197,8 +198,9 @@ reports as (
 ),
 
 -- Places a dated working would change an answer for: inside a profile's area, of a source with no working known there by
--- the profile's last year. One item per upstream record, which can be an occurrence of several source kinds; the more
--- profiles it would answer for, the higher.
+-- the profile's last year. Not of a source the profile lists, which it has anyway, nor of an ore class, which is never
+-- added (ADR 0052). One item per upstream record, which can be an occurrence of several source kinds; the more profiles
+-- it would answer for, the higher.
 undated as (
     select
         occurrences.dataset,
@@ -216,6 +218,10 @@ undated as (
     join nodes as profiles on profiles.id = inside.profile_id
     join nodes as source_nodes on source_nodes.id = occurrences.source_id
     where sources.availability = 'maybe'
+        and sources.source_kind = 'source'
+        and not list_contains(
+            coalesce(json_extract_string(profiles.document, '$.includes[*].id'), []), inside.source_id
+        )
     group by occurrences.dataset, occurrences.record_id
 ),
 

@@ -14,6 +14,7 @@ import {
   placesUnder,
   recordLinkText,
   safeLink,
+  skipYearZero,
   sourceLine,
   stateText,
   thenState,
@@ -278,5 +279,13 @@ describe("places against a preset's area and a year (ADR 0052)", () => {
     expect(areaBounds({ type: "Polygon", coordinates: square })).toEqual([[0, 0], [2, 1]]);
     expect(areaBounds({ type: "MultiPolygon", coordinates: [square, [[[5, -3], [6, -3], [6, -2], [5, -3]]]] })).toEqual([[0, -3], [6, 1]]);
     expect(areaBounds({ type: "Polygon", coordinates: [] })).toBeNull();
+  });
+});
+
+describe("the year slider (ADR 0051, ADR 0019)", () => {
+  it("passes over year 0 in the direction it moved, so keys never stick", () => {
+    expect(skipYearZero(0, 1)).toBe(-1);
+    expect(skipYearZero(0, -1)).toBe(1);
+    expect([skipYearZero(-1650, -1651), skipYearZero(300, 299)]).toEqual([-1650, 300]);
   });
 });

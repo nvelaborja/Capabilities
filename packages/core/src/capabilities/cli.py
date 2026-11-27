@@ -22,7 +22,7 @@ from .built import (
     run_build,
 )
 from .graph import Graph, LoadError, find_root
-from .profiles import place_view, profile_selection
+from .profiles import added_by_map, place_view, profile_selection
 from .reasoner import Backward, Selection, assess_job, closure, explore, need_tree
 from .validate import validate
 from .withdraw import WithdrawError, withdraw_ore_row, withdraw_reference
@@ -272,6 +272,10 @@ def cmd_explore(args, root: Path) -> int:
     selected, what_if = build_selection(graph, args.profile, args.select, args.deselect, args.hypothetical)
     result = explore(graph, selected, what_if).to_dict(graph)
     if args.json:
+        if args.profile:
+            # As the API says it: what the map found, and the sources it added that weren't deselected (ADR 0052).
+            result["place"] = place_view(graph, args.profile)
+            result["from_map"] = [source for source in added_by_map(graph, args.profile) if source in selected.things]
         print(json.dumps(result, indent=2, ensure_ascii=False))
         return 0
     section("Selected (confirmed made or done)", result["selected"])

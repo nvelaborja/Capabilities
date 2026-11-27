@@ -195,6 +195,8 @@ def definitions(root: Path, build_dir: Path) -> Definitions:
         and the run says so: the asset's metadata names the copy used and the error."""
         snapshot, error = fetch_or_fall_back(dataset, root, build_dir, url)
         metadata = {key: snapshot[key] for key in ("rows", "retrieved_at", "sha256", "url", "license")}
+        # A dataset published in releases (Cliopatria) says which one, and the file it came from (ADR 0052).
+        metadata |= {key: snapshot[key] for key in ("release", "archive") if snapshot.get(key)}
         metadata["copy"] = snapshot.get("copy", "download")
         if error:
             context.log.warning(f"Couldn't download {dataset.name} ({error}); using the cold backup of {snapshot['retrieved_at']}.")

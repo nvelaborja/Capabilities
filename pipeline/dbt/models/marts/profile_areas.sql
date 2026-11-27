@@ -22,7 +22,8 @@ areas as (
         -- The years Cliopatria's rows cover, which can start before the profile's and end after them.
         min(polities.from_year) as cliopatria_from_year,
         max(polities.to_year) as cliopatria_to_year,
-        any_value(polities.wikidata) as wikidata,
+        -- Rows of one entity can carry different items: the latest row's, so every build gives the same one.
+        arg_max(polities.wikidata, polities.to_year) as wikidata,
         st_union_agg(polities.geometry) as geometry
     from places
     join polities

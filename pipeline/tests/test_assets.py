@@ -185,6 +185,10 @@ class TestMaterializing:
         assert {PLEIADES_SNAPSHOT, PLEIADES_RAW, PLEIADES_RULES, PLEIADES_STAGING} <= materialized
         assert {PERIODS_SNAPSHOT, PERIODS_RAW, PERIODS_STAGING} <= materialized
         assert {CLIOPATRIA_SNAPSHOT, CLIOPATRIA_RAW, CLIOPATRIA_STAGING, PROFILE_AREAS, PROFILE_SOURCES} <= materialized
+        # The run says which Cliopatria release it downloaded, and from where (ADR 0052).
+        cliopatria = next(event for event in result.get_asset_materialization_events() if event.asset_key == CLIOPATRIA_SNAPSHOT)
+        metadata = cliopatria.materialization.metadata
+        assert metadata["release"].value == "v0.2.2" and metadata["archive"].value.endswith("/v0.2.2/cliopatria.geojson.zip")
         assert {REFERENCES_SNAPSHOT, REFERENCES_RAW, CHECKS} <= materialized
 
     def test_offline_a_download_falls_back_to_the_cold_backup_and_says_so(self, dagster_build, wikidata_endpoint):

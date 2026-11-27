@@ -22,6 +22,7 @@ import {
   placesUnder,
   recordLinkText,
   safeLink,
+  skipYearZero,
   sourceLine,
   stateText,
   whereText,
@@ -111,8 +112,7 @@ function YearControl({ area, year, onChange }: { area: ProfileArea; year: number
         max={new Date().getFullYear()}
         step={1}
         value={year}
-        // Signed years have no year 0 (ADR 0051): the slider's 0 is read as AD 1.
-        onChange={(event) => onChange(Number(event.target.value) || 1)}
+        onChange={(event) => onChange(skipYearZero(Number(event.target.value), year))}
       />
       <p className="muted">
         Moving the year recolours the map only. The preset's answers use {yearText(last)}, its last year.

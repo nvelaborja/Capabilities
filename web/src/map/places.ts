@@ -231,3 +231,11 @@ function areaPoints(area: AreaGeometry): number[][] {
   if (area.type === "MultiPolygon") return area.coordinates.flat(2);
   return area.geometries.flatMap(areaPoints);
 }
+
+/** A year chosen on a slider, which passes through 0: signed years have none (ADR 0051), so 0 is passed over in the
+ * direction the slider moved, from AD 1 down to 1 BC or from 1 BC up to AD 1. Keys move one step, so it must never
+ * stick. */
+export function skipYearZero(next: number, current: number): number {
+  if (next !== 0) return next;
+  return current > 0 ? -1 : 1;
+}
