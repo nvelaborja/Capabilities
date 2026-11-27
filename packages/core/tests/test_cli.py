@@ -22,6 +22,14 @@ class TestCli:
         assert "steel" in result["reachable"]
         assert result["hypothetical"] == ["hematite"]
 
+    def test_explore_says_where_a_profile_is_and_what_the_map_found(self, repo_root, built_dir, capsys):
+        assert main(["--root", str(repo_root), "--build-dir", str(built_dir), "explore", "--profile", "middle-kingdom-egypt"]) == 0
+        out = capsys.readouterr().out
+        assert "From the map: Middle Kingdom of Egypt (Cliopatria v" in out and "2050 BC to 1650 BC" in out
+        # Granite outcrops are listed, whatever the map says about them (ADR 0052).
+        granite = next(line for line in out.splitlines() if "Granite outcrop:" in line)
+        assert granite.strip().startswith(("yes", "maybe")) and "listed" in granite
+
     def test_deselect_removes_profile_items(self, repo_root, built_dir, capsys):
         main(["--root", str(repo_root), "--build-dir", str(built_dir), "explore", "--profile", "middle-kingdom-egypt", "--deselect", "copper-saw", "--json"])
         assert "copper-saw" not in json.loads(capsys.readouterr().out)["selected"]

@@ -20,6 +20,9 @@ from capabilities.built import (
     MANIFEST_FILE,
     NODES_FILE,
     OCCURRENCES_FILE,
+    PROFILE_AREAS_FILE,
+    PROFILE_OCCURRENCES_FILE,
+    PROFILE_SOURCES_FILE,
     QUEUE_FILE,
     fingerprint,
     graph_dir,
@@ -59,7 +62,8 @@ def write_manifest(root: Path, build_dir: Path) -> dict:
         "git_commit": git_commit(root),
         "tables": {
             name: row_count(graph_dir(build_dir) / name)
-            for name in (NODES_FILE, FACTS_FILE, OCCURRENCES_FILE, QUEUE_FILE, CHECKS_FILE)
+            for name in (NODES_FILE, FACTS_FILE, OCCURRENCES_FILE, QUEUE_FILE, CHECKS_FILE, PROFILE_AREAS_FILE,
+                         PROFILE_OCCURRENCES_FILE, PROFILE_SOURCES_FILE)
         },
         "upstream": loaded_snapshots(build_dir),
     }
@@ -128,10 +132,14 @@ def loaded_snapshots(build_dir: Path) -> dict[str, dict]:
     with duckdb.connect(str(build_dir / WAREHOUSE_FILE)) as connection:
         rows = connection.execute(
             "select dataset, url, strftime(retrieved_at at time zone 'UTC', '%Y-%m-%dT%H:%M:%SZ'), sha256, row_count, "
-            "license, copy from raw.upstream_snapshots order by dataset"
+            "license, copy, release from raw.upstream_snapshots order by dataset"
         ).fetchall()
-    keys = ("url", "retrieved_at", "sha256", "rows", "license", "copy")
-    return {dataset: dict(zip(keys, values)) for dataset, *values in rows}
+    keys = ("url", "retrieved_at", "sha256", "rows", "license", "copy", "release")
+    # Only a dataset published in numbered releases (Cliopatria) has one.
+    return {
+        dataset: {key: value for key, value in zip(keys, values) if key != "release" or value}
+        for dataset, *values in rows
+    }
 
 
 def dbt_environment(build_dir: Path) -> None:

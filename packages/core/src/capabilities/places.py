@@ -47,21 +47,26 @@ class NotPlaceable(Exception):
 
 @dataclass
 class Places:
-    """Every occurrence, grouped by source kind, and the upstream snapshots they came from."""
+    """Every occurrence, grouped by source kind, the upstream snapshots they came from, and which are inside each
+    profile's area, with whether each was worked by the profile's last year (ADR 0052)."""
 
     by_source: dict[str, list[dict]] = field(default_factory=dict)
     snapshots: dict[str, dict] = field(default_factory=dict)
+    inside: dict[str, dict[str, bool]] = field(default_factory=dict)
 
     @classmethod
-    def from_rows(cls, rows: list[dict], snapshots: dict[str, dict] | None = None) -> "Places":
+    def from_rows(
+        cls, rows: list[dict], snapshots: dict[str, dict] | None = None, inside: dict[str, dict[str, bool]] | None = None
+    ) -> "Places":
         grouped: dict[str, list[dict]] = defaultdict(list)
         for row in rows:
             grouped[row["source_id"]].append(row)
-        return cls(dict(grouped), snapshots or {})
+        return cls(dict(grouped), snapshots or {}, inside or {})
 
 
-def places_view(graph: Graph, places: Places, thing_id: str) -> dict:
-    """Where a material or source is found: a summary of each source, the datasets, and every place as GeoJSON."""
+def places_view(graph: Graph, places: Places, thing_id: str, profile_id: str | None = None) -> dict:
+    """Where a material or source is found: a summary of each source, the datasets, and every place as GeoJSON. With a
+    profile that has a place, its area too, and each place says whether it is inside."""
     kind = graph.kind(thing_id)
     if kind == "source":
         sources = [thing_id]
@@ -71,6 +76,8 @@ def places_view(graph: Graph, places: Places, thing_id: str) -> dict:
             sources += sorted(classes_with_places(graph, places, thing_id), key=graph.label)
     else:
         raise NotPlaceable(thing_id)
+    area = profile_area(graph, profile_id)
+    inside = places.inside.get(profile_id, {}) if area else None
     return {
         "id": thing_id,
         "label": graph.label(thing_id),
@@ -78,13 +85,29 @@ def places_view(graph: Graph, places: Places, thing_id: str) -> dict:
         "origin": graph.things[thing_id].get("origin"),
         "sources": [source_summary(graph, source, places.by_source.get(source, [])) for source in sources],
         "datasets": datasets(places.snapshots),
+        "profile": area,
         "features": {
             "type": "FeatureCollection",
             "features": [
-                feature(row, class_level=graph.kind(source) == "category")
+                feature(row, class_level=graph.kind(source) == "category", inside=inside)
                 for source in sources for row in places.by_source.get(source, [])
             ],
         },
+    }
+
+
+def profile_area(graph: Graph, profile_id: str | None) -> dict | None:
+    """The profile's area for the map, and the years it is compared with; None without a profile or a place."""
+    place = graph.profile_places.get(profile_id) if profile_id else None
+    if not place:
+        return None
+    return {
+        "id": profile_id,
+        "label": graph.profiles[profile_id]["label"],
+        "cliopatria": place["cliopatria"],
+        "release": place["cliopatria_release"],
+        "years": [place["from_year"], place["to_year"]],
+        "area": place["geojson"],
     }
 
 
@@ -118,9 +141,13 @@ def datasets(snapshots: dict[str, dict]) -> list[dict]:
     ]
 
 
-def feature(row: dict, class_level: bool = False) -> dict:
+def feature(row: dict, class_level: bool = False, inside: dict[str, bool] | None = None) -> dict:
+    """A place as a GeoJSON point. With a profile's area, `in_area` says whether it is inside (ADR 0052)."""
+    properties = {**{key: row[key] for key in FEATURE_PROPERTIES}, "class_level": class_level}
+    if inside is not None:
+        properties["in_area"] = row["id"] in inside
     return {
         "type": "Feature",
         "geometry": {"type": "Point", "coordinates": [row["longitude"], row["latitude"]]},
-        "properties": {**{key: row[key] for key in FEATURE_PROPERTIES}, "class_level": class_level},
+        "properties": properties,
     }

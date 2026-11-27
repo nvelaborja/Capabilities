@@ -21,12 +21,15 @@ from pathlib import Path
 from .graph import Graph, LoadError
 
 # Bump when the artifact's shape changes, so older builds are rebuilt rather than misread.
-FORMAT_VERSION = 5
+FORMAT_VERSION = 6
 NODES_FILE = "graph_nodes.parquet"
 FACTS_FILE = "graph_facts.parquet"
 QUEUE_FILE = "curation_queue.parquet"
 OCCURRENCES_FILE = "source_occurrences.parquet"
 CHECKS_FILE = "reference_checks.parquet"
+PROFILE_AREAS_FILE = "profile_areas.parquet"
+PROFILE_SOURCES_FILE = "profile_sources.parquet"
+PROFILE_OCCURRENCES_FILE = "profile_occurrences.parquet"
 MANIFEST_FILE = "manifest.json"
 SNAPSHOT_FILE = "snapshot.json"
 # Cold backups of every upstream dataset, kept in git, so the graph builds offline or when a download fails (ADR 0044).
@@ -116,11 +119,55 @@ def load_built(root: Path, build_dir: Path) -> Graph:
     graph = Graph.from_documents(root, ((node_type, json.loads(document), provenance) for node_type, document, provenance in rows))
     graph.facts = load_facts(build_dir)
     graph.reference_checks = load_reference_checks(build_dir)
+    graph.profile_places = load_profile_places(build_dir)
     for _, document, provenance in rows:
         source = json.loads(provenance)
         if source.get("layer") == "upstream":
             graph.upstream_nodes[json.loads(document)["id"]] = source
     return graph
+
+
+AREA_COLUMNS = ("id", "cliopatria", "from_year", "to_year", "cliopatria_rows", "cliopatria_from_year",
+                "cliopatria_to_year", "wikidata", "cliopatria_release", "geojson")
+SOURCE_COLUMNS = ("profile_id", "source_id", "source_kind", "availability", "worked_by_then", "not_known_worked",
+                  "examples")
+
+
+def load_profile_places(build_dir: Path) -> dict[str, dict]:
+    """Each profile's area and the sources found inside it (ADR 0052), by profile id. Empty for a build without them."""
+    import duckdb
+
+    areas, sources = graph_dir(build_dir) / PROFILE_AREAS_FILE, graph_dir(build_dir) / PROFILE_SOURCES_FILE
+    if not areas.is_file() or not sources.is_file():
+        return {}
+    places = {}
+    for row in duckdb.sql(
+        f"select {', '.join(AREA_COLUMNS)} from read_parquet(?) where id is not null order by id", params=[str(areas)]
+    ).fetchall():
+        area = dict(zip(AREA_COLUMNS, row))
+        places[area["id"]] = {**area, "geojson": json.loads(area["geojson"]), "sources": []}
+    for row in duckdb.sql(
+        f"select {', '.join(SOURCE_COLUMNS)} from read_parquet(?) where id is not null order by profile_id, source_id",
+        params=[str(sources)],
+    ).fetchall():
+        source = dict(zip(SOURCE_COLUMNS, row))
+        places[source.pop("profile_id")]["sources"].append(source)
+    return places
+
+
+def load_profile_occurrences(build_dir: Path) -> dict[str, dict[str, bool]]:
+    """The occurrences inside each profile's area, and whether each was worked by its last year (ADR 0052)."""
+    import duckdb
+
+    path = graph_dir(build_dir) / PROFILE_OCCURRENCES_FILE
+    if not path.is_file():
+        return {}
+    inside: dict[str, dict[str, bool]] = {}
+    for profile_id, occurrence_id, worked in duckdb.sql(
+        "select profile_id, occurrence_id, worked_by_then from read_parquet(?) where id is not null", params=[str(path)]
+    ).fetchall():
+        inside.setdefault(profile_id, {})[occurrence_id] = worked
+    return inside
 
 
 FACT_COLUMNS = ("id", "layer", "value", "curated_value", "upstream_value", "disagrees", "upstream", "override")

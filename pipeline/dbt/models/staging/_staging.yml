@@ -28,3 +28,24 @@ models:
           - accepted_values:
               arguments:
                 values: [before, after]
+  - name: stg_cliopatria__polities
+    description: Cliopatria's borders, typed, with empty fields as nulls and polygons as geometries (ADR 0052).
+    columns:
+      - name: name
+        data_tests: [not_null]
+      - name: type
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [POLITY, RELATION]
+  - name: stg_curated__profile_places
+    description: Each profile's Cliopatria entity and years, for profiles that have a place (ADR 0052).
+    columns:
+      - name: id
+        data_tests: [unique, not_null]
+      - name: cliopatria
+        data_tests: [not_null]
+      - name: from_year
+        data_tests: [not_null]
+      - name: to_year
+        data_tests: [not_null]

@@ -22,6 +22,7 @@ from .built import (
     run_build,
 )
 from .graph import Graph, LoadError, find_root
+from .profiles import place_view, profile_selection
 from .reasoner import Backward, Selection, assess_job, closure, explore, need_tree
 from .validate import validate
 from .withdraw import WithdrawError, withdraw_ore_row, withdraw_reference
@@ -121,7 +122,7 @@ def build_selection(graph: Graph, profile: str | None, select: list[str], desele
     if profile:
         if profile not in graph.profiles:
             raise UsageError(f"unknown profile {profile!r}. Known: {', '.join(sorted(graph.profiles))}")
-        selected = Selection.from_profile(graph.profiles[profile])
+        selected = profile_selection(graph, profile)
     selected = (selected | Selection.parse(select)) - Selection.parse(deselect)
     what_if = Selection.parse(hypothetical)
     unknown = (selected | what_if).unknown_ids(graph)
@@ -245,6 +246,27 @@ def cmd_need(args, root: Path) -> int:
     return 0
 
 
+def print_place(place: dict) -> None:
+    """Where the profile is, and the sources found there (ADR 0052): had, or only present."""
+    first, last = place["years"]
+    print(f"From the map: {place['cliopatria']} (Cliopatria {place['release']}), {year_text(first)} to {year_text(last)}")
+    for source in place["sources"]:
+        if source["availability"] == "yes":
+            how = "listed" if source["listed"] else ("had" if source["from_map"] else "an ore class: add the ore's source")
+            print(f"  yes    {source['label']}: {source['worked_by_then']} worked by {year_text(last)} ({how})")
+        else:
+            listed = " (listed)" if source["listed"] else ""
+            print(f"  maybe  {source['label']}: {source['not_known_worked']} present, not known to be worked by then{listed}")
+    print()
+
+
+def year_text(year: int) -> str:
+    """A signed year as historians write it (ADR 0051): 550 BC, AD 300, 1860."""
+    if year < 0:
+        return f"{-year} BC"
+    return f"AD {year}" if year < 1000 else str(year)
+
+
 def cmd_explore(args, root: Path) -> int:
     graph = current_graph(root, args.build_dir)
     selected, what_if = build_selection(graph, args.profile, args.select, args.deselect, args.hypothetical)
@@ -253,6 +275,8 @@ def cmd_explore(args, root: Path) -> int:
         print(json.dumps(result, indent=2, ensure_ascii=False))
         return 0
     section("Selected (confirmed made or done)", result["selected"])
+    if args.profile and (place := place_view(graph, args.profile)):
+        print_place(place)
     if result["hypothetical"]:
         section("Hypothetical (what-if)", result["hypothetical"])
     print("Implied (needed by every route to something selected):")

@@ -39,7 +39,8 @@ models:
   - name: curation_queue
     description: >
       The gaps the build finds, as a to-do list (build/graph/curation_queue.parquet, ADR 0045): readers' reports
-      from GitHub issues, first (ADR 0050), ore candidates from
+      from GitHub issues, first (ADR 0050), places inside a profile's area that a cited date would make a yes (ADR
+      0052), ore candidates from
       MRDS, extracted materials with no route, sources with no places, routes with only unverified references, upstream
       disagreements, stale overrides, works not yet read (ADR 0047), and Pleiades places no rule matches.
     columns:
@@ -50,7 +51,7 @@ models:
           - not_null
           - accepted_values:
               arguments:
-                values: [reported, ore_candidate, extracted_without_route, source_without_places, route_unverified, upstream_disagreement, stale_override, unread_reference, unmatched_place]
+                values: [reported, date_unknown, ore_candidate, extracted_without_route, source_without_places, route_unverified, upstream_disagreement, stale_override, unread_reference, unmatched_place]
       - name: detail
         data_tests: [not_null]
   - name: source_occurrences
@@ -113,6 +114,48 @@ models:
           With a curated date, the note the dataset's year came with (for Pleiades, the period it was the end of), kept
           beside upstream_worked_by_year.
       - name: provenance
+        data_tests: [not_null]
+  - name: profile_areas
+    description: >
+      Each profile's area (build/graph/profile_areas.parquet, ADR 0052): the union of its Cliopatria entity's polygons
+      in the rows whose years overlap the profile's, with the years those rows cover, the Cliopatria release, and the
+      area as GeoJSON for the map.
+    columns:
+      - name: id
+        description: The profile's id.
+        data_tests: [unique, not_null]
+      - name: geojson
+        data_tests: [not_null]
+  - name: profile_occurrences
+    description: >
+      The occurrences inside each profile's area (build/graph/profile_occurrences.parquet, ADR 0052), and whether each
+      was worked by the profile's last year. The map marks them; profile_sources counts them.
+    columns:
+      - name: id
+        data_tests: [unique, not_null]
+      - name: occurrence_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('source_occurrences')
+                field: id
+  - name: profile_sources
+    description: >
+      Which sources each profile had, from the map (build/graph/profile_sources.parquet, ADR 0052): one row per profile
+      and source kind with occurrences inside its area. yes when one was worked by the profile's last year, maybe when
+      none is known to have been, with how many of each and a few examples. A source kind with nothing inside has no row.
+    columns:
+      - name: id
+        data_tests: [unique, not_null]
+      - name: availability
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['yes', maybe]
+      - name: source_kind
+        description: source, or category for an ore class (a mine that doesn't say which ore); only sources can be selected.
         data_tests: [not_null]
   - name: reference_checks
     description: >

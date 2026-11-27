@@ -14,10 +14,11 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from capabilities import __version__
-from capabilities.built import build_dir_for, current_graph, load_occurrences, read_manifest
+from capabilities.built import build_dir_for, current_graph, load_occurrences, load_profile_occurrences, read_manifest
 from capabilities.graph import Graph, find_root
 from capabilities.levels import compute_levels
 from capabilities.places import NotPlaceable, Places, places_view
+from capabilities.profiles import added_by_map, profile_selection, profile_view
 from capabilities.reasoner import Backward, Selection, assess_job, closure, explore, need_tree
 from capabilities.views import StatusContext, UnknownNode, explain, explain_edge, explore_view, graph_view, parse_action
 
@@ -63,7 +64,9 @@ def create_app(root: Path | None = None, web_dist: Path | None = None, build_dir
     build_dir = build_dir_for(root, build_dir)
     graph = current_graph(root, build_dir)
     levels = compute_levels(graph)
-    places = Places.from_rows(load_occurrences(build_dir), (read_manifest(build_dir) or {}).get("upstream", {}))
+    places = Places.from_rows(
+        load_occurrences(build_dir), (read_manifest(build_dir) or {}).get("upstream", {}), load_profile_occurrences(build_dir)
+    )
     api = APIRouter(prefix="/api")
     app = FastAPI(
         title="Capabilities",
@@ -78,7 +81,7 @@ def create_app(root: Path | None = None, web_dist: Path | None = None, build_dir
         if request.profile:
             if request.profile not in graph.profiles:
                 raise HTTPException(404, f"Unknown profile {request.profile!r}")
-            selected = Selection.from_profile(graph.profiles[request.profile])
+            selected = profile_selection(graph, request.profile)
         selected = (selected | Selection.parse(request.select)) - Selection.parse(request.deselect)
         what_if = Selection.parse(request.hypothetical)
         unknown = (selected | what_if).unknown_ids(graph)
@@ -121,7 +124,7 @@ def create_app(root: Path | None = None, web_dist: Path | None = None, build_dir
     def profile(profile_id: str) -> dict:
         if profile_id not in graph.profiles:
             raise HTTPException(404, f"Unknown profile {profile_id!r}")
-        return graph.profiles[profile_id]
+        return profile_view(graph, profile_id)
 
     @api.get("/jobs")
     def jobs() -> list[dict]:
@@ -152,11 +155,17 @@ def create_app(root: Path | None = None, web_dist: Path | None = None, build_dir
         return graph_view(graph, levels, extra)
 
     @api.get("/occurrences/{thing_id}")
-    def occurrences(thing_id: str) -> dict:
+    def occurrences(
+        thing_id: str,
+        profile: str | None = Query(None, description="Also mark which places are inside this profile's area (ADR 0052)."),
+    ) -> dict:
         """Where a material or source is found: each source it comes from, with how many places are known and how many
-        are known to have been worked, and every place as GeoJSON points (ADR 0036, ADR 0041)."""
+        are known to have been worked, and every place as GeoJSON points (ADR 0036, ADR 0041). With a profile that has a
+        place, its area, and whether each place is inside it and was worked by its last year."""
+        if profile is not None and profile not in graph.profiles:
+            raise HTTPException(404, f"Unknown profile {profile!r}")
         try:
-            return places_view(graph, places, thing_id)
+            return places_view(graph, places, thing_id, profile)
         except NotPlaceable:
             raise HTTPException(404, f"{thing_id!r} is not a material or a source") from None
 
@@ -164,7 +173,10 @@ def create_app(root: Path | None = None, web_dist: Path | None = None, build_dir
     def explore_endpoint(request: SelectionRequest) -> dict:
         """Q2: given what a group made or did, what else was within reach? Includes a status for every drawable node."""
         selected, what_if = selection(request)
-        return explore_view(graph, explore(graph, selected, what_if))
+        view = explore_view(graph, explore(graph, selected, what_if))
+        # The sources the profile had from the map (ADR 0052), as long as they weren't deselected.
+        from_map = added_by_map(graph, request.profile) if request.profile else []
+        return {**view, "from_map": [source for source in from_map if source in selected.things]}
 
     @api.post("/explain")
     def explain_endpoint(request: ExplainRequest) -> dict:

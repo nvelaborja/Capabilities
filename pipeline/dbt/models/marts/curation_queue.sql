@@ -2,6 +2,8 @@
 -- One row per item, most valuable first within each kind:
 --   reported                  a fact readers reported as wrong on GitHub, one item per fact. First: a report is someone
 --                             telling us the graph is wrong (ADR 0050)
+--   date_unknown              a mine, quarry or deposit inside a profile's area, of a source the profile only "maybe" had:
+--                             a cited date that it was worked by the profile's last year would make it a yes (ADR 0052)
 --   ore_candidate             a mineral MRDS lists as an ore on many copper, iron or tin deposits, not yet reviewed
 --   extracted_without_route   a material said to be extracted that no route extracts
 --   source_without_places     a regional source with no mapped places
@@ -194,8 +196,54 @@ reports as (
     group by reports.fact, case when reports.fact is null then reports.number end
 ),
 
+-- Places a dated working would change an answer for: inside a profile's area, of a source with no working known there by
+-- the profile's last year. One item per upstream record, which can be an occurrence of several source kinds; the more
+-- profiles it would answer for, the higher.
+undated as (
+    select
+        occurrences.dataset,
+        occurrences.record_id,
+        any_value(occurrences.name) as name,
+        any_value(occurrences.worked_by_year) as worked_by_year,
+        list(distinct profiles.label order by profiles.label) as profiles,
+        list(distinct occurrences.source_id order by occurrences.source_id) as sources,
+        list(distinct lower(source_nodes.label) order by lower(source_nodes.label)) as source_labels,
+        count(distinct inside.profile_id) as profile_count
+    from {{ ref('profile_occurrences') }} as inside
+    join {{ ref('profile_sources') }} as sources
+        on sources.profile_id = inside.profile_id and sources.source_id = inside.source_id
+    join {{ ref('source_occurrences') }} as occurrences on occurrences.id = inside.occurrence_id
+    join nodes as profiles on profiles.id = inside.profile_id
+    join nodes as source_nodes on source_nodes.id = occurrences.source_id
+    where sources.availability = 'maybe'
+    group by occurrences.dataset, occurrences.record_id
+),
+
+dates_unknown as (
+    select
+        'date_unknown' as kind,
+        dataset || ':' || record_id as subject,
+        coalesce(name, dataset || ' ' || record_id) as label,
+        'Inside the area of ' || array_to_string(profiles, ', ') || ', where no ' || array_to_string(source_labels, ' or ')
+            || ' is known to have been worked by then. '
+            || case
+                when worked_by_year is null then 'Its dataset gives no working date. '
+                -- Years as the app writes them (ADR 0051).
+                else 'Its dataset knows it was worked only by ' || case
+                    when worked_by_year < 0 then (-worked_by_year) || ' BC'
+                    when worked_by_year < 1000 then 'AD ' || worked_by_year
+                    else worked_by_year::varchar end || '. '
+            end
+            || 'If a work dates its working, add a date in data/dates/ with the reference.' as detail,
+        profile_count as priority,
+        json_object('dataset', dataset, 'record', record_id, 'profiles', profiles, 'sources', sources,
+                    'worked_by_year', worked_by_year) as evidence
+    from undated
+),
+
 queue as (
     select * from reports
+    union all select * from dates_unknown
     union all select * from ore_candidates
     union all select * from extracted_without_route
     union all select * from sources_without_places

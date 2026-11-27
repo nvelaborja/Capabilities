@@ -17,7 +17,7 @@ One page per technology the project uses. Each page teaches the technology, enou
 | YAML and JSON Schema | How the curated data is written and checked | [yaml-and-json-schema.md](yaml-and-json-schema.md) |
 | DuckDB | The analytical database the build runs in, and how the app reads the built graph | [duckdb.md](duckdb.md) |
 | Apache Parquet | The file format of the built graph | [parquet.md](parquet.md) |
-| DuckDB spatial and GeoParquet | Points for where sources are found, written as GeoParquet | [duckdb-spatial-and-geoparquet.md](duckdb-spatial-and-geoparquet.md) |
+| DuckDB spatial and GeoParquet | Points for where sources are found, profile areas from Cliopatria's borders, and which places are inside them | [duckdb-spatial-and-geoparquet.md](duckdb-spatial-and-geoparquet.md) |
 | dbt | Transforms and tests the data inside DuckDB | [dbt.md](dbt.md) |
 | Wikidata and SPARQL | Quantity values for our things, from one query to Wikidata | [wikidata-and-sparql.md](wikidata-and-sparql.md) |
 | OpenAlex and Crossref | Checking that cited works exist, and finding free copies to read | [openalex-and-crossref.md](openalex-and-crossref.md) |

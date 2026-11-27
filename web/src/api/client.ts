@@ -65,7 +65,9 @@ export const api = {
   },
 
   /** Where a material or source is found: its sources and every mapped place (ADR 0042). */
-  occurrences(id: string, signal?: AbortSignal): Promise<OccurrencesResponse> {
-    return request<OccurrencesResponse>(`/api/occurrences/${encodeURIComponent(id)}`, { signal });
+  /** Where a material or source is found; with a profile, also its area and which places are inside (ADR 0052). */
+  occurrences(id: string, signal?: AbortSignal, profile?: string | null): Promise<OccurrencesResponse> {
+    const query = profile ? `?profile=${encodeURIComponent(profile)}` : "";
+    return request<OccurrencesResponse>(`/api/occurrences/${encodeURIComponent(id)}${query}`, { signal });
   },
 };

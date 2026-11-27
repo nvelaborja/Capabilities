@@ -70,7 +70,55 @@ export interface ProfileItem {
 
 export interface ProfileDetail extends Profile {
   includes: ProfileItem[];
+  /** Signed years, [from, to] (ADR 0051); with `place`, only for a profile in space and time (ADR 0052). */
+  years?: [number, number];
+  place?: { cliopatria: string };
+  /** The profile's area and the sources found inside it; null for a profile that is only a list. */
+  map: ProfileMap | null;
 }
+
+/** Where a profile is, from Cliopatria's borders, and the sources found there (ADR 0052). */
+export interface ProfileMap {
+  cliopatria: string;
+  years: [number, number];
+  /** The years Cliopatria's rows cover, which can start before the profile's and end after them. */
+  cliopatria_years: [number, number];
+  cliopatria_rows: number;
+  wikidata: string | null;
+  release: string | null;
+  sources: ProfileSource[];
+}
+
+/** A source kind found inside a profile's area: had (yes) when one place was worked by the profile's last year. */
+export interface ProfileSource {
+  id: string;
+  label: string;
+  /** source, or category for an ore class (a mine that doesn't say which ore), which can't be selected. */
+  kind: string;
+  availability: "yes" | "maybe";
+  worked_by_then: number;
+  not_known_worked: number;
+  /** In the profile's own list. */
+  listed: boolean;
+  /** Had because of the map, and not in the list: the map added it to the selection. */
+  from_map: boolean;
+}
+
+/** A profile's area on the map, and the years it is compared with. */
+export interface ProfileArea {
+  id: string;
+  label: string;
+  cliopatria: string;
+  release: string | null;
+  years: [number, number];
+  area: AreaGeometry;
+}
+
+/** A profile's area as GeoJSON: the union of its entity's polygons. */
+export type AreaGeometry =
+  | { type: "Polygon"; coordinates: number[][][] }
+  | { type: "MultiPolygon"; coordinates: number[][][][] }
+  | { type: "GeometryCollection"; geometries: AreaGeometry[] };
 
 export interface SelectionRequest {
   profile?: string | null;
@@ -99,6 +147,8 @@ export interface ExploreResponse {
   implied_by: Record<string, string[]>;
   implied_effects: { id: string; label: string; conditions: string[] }[];
   near: NearMiss[];
+  /** Sources the profile had from the map (ADR 0052), added to its list; absent from older servers. */
+  from_map?: string[];
 }
 
 /** A thing one requirement away, with each route that would work and the one thing it is missing. */
@@ -324,6 +374,8 @@ export interface PlaceProperties {
   class_level: boolean;
   record_id: string;
   url: string | null;
+  /** With a profile's area: whether the place is inside it (ADR 0052). */
+  in_area?: boolean;
 }
 
 export interface PlaceFeature {
@@ -363,5 +415,7 @@ export interface OccurrencesResponse {
   origin?: "natural" | "extracted" | "produced" | null;
   sources: SourceSummary[];
   datasets: PlaceDataset[];
+  /** The profile's area, when one was asked for and it has a place (ADR 0052). */
+  profile?: ProfileArea | null;
   features: { type: "FeatureCollection"; features: PlaceFeature[] };
 }

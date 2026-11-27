@@ -1,0 +1,11 @@
+{
+  "dataset": "cliopatria_polities",
+  "url": "https://api.github.com/repos/Seshat-Global-History-Databank/cliopatria/releases/latest",
+  "retrieved_at": "2026-11-27T18:48:35Z",
+  "sha256": "20d8e38baf8ea958d149883bc9b8e10f72c703bfdc79cb655b4fe16534c2f003",
+  "rows": 13246,
+  "license": "CC BY 4.0 (Cliopatria, Seshat Global History Databank, https://github.com/Seshat-Global-History-Databank/cliopatria)",
+  "release": "v0.2.2",
+  "archive": "https://raw.githubusercontent.com/Seshat-Global-History-Databank/cliopatria/v0.2.2/cliopatria.geojson.zip",
+  "etag": "\"1d8c380133f007b7b0a92148d9ae71ba3186eec9188ec8901d1b4dce83551f69\""
+}

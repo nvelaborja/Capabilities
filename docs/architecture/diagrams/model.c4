@@ -29,6 +29,10 @@ model {
     description 'A community-built gazetteer of ancient places, CC BY 3.0. Its daily dump (pleiades-places-latest.csv.gz) holds every place, with its types, tags, location and the periods it is attested in; its mines and quarries place our sources and ore classes (ADR 0046). Its vocabulary of time periods (time-periods.ttl) gives each period\'s years, which date when they were worked by (ADR 0051).'
   }
 
+  cliopatria = external 'Cliopatria' {
+    description 'Seshat\'s borders of the world\'s polities from 3400 BCE to 2024 CE, CC BY 4.0: one GeoJSON in a zip in its GitHub repository, released with tags. Each row is an entity\'s polygons for a range of years. A profile\'s place is one of its entities (ADR 0052).'
+  }
+
   openalex = external 'OpenAlex' {
     description 'An open index of scholarly works, CC0. Its API finds each work we cite, by DOI or by searching its title, and knows where free copies are (ADR 0047).'
   }
@@ -134,6 +138,9 @@ model {
       rawPleiadesPeriods = table 'raw.pleiades_periods' {
         description 'Pleiades\' time periods, read from the Turtle: key, label, scope note and the years it gives, as text.'
       }
+      rawCliopatria = table 'raw.cliopatria_polities' {
+        description 'The Cliopatria snapshot: each row\'s ten properties as text, and its polygons as WKB.'
+      }
       rawReports = table 'raw.github_reports' {
         description 'Open issues labelled report: number, link, title, date, and the fact, kind, reference and run the app\'s link filled in, as text. No reporter, no text.'
       }
@@ -185,6 +192,14 @@ model {
         technology 'dbt view'
         description 'Curated working dates (data/dates): the record each dates, the year it was worked by, the reason and references (ADR 0051).'
       }
+      stgCliopatria = table 'stg_cliopatria__polities' {
+        technology 'dbt view'
+        description 'Cliopatria\'s rows typed: name, signed years (its year 0 read as 1 BCE), Wikidata item, Seshat ids, and the polygons as geometries (ADR 0052).'
+      }
+      stgProfilePlaces = table 'stg_curated__profile_places' {
+        technology 'dbt view'
+        description 'Each profile\'s place (a Cliopatria entity) and years, for profiles that have one (ADR 0052).'
+      }
       stgPleiades = table 'stg_pleiades__workings' {
         technology 'dbt view'
         description 'Pleiades mines and quarries: the kinds of place, the materials they name (tags) and their text, location and precision, attested years and periods.'
@@ -206,7 +221,7 @@ model {
       }
       queue = file 'curation_queue.parquet' {
         technology 'dbt mart, external materialization'
-        description 'The gaps the build found, most valuable first: ore candidates from MRDS, extracted materials with no route, sources with no places, routes with only unverified references, disagreements and stale overrides (ADR 0045), the works not yet read (ADR 0047), and unmatched Pleiades places (ADR 0046).'
+        description 'The gaps the build found, most valuable first: readers\' reports (ADR 0050), places inside a profile\'s area that a cited date would make a yes (ADR 0052), ore candidates from MRDS, extracted materials with no route, sources with no places, routes with only unverified references, disagreements and stale overrides (ADR 0045), the works not yet read (ADR 0047), and unmatched Pleiades places (ADR 0046).'
       }
       checks = file 'reference_checks.parquet' {
         technology 'dbt mart, external materialization'
@@ -215,6 +230,10 @@ model {
       occurrences = file 'source_occurrences.parquet' {
         technology 'dbt mart, external materialization, GeoParquet'
         description 'Where each source kind is found: one row per source kind and MRDS deposit, with a point geometry, worked_by_year, state (worked or present) and upstream provenance (ADR 0041).'
+      }
+      profiles = file 'profile_areas, profile_occurrences, profile_sources (.parquet)' {
+        technology 'dbt marts, external materialization, GeoParquet'
+        description 'Each profile\'s area (the union of its entity\'s polygons in its years, also as GeoJSON, with the Cliopatria release), the places inside it, and each source kind found there: had (worked there by the profile\'s last year) or maybe (ADR 0052).'
       }
       manifest = file 'manifest.json' {
         description 'Format version, input fingerprint, build time, git commit, row counts and the upstream snapshots used. A build is current when its fingerprint matches the inputs.'
@@ -284,6 +303,9 @@ model {
   capabilities.api -> capabilities.core.places 'where a material or source is found (/api/occurrences)'
   capabilities.core.places -> capabilities.artifact.occurrences 'loads every occurrence at start-up'
   capabilities.core.places -> capabilities.artifact.manifest 'which upstream snapshots, and when'
+  capabilities.core.places -> capabilities.artifact.profiles 'which places are inside each profile\'s area'
+  capabilities.core.built -> capabilities.artifact.profiles 'each profile\'s area and the sources found there'
+  capabilities.core.reasoner -> capabilities.core.built 'a profile starts with its list and the sources it had from the map'
   capabilities.web -> openfreemap 'fetches basemap tiles when the map opens'
   capabilities.core.cli -> capabilities.core.reasoner 'asks the three questions'
   capabilities.core.cli -> capabilities.core.built 'loads the graph'
@@ -339,6 +361,15 @@ model {
   capabilities.pipeline.loader -> capabilities.warehouse.rawPleiadesPeriods 'loads the newest copy of the periods'
   capabilities.warehouse.rawPleiadesPeriods -> capabilities.warehouse.stgPleiadesPeriods 'years, typed'
   capabilities.warehouse.stgPleiadesPeriods -> capabilities.artifact.occurrences 'the year each place was worked by'
+  capabilities.pipeline.downloader -> cliopatria 'asks for the latest release, downloads the zip at its tag (HTTPS)'
+  capabilities.pipeline.loader -> capabilities.warehouse.rawCliopatria 'loads the newest copy of Cliopatria'
+  capabilities.warehouse.rawCliopatria -> capabilities.warehouse.stgCliopatria 'borders, typed'
+  capabilities.warehouse.stgDocuments -> capabilities.warehouse.stgProfilePlaces 'profiles\' places and years'
+  capabilities.warehouse.stgCliopatria -> capabilities.artifact.profiles 'the entity\'s polygons in the profile\'s years'
+  capabilities.warehouse.stgProfilePlaces -> capabilities.artifact.profiles 'each profile\'s entity and years'
+  capabilities.artifact.occurrences -> capabilities.artifact.profiles 'the places inside each area'
+  capabilities.artifact.profiles -> capabilities.artifact.queue 'places a date would make a yes'
+  capabilities.pipeline.dbt -> capabilities.artifact.profiles 'writes the marts as Parquet, with data tests'
   capabilities.warehouse.stgDocuments -> capabilities.warehouse.stgDates 'working dates'
   capabilities.warehouse.stgDates -> capabilities.artifact.occurrences 'curated dates, over the datasets\''
   capabilities.pipeline.downloader -> capabilities.curated 'reads the crosswalks, quantities and references to build the queries'
@@ -418,6 +449,10 @@ model {
   capabilities.snapshots -[lineage]-> capabilities.warehouse.rawPleiades 'the download, if newest'
   capabilities.backups -[lineage]-> capabilities.warehouse.rawPleiades 'the backup, if newest'
   capabilities.snapshots -[lineage]-> capabilities.warehouse.rawPleiadesPeriods 'the download, if newest'
+  capabilities.snapshots -[lineage]-> capabilities.warehouse.rawCliopatria 'the download, if newest'
+  capabilities.backups -[lineage]-> capabilities.warehouse.rawCliopatria 'the backup, if newest'
+  cliopatria -[lineage]-> capabilities.snapshots 'the latest release\'s borders, as Parquet'
+  capabilities.artifact.profiles -[lineage]-> capabilities.artifact.manifest 'their row counts'
   capabilities.backups -[lineage]-> capabilities.warehouse.rawPleiadesPeriods 'the backup, if newest'
   capabilities.snapshots -[lineage]-> capabilities.backups 'capabilities backup, when newer'
   capabilities.curated -[lineage]-> capabilities.warehouse.rawDocuments 'every document, whole'
@@ -453,7 +488,7 @@ model {
   }
   stageDownload = stage '1b Download upstream' {
     technology 'Dagster'
-    description 'Dagster only: downloads MRDS, the two Wikidata queries and Pleiades (places and periods), and looks up every cited work in OpenAlex and Crossref (Downloader). If the network fails, it uses the cold backup instead.'
+    description 'Dagster only: downloads MRDS, the two Wikidata queries, Pleiades (places and periods) and Cliopatria\'s borders, and looks up every cited work in OpenAlex and Crossref (Downloader). If the network fails, it uses the cold backup instead.'
   }
   stageLoad = stage '2 Load' {
     technology 'Python, DuckDB'

@@ -57,6 +57,10 @@ class Dataset:
         snapshot should record."""
         raise NotImplementedError
 
+    def convert(self, source: Path, parquet: Path) -> int:
+        """The downloaded data as Parquet, every value unchanged; returns its rows."""
+        return to_parquet(self, source, parquet)
+
 
 @dataclass(frozen=True)
 class ZipDataset(Dataset):
@@ -236,6 +240,43 @@ def turtle_unescape(text: str) -> str:
     return re.sub(r"\\(.)", lambda match: {"n": "\n", "t": "\t"}.get(match.group(1), match.group(1)), text)
 
 
+@dataclass(frozen=True)
+class CliopatriaPolities(Dataset):
+    """Cliopatria, Seshat's borders of the world's polities from 3400 BCE to 2024 CE (ADR 0052): one GeoJSON, in a zip
+    in its GitHub repository. `url` is the repository's latest release, whose tag names the version downloaded and
+    recorded; `archive` is where the zip of a tag is. Each row is an entity's borders for a range of years. Its
+    properties are kept as text, as published, and its polygons as WKB, which holds the same coordinates exactly."""
+
+    archive: str = ""  # with {tag}
+    member: str = "cliopatria.geojson"
+
+    def download(self, url: str, scratch: Path, root: Path) -> tuple[Path, Path, dict]:
+        with urllib.request.urlopen(urllib.request.Request(url, headers={
+                "User-Agent": USER_AGENT, "Accept": "application/vnd.github+json"}), timeout=TIMEOUT_S) as response:
+            release = json.load(response)["tag_name"]
+        download = scratch / "download.zip"
+        archive = self.archive.format(tag=release)
+        headers = save(urllib.request.Request(archive, headers={"User-Agent": USER_AGENT}), download)
+        with zipfile.ZipFile(download) as zipped:
+            extracted = Path(zipped.extract(self.member, scratch))
+        return download, extracted, {"release": release, "archive": archive, "etag": headers.get("ETag")}
+
+    def convert(self, source: Path, parquet: Path) -> int:
+        with duckdb.connect() as connection:
+            connection.install_extension("spatial")
+            connection.load_extension("spatial")
+            relation = connection.sql("select * from st_read(?)", params=[str(source)])
+            properties = tuple(column for column in relation.columns if column not in ("OGC_FID", "geom"))
+            if properties + ("geometry",) != self.columns:
+                raise ValueError(f"{self.name}: the published properties changed: {properties}")
+            text = ", ".join(f'"{column}"::varchar as "{column}"' for column in properties)
+            connection.execute(
+                f"copy (select {text}, st_aswkb(geom) as geometry from st_read(?)) to '{parquet}' (format parquet)",
+                [str(source)],
+            )
+            return connection.execute("select count(*) from read_parquet(?)", [str(parquet)]).fetchall()[0][0]
+
+
 # The fields of the report form (.github/ISSUE_TEMPLATE/report.yml), by the heading GitHub gives each in the issue.
 REPORT_FIELDS = {"Fact": "fact", "Kind": "kind", "Reference": "reference", "Agent run": "run"}
 REPORT_WRITTEN = "What is wrong"  # the first field the reader writes, after all of the app's
@@ -335,6 +376,18 @@ PLEIADES_PERIODS = PleiadesPeriods(
     columns=("key", "label", "scope_note", "from_year", "to_year"),
 )
 
+CLIOPATRIA = CliopatriaPolities(
+    name="cliopatria_polities",
+    url="https://api.github.com/repos/Seshat-Global-History-Databank/cliopatria/releases/latest",
+    archive="https://raw.githubusercontent.com/Seshat-Global-History-Databank/cliopatria/{tag}/cliopatria.geojson.zip",
+    license="CC BY 4.0 (Cliopatria, Seshat Global History Databank, "
+    "https://github.com/Seshat-Global-History-Databank/cliopatria)",
+    columns=(
+        "Name", "FromYear", "ToYear", "Area", "Type", "Wikipedia", "Wikidata", "SeshatID", "Components", "MemberOf",
+        "geometry",
+    ),
+)
+
 REFERENCES = ReferenceCandidates(
     name="reference_candidates",
     url="https://api.openalex.org",
@@ -350,7 +403,7 @@ REPORTS = GitHubReports(
     columns=("number", "url", "title", "created_at", *REPORT_FIELDS.values()),
 )
 
-DATASETS = (MRDS, WIKIDATA, WIKIDATA_ITEMS, PLEIADES, PLEIADES_PERIODS, REFERENCES, REPORTS)
+DATASETS = (MRDS, WIKIDATA, WIKIDATA_ITEMS, PLEIADES, PLEIADES_PERIODS, CLIOPATRIA, REFERENCES, REPORTS)
 
 
 def fetch(dataset: Dataset, build_dir: Path, url: str | None = None, root: Path | None = None) -> dict:
@@ -362,7 +415,7 @@ def fetch(dataset: Dataset, build_dir: Path, url: str | None = None, root: Path 
     with tempfile.TemporaryDirectory(dir=directory) as scratch:
         download, csv_file, extra = dataset.download(url, Path(scratch), root or Path.cwd())
         converted = Path(scratch) / "converted.parquet"
-        rows = to_parquet(dataset, csv_file, converted)
+        rows = dataset.convert(csv_file, converted)
         converted.replace(dataset.parquet(build_dir))
         snapshot = {
             "dataset": dataset.name,
@@ -527,7 +580,7 @@ def load_upstream(connection: duckdb.DuckDBPyConnection, root: Path, build_dir: 
         )
     connection.execute(
         "create or replace table raw.upstream_snapshots (dataset varchar, url varchar, retrieved_at timestamptz, "
-        "sha256 varchar, row_count bigint, license varchar, copy varchar)"
+        "sha256 varchar, row_count bigint, license varchar, copy varchar, release varchar)"
     )
     for copy in copies.values():
         connection.execute(
@@ -535,9 +588,9 @@ def load_upstream(connection: duckdb.DuckDBPyConnection, root: Path, build_dir: 
         )
         snapshot = copy.snapshot
         connection.execute(
-            "insert into raw.upstream_snapshots values (?, ?, ?, ?, ?, ?, ?)",
+            "insert into raw.upstream_snapshots values (?, ?, ?, ?, ?, ?, ?, ?)",
             [copy.dataset.name, snapshot["url"], snapshot["retrieved_at"], snapshot["sha256"], snapshot["rows"],
-             snapshot["license"], copy.kind],
+             snapshot["license"], copy.kind, snapshot.get("release")],
         )
     return {name: {**copy.snapshot, "copy": copy.kind} for name, copy in copies.items()}
 

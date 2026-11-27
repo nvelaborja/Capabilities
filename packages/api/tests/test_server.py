@@ -155,6 +155,37 @@ class TestOccurrences:
         assert client.get("/api/occurrences/copper-saw").status_code == 404
 
 
+class TestProfilePlaces:
+    """A profile in space and time (ADR 0052): Middle Kingdom Egypt, on the Cliopatria and Pleiades samples."""
+
+    @pytest.fixture(scope="class")
+    def mapped(self, repo_root, upstream_built_dir, tmp_path_factory) -> TestClient:
+        return TestClient(create_app(repo_root, web_dist=tmp_path_factory.mktemp("no-web-build"), build_dir=upstream_built_dir))
+
+    def test_a_profile_says_where_it_is_and_what_was_found_there(self, mapped):
+        place = mapped.get("/api/profiles/middle-kingdom-egypt").json()["map"]
+        assert (place["cliopatria"], place["years"], place["release"]) == ("Middle Kingdom of Egypt", [-2050, -1650], "v0.2.2")
+        assert place["area"]["type"] in ("Polygon", "MultiPolygon")
+        granite = next(source for source in place["sources"] if source["id"] == "granite-outcrop")
+        # Aswan's quarry was worked by 1086 BCE, after the Middle Kingdom: a maybe, which the profile lists anyway.
+        assert (granite["availability"], granite["listed"], granite["from_map"]) == ("maybe", True, False)
+
+    def test_a_places_map_marks_which_are_inside_the_profiles_area(self, mapped):
+        body = mapped.get("/api/occurrences/granite", params={"profile": "middle-kingdom-egypt"}).json()
+        assert body["profile"]["years"] == [-2050, -1650]
+        inside = {f["properties"]["name"] for f in body["features"]["features"] if f["properties"]["in_area"]}
+        assert "Aswan Quarry Landscape" in inside
+        assert all("in_area" not in f["properties"] for f in mapped.get("/api/occurrences/granite").json()["features"]["features"])
+
+    def test_an_unknown_profile_is_not_found(self, mapped):
+        assert mapped.get("/api/occurrences/granite", params={"profile": "atlantis"}).status_code == 404
+
+    def test_explore_names_the_sources_the_map_added_and_none_for_a_list_only(self, mapped):
+        # Nothing is worked inside Middle Kingdom Egypt by 1650 BCE in the samples: the map adds nothing.
+        assert mapped.post("/api/explore", json={"profile": "middle-kingdom-egypt"}).json()["from_map"] == []
+        assert mapped.post("/api/explore", json={"select": ["copper"]}).json()["from_map"] == []
+
+
 class TestProvenance:
     @pytest.fixture(scope="class")
     def upstream(self, repo_root, upstream_built_dir, tmp_path_factory) -> TestClient:

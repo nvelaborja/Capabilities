@@ -39,6 +39,13 @@ QUEUE = AssetKey("curation_queue")
 CHECKS = AssetKey("reference_checks")
 REFERENCES_SNAPSHOT = AssetKey(["upstream", "reference_candidates"])
 REFERENCES_RAW = AssetKey(["raw", "reference_candidates"])
+CLIOPATRIA_SNAPSHOT = AssetKey(["upstream", "cliopatria_polities"])
+CLIOPATRIA_RAW = AssetKey(["raw", "cliopatria_polities"])
+CLIOPATRIA_STAGING = AssetKey("stg_cliopatria__polities")
+PROFILE_PLACES = AssetKey("stg_curated__profile_places")
+PROFILE_AREAS = AssetKey("profile_areas")
+PROFILE_OCCURRENCES = AssetKey("profile_occurrences")
+PROFILE_SOURCES = AssetKey("profile_sources")
 
 
 @pytest.fixture
@@ -62,7 +69,8 @@ class TestDefinitions:
         graph = asset_graph(dagster_build[0])
         assert graph.get(STAGING).parent_keys == {RAW}
         assert graph.get(NODES).parent_keys == {STAGING, FACTS, ORE_NODES}
-        assert graph.get(MANIFEST).parent_keys == {NODES, FACTS, OCCURRENCES, QUEUE, CHECKS}
+        assert graph.get(MANIFEST).parent_keys == {
+            NODES, FACTS, OCCURRENCES, QUEUE, CHECKS, PROFILE_AREAS, PROFILE_OCCURRENCES, PROFILE_SOURCES}
         assert graph.get(REFERENCES_RAW).parent_keys == {REFERENCES_SNAPSHOT}
 
     def test_the_lineage_runs_from_the_mrds_download_and_the_crosswalk_to_the_occurrences(self, dagster_build):
@@ -86,6 +94,16 @@ class TestDefinitions:
         assert graph.get(PERIODS_RAW).parent_keys == {PERIODS_SNAPSHOT}
         assert graph.get(PERIODS_STAGING).parent_keys == {PERIODS_RAW}
         assert {PERIODS_STAGING, DATES_STAGING} <= graph.get(OCCURRENCES).parent_keys
+
+    def test_the_lineage_runs_from_the_cliopatria_download_and_the_profiles_to_their_sources(self, dagster_build):
+        graph = asset_graph(dagster_build[0])
+        assert graph.get(CLIOPATRIA_RAW).parent_keys == {CLIOPATRIA_SNAPSHOT}
+        assert graph.get(CLIOPATRIA_STAGING).parent_keys == {CLIOPATRIA_RAW}
+        assert graph.get(PROFILE_PLACES).parent_keys == {STAGING}
+        assert {CLIOPATRIA_STAGING, PROFILE_PLACES, SNAPSHOTS_RAW} <= graph.get(PROFILE_AREAS).parent_keys
+        assert graph.get(PROFILE_OCCURRENCES).parent_keys == {PROFILE_AREAS, OCCURRENCES}
+        assert {PROFILE_OCCURRENCES, OCCURRENCES, NODES} <= graph.get(PROFILE_SOURCES).parent_keys
+        assert {PROFILE_OCCURRENCES, PROFILE_SOURCES} <= graph.get(QUEUE).parent_keys
 
     def test_the_lineage_runs_from_the_wikidata_download_and_its_crosswalk_to_the_facts(self, dagster_build):
         graph = asset_graph(dagster_build[0])
@@ -129,7 +147,7 @@ class TestDefinitions:
 class TestMaterializing:
     def test_materializing_everything_downloads_every_dataset_and_builds_a_current_graph(
         self, dagster_build, repo_root, tmp_path, mrds_zip, wikidata_endpoint, pleiades_gz, pleiades_periods_ttl,
-        scholarly_endpoint, lookups_offline,
+        cliopatria_release, scholarly_endpoint, lookups_offline,
     ):
         from capabilities_pipeline.assets import UpstreamDownloads
 
@@ -137,6 +155,7 @@ class TestMaterializing:
         downloads = UpstreamDownloads(
             mrds_url=mrds_zip(tmp_path / "download"), wikidata_url=wikidata_endpoint.url, pleiades_url=pleiades_gz,
             pleiades_periods_url=pleiades_periods_ttl, openalex_url=scholarly_endpoint.openalex_url, crossref_url=scholarly_endpoint.crossref_url,
+            cliopatria_url=cliopatria_release.url, cliopatria_archive=cliopatria_release.dataset.archive,
         )
         with lookups_offline():
             result = materialize(list(defs.assets), resources={**defs.resources, "downloads": downloads})
@@ -155,6 +174,8 @@ class TestMaterializing:
         assert manifest["tables"][OCCURRENCES_FILE] == 18 + 15
         assert manifest["upstream"]["pleiades_places"]["rows"] == 13
         assert manifest["upstream"]["pleiades_periods"]["rows"] == 26
+        assert (manifest["upstream"]["cliopatria_polities"]["rows"], manifest["upstream"]["cliopatria_polities"]["release"]) == (5, "v0.2.2")
+        assert manifest["tables"]["profile_areas.parquet"] == sum("place" in profile for profile in curated.profiles.values())
         assert manifest["upstream"]["mrds_deposits"]["rows"] == 14
         assert manifest["upstream"]["wikidata_quantities"]["rows"] == 4
         materialized = {event.asset_key for event in result.get_asset_materialization_events()}
@@ -163,6 +184,7 @@ class TestMaterializing:
         assert {ITEMS_SNAPSHOT, ITEMS_RAW, ORE_RAW, ORE_NODES, QUEUE} <= materialized
         assert {PLEIADES_SNAPSHOT, PLEIADES_RAW, PLEIADES_RULES, PLEIADES_STAGING} <= materialized
         assert {PERIODS_SNAPSHOT, PERIODS_RAW, PERIODS_STAGING} <= materialized
+        assert {CLIOPATRIA_SNAPSHOT, CLIOPATRIA_RAW, CLIOPATRIA_STAGING, PROFILE_AREAS, PROFILE_SOURCES} <= materialized
         assert {REFERENCES_SNAPSHOT, REFERENCES_RAW, CHECKS} <= materialized
 
     def test_offline_a_download_falls_back_to_the_cold_backup_and_says_so(self, dagster_build, wikidata_endpoint):

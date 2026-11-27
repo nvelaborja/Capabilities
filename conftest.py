@@ -6,6 +6,7 @@ import shutil
 import threading
 import zipfile
 from contextlib import contextmanager
+from dataclasses import dataclass, replace
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from types import SimpleNamespace
@@ -107,6 +108,36 @@ PLEIADES_PERIODS_SAMPLE = REPO_ROOT / "pipeline" / "tests" / "fixtures" / "pleia
 def pleiades_periods_ttl() -> str:
     """The Pleiades periods sample, as a file:// URL."""
     return PLEIADES_PERIODS_SAMPLE.as_uri()
+
+
+# Five real Cliopatria rows (CC BY 4.0), from release v0.2.2: the Middle Kingdom of Egypt in two (2000-1801 and
+# 1800-1601 BCE), whose area holds Aswan's quarries; and the Twenty-sixth Dynasty in three (615-531 BCE), the last of
+# which holds Cyprus, and so Agrokipia and Almyras, as well.
+CLIOPATRIA_SAMPLE = REPO_ROOT / "pipeline" / "tests" / "fixtures" / "cliopatria-sample.geojson"
+CLIOPATRIA_RELEASE = "v0.2.2"
+
+
+@dataclass(frozen=True)
+class CliopatriaRelease:
+    """Where the test Cliopatria is downloaded from: its release (`url`) and the dataset, whose archive is local."""
+
+    url: str
+    dataset: object
+
+
+@pytest.fixture(scope="session")
+def cliopatria_release(tmp_path_factory) -> CliopatriaRelease:
+    """The Cliopatria sample, zipped as in its repository at the tag a release names, as file:// URLs."""
+    from capabilities_pipeline.upstream import CLIOPATRIA
+
+    directory = tmp_path_factory.mktemp("cliopatria-download")
+    release = directory / "latest.json"
+    release.write_text(json.dumps({"tag_name": CLIOPATRIA_RELEASE}), encoding="utf-8")
+    (directory / CLIOPATRIA_RELEASE).mkdir()
+    with zipfile.ZipFile(directory / CLIOPATRIA_RELEASE / "cliopatria.geojson.zip", "w") as zipped:
+        zipped.write(CLIOPATRIA_SAMPLE, "cliopatria.geojson")
+    archive = directory.as_uri() + "/{tag}/cliopatria.geojson.zip"
+    return CliopatriaRelease(release.as_uri(), replace(CLIOPATRIA, archive=archive))
 
 
 @pytest.fixture(scope="session")
@@ -326,7 +357,7 @@ def fetch_references(scholarly_endpoint):
 
 @pytest.fixture(scope="session")
 def upstream_built_dir(tmp_path_factory, mrds_zip, wikidata_endpoint, pleiades_gz, pleiades_periods_ttl,
-                       fetch_references, github_endpoint) -> Path:
+                       cliopatria_release, fetch_references, github_endpoint) -> Path:
     """The repository's graph built once with snapshots of the MRDS and Wikidata samples, so it has source occurrences
     and upstream quantity values."""
     from capabilities.built import run_build
@@ -338,6 +369,7 @@ def upstream_built_dir(tmp_path_factory, mrds_zip, wikidata_endpoint, pleiades_g
     fetch(WIKIDATA_ITEMS, build_dir, wikidata_endpoint.url, root=REPO_ROOT)
     fetch(PLEIADES, build_dir, pleiades_gz)
     fetch(PLEIADES_PERIODS, build_dir, pleiades_periods_ttl)
+    fetch(cliopatria_release.dataset, build_dir, cliopatria_release.url)
     fetch_references(build_dir)
     fetch(REPORTS, build_dir, github_endpoint.url)
     run_build(REPO_ROOT, build_dir)
