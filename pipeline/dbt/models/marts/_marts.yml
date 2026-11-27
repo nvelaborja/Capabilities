@@ -38,7 +38,8 @@ models:
         data_tests: [not_null]
   - name: curation_queue
     description: >
-      The gaps the build finds, as a to-do list (build/graph/curation_queue.parquet, ADR 0045): ore candidates from
+      The gaps the build finds, as a to-do list (build/graph/curation_queue.parquet, ADR 0045): readers' reports
+      from GitHub issues, first (ADR 0050), ore candidates from
       MRDS, extracted materials with no route, sources with no places, routes with only unverified references, upstream
       disagreements, stale overrides, works not yet read (ADR 0047), and Pleiades places no rule matches.
     columns:
@@ -49,7 +50,7 @@ models:
           - not_null
           - accepted_values:
               arguments:
-                values: [ore_candidate, extracted_without_route, source_without_places, route_unverified, upstream_disagreement, stale_override, unread_reference, unmatched_place]
+                values: [reported, ore_candidate, extracted_without_route, source_without_places, route_unverified, upstream_disagreement, stale_override, unread_reference, unmatched_place]
       - name: detail
         data_tests: [not_null]
   - name: source_occurrences

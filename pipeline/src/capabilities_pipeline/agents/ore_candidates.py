@@ -17,9 +17,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from capabilities.graph import ORE_CROSSWALK, Graph, ore_crosswalk_rows
+from capabilities.withdraw import withdrawn_quotes
 
 from .sources import NETWORK_ERRORS, OPENALEX_SEARCHES, Library, Passage, Wanted
-from .task import Check, Evidence, Finding, Prompt, Skip, Task, cell, offered, page_checks
+from .task import Check, Evidence, Finding, Merged, Prompt, Skip, Task, cell, not_withdrawn, offered, page_checks
 from .web import WikidataItem, excerpt
 
 EVALUATION = Path(__file__).parent / "evaluation" / "ore_candidates.csv"
@@ -94,6 +95,7 @@ class Context:
     taken_ids: frozenset[str]
     taken_items: frozenset[str]
     decided_items: frozenset[str] = frozenset()  # the ore crosswalk's own items: minerals already decided
+    withdrawn: frozenset[tuple[str, str]] = frozenset()  # (mineral, quote) a person withdrew (ADR 0050)
 
     @classmethod
     def of(cls, root: Path, leaving_out: frozenset[str] = frozenset()) -> Context:
@@ -115,6 +117,7 @@ class Context:
             taken_ids=frozenset(graph.things) | frozenset(graph.routes) | {row["id"] for row in kept if row["id"]},
             taken_items=frozenset(row["wikidata"] for row in kept) | frozenset(_wikidata_things(root)),
             decided_items=frozenset(row["wikidata"] for row in kept),
+            withdrawn=frozenset(withdrawn_quotes(root)),
         )
 
 
@@ -168,7 +171,8 @@ def check(candidate: Candidate, proposal: Proposal, context: Context, web: Libra
     except NETWORK_ERRORS as error:
         # Wikidata is down, not the proposal wrong: say so, and let the proposer try again.
         item = None
-        checks.append(Check("wikidata_item_is_the_mineral", False, f"Wikidata couldn't be reached: {error}"))
+        checks.append(Check("wikidata_item_is_the_mineral", False, f"Wikidata couldn't be reached: {error}",
+                            unreachable=True))
     else:
         checks += _item_checks(candidate, proposal, item, context)
     if proposal.ore_class != "none":
@@ -176,7 +180,8 @@ def check(candidate: Candidate, proposal: Proposal, context: Context, web: Libra
         checks.append(Check("id_is_new", not taken, f"{candidate.id!r} is already an id in the graph" if taken
                             else f"the mineral's id will be {candidate.id!r}"))
     on_page, page, found = page_checks(proposal.url, proposal.quote, web)
-    checks += on_page + [_names_the_mineral(candidate, proposal, item)]
+    checks += on_page + [_names_the_mineral(candidate, proposal, item),
+                         not_withdrawn(candidate.name, proposal.quote, context.withdrawn)]
     return checks, Evidence(page, excerpt(*found) if found else None, item)
 
 
@@ -257,6 +262,10 @@ def write_crosswalk(root: Path, rows: list[dict]) -> None:
         writer.writerows([{column: row.get(column) or "" for column in COLUMNS} for row in kept + list(by_name.values())])
 
 
+def _agents_rows(root: Path) -> list[dict]:
+    return [row for row in ore_crosswalk_rows(root) if row.get("proposed_by")]
+
+
 def score(results: list, answers: dict[str, dict]) -> dict:
     """How the agents' answers compare with a person's: the class and Wikidata item proposed, and above all whether
     anything wrong was accepted, which is what the checks and the reviewer are there to stop."""
@@ -284,13 +293,26 @@ class OreCandidates(Task):
     prompts = ("ore_proposer", "ore_reviewer")
     review_about = ("class", "wikidata", "citation", "quote", "supports", "source", "notes")
 
-    def __init__(self, context: Context, library: Library):
-        self.context, self.library = context, library
+    def __init__(self, context: Context, library: Library, root: Path | None = None):
+        self.context, self.library, self.root = context, library, root
 
     @classmethod
     def open(cls, root: Path, library: Library, build_dir: Path | None = None,
              leaving_out: frozenset[str] = frozenset()) -> OreCandidates:
-        return cls(Context.of(root, leaving_out=leaving_out), library)
+        return cls(Context.of(root, leaving_out=leaving_out), library, root)
+
+    @classmethod
+    def before_merging(cls, root: Path, library: Library, build_dir: Path | None = None) -> OreCandidates:
+        # The agents' rows left out, as an evaluation leaves out a person's: else each finds its own id and item taken.
+        return cls.open(root, library, build_dir, leaving_out=frozenset(row["mrds_ore"] for row in _agents_rows(root)))
+
+    def merged(self) -> list[Merged]:
+        return [Merged(Candidate(row["mrds_ore"]),
+                       Proposal("propose", row["wikidata"], row["class"], row["citation"], row["url"], row["quote"],
+                                row["supports"], row["notes"]),
+                       row["proposed_by"], f"{row['mrds_ore']}'s ore row", row["id"] or row["mrds_ore"], "ore row",
+                       row["citation"])
+                for row in _agents_rows(self.root)]
 
     @classmethod
     def evaluation_set(cls) -> list[tuple[Candidate, dict]]:

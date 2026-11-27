@@ -48,6 +48,12 @@ class Page:
     def loaded(self) -> bool:
         return self.status == "200" and bool(self.text.strip())
 
+    @property
+    def unreachable(self) -> bool:
+        """The site didn't answer, or said it can't for now (too many requests, a server error): the page may still be
+        there."""
+        return self.status.startswith("unreachable") or self.status == "429" or self.status.startswith("5")
+
 
 @dataclass(frozen=True)
 class WikidataItem:

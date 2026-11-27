@@ -1,5 +1,7 @@
 -- The curation queue (ADR 0034, ADR 0045): the gaps the build finds, as a to-do list for people and, from M3, agents.
 -- One row per item, most valuable first within each kind:
+--   reported                  a fact readers reported as wrong on GitHub, one item per fact. First: a report is someone
+--                             telling us the graph is wrong (ADR 0050)
 --   ore_candidate             a mineral MRDS lists as an ore on many copper, iron or tin deposits, not yet reviewed
 --   extracted_without_route   a material said to be extracted that no route extracts
 --   source_without_places     a regional source with no mapped places
@@ -172,8 +174,29 @@ unread_references as (
     where not verified
 ),
 
+-- Readers' reports, one item per fact: every open issue about it, oldest first. An issue that names no fact is an item
+-- of its own.
+reports as (
+    select
+        'reported' as kind,
+        coalesce(reports.fact, '#' || min(reports.number)) as subject,
+        coalesce(min(nodes.label), reports.fact, min(reports.title)) as label,
+        'Reported in ' || string_agg('#' || reports.number || ' (' || reports.title || ')', ', '
+            order by reports.number) || '. Read the report; if it holds, withdraw the fact with '
+            || '`uv run capabilities withdraw` (an agent''s) or correct it (a person''s), and close the issue from the '
+            || 'pull request.' as detail,
+        count(*) as priority,
+        json_object('issues', list(reports.url order by reports.number),
+                    'runs', list_filter(list(distinct reports.run), lambda run: run is not null),
+                    'references', list_filter(list(distinct reports.reference), lambda ref: ref is not null)) as evidence
+    from {{ ref('stg_github__reports') }} as reports
+    left join nodes on nodes.id = reports.fact
+    group by reports.fact, case when reports.fact is null then reports.number end
+),
+
 queue as (
-    select * from ore_candidates
+    select * from reports
+    union all select * from ore_candidates
     union all select * from extracted_without_route
     union all select * from sources_without_places
     union all select * from routes_unverified
@@ -192,5 +215,6 @@ select
     priority,
     evidence
 from queue
--- Unmatched places last: the app's questions don't depend on where a material was found (ADR 0046).
-order by kind = 'unmatched_place', kind, priority desc nulls last, subject
+-- Reports first: someone told us the graph is wrong (ADR 0050). Unmatched places last: the app's questions don't
+-- depend on where a material was found (ADR 0046).
+order by kind <> 'reported', kind = 'unmatched_place', kind, priority desc nulls last, subject

@@ -3,6 +3,7 @@ import { NodeChip } from "../chips/NodeChip";
 import { STATUS_LABELS } from "../legend/Legend";
 import { useExplainEdge } from "../state/useExplain";
 import { DetailShell } from "./DetailShell";
+import { ReportLink } from "./ReportLink";
 import { lineStyle } from "./lines";
 import { chipStatus, routeVerdict } from "./marks";
 import type { DetailContext } from "./NodeDetail";
@@ -36,6 +37,7 @@ export function EdgeDetail(props: EdgeDetailProps) {
         </>
       }
       meta={data && <span className="kind-chip">{data.kind === "is_a" ? "Class member" : `Needed to make ${to.toLowerCase()}`}</span>}
+      actions={<ReportLink fact={`${source} → ${target}`} kind="line" label={`${from} → ${to}`} />}
     >
       {error && <p className="error">Couldn't explain this line.</p>}
       {!data && !error && loading && <p className="muted">Loading…</p>}

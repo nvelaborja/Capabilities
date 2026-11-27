@@ -99,10 +99,10 @@ class Worktree:
 
 
 def git(directory: Path, *arguments: str) -> str:
-    return _run(["git", "-C", str(directory), *arguments])
+    return run_command(["git", "-C", str(directory), *arguments])
 
 
-def _run(command: list[str], cwd: Path | None = None) -> str:
+def run_command(command: list[str], cwd: Path | None = None) -> str:
     try:
         return subprocess.run(command, cwd=cwd, capture_output=True, text=True, check=True, timeout=300).stdout.strip()
     except subprocess.CalledProcessError as error:
@@ -113,7 +113,7 @@ def _run(command: list[str], cwd: Path | None = None) -> str:
 
 def check_gh(gh: str = "gh") -> None:
     """That `gh` is logged in, before a run spends any usage on proposals it couldn't open a pull request for."""
-    _run([gh, "auth", "status"])
+    run_command([gh, "auth", "status"])
 
 
 def gate(root: Path, build_dir: Path, downloads: Downloads) -> dict[str, dict]:
@@ -174,7 +174,7 @@ def publish(worktree: Worktree, build_dir: Path, run_id: str, summary: dict, pro
     worktree.pushed = True
     body_file = build_dir / "pull-request.md"
     body_file.write_text(proposals.body, encoding="utf-8")
-    return _run([gh, "pr", "create", "--draft", "--base", worktree.base.removeprefix("origin/"), "--head",
+    return run_command([gh, "pr", "create", "--draft", "--base", worktree.base.removeprefix("origin/"), "--head",
                  worktree.branch, "--title", proposals.title, "--body-file", str(body_file)], cwd=root).splitlines()[-1]
 
 

@@ -26,6 +26,8 @@ data/
   crosswalks/            CSV tables matching upstream records to our ids (MRDS deposits to source kinds, things to Wikidata items, ore minerals that join the graph, rules placing Pleiades mines and quarries)
   overrides/             replacements for upstream values we believe are wrong, with the reason and references
   suppressions/          upstream records left out of the build, with why
+  withdrawals.csv        agents' facts taken out, with what they said and why (ADR 0050)
+  agent_runs/            the summary of each agent run whose pull request was merged
   LICENSE                CC BY-NC-SA 4.0 (the data); the code is PolyForm Noncommercial 1.0.0
 examples/jobs/           concrete tasks for feasibility checks
 src/capabilities/        the Python reasoner, CLI, and local API server
@@ -196,7 +198,7 @@ siderite,Q192669,Siderite,iron-ore,mine-hematite,"Föll, H. ...",https://...,"Si
 
 Add a mineral only with a reference that it was smelted as its class says; leave it in the curation queue otherwise (`uv run capabilities queue`). Rejecting a mineral (`none`, with the reference that says why) takes it off the queue. After adding rows, query Wikidata again, as for `wikidata_things.csv`.
 
-Agents can work through the ore candidates too, on a Claude subscription ([ADR 0048](adr/0048-run-agents-through-claude-code-on-a-claude-subscription.md)): `cd pipeline && uv run dg launch --job agent_curation --config-json '{"ops": {"curate": {"config": {"items": 5}}}}'`. What passes their checks arrives as a draft pull request; merge, edit or close it as you would anyone's. An agent's references stay `unverified`.
+Agents can work through the ore candidates too, on a Claude subscription ([ADR 0048](adr/0048-run-agents-through-claude-code-on-a-claude-subscription.md)): `cd pipeline && uv run dg launch --job agent_curation --config-json '{"ops": {"curate": {"config": {"items": 5}}}}'`. What passes their checks arrives as a draft pull request; merge, edit or close it as you would anyone's. An agent's references stay `unverified`. A wrong row is withdrawn (see Withdrawal, below).
 
 `pleiades_sources.csv` places Pleiades' ancient mines and quarries at our sources and ore classes, with the years they are attested ([ADR 0046](adr/0046-place-ancient-mines-and-quarries-from-pleiades.md)). One row per rule:
 
@@ -241,6 +243,33 @@ Upstream records left out of the build: a duplicate, bad coordinates, the wrong 
 | `dataset` | `mrds` (a deposit, by `dep_id`), `wikidata` (an item, by Q id) or `pleiades` (a place, by its id) |
 | `record_id` | The record |
 | `reason` | Why it doesn't belong |
+
+### Withdrawal (`data/withdrawals.csv`)
+
+An agent's fact taken out of the data because it was wrong, with what it said, so the record outlives the fact ([ADR 0050](adr/0050-report-withdraw-and-recheck-agent-facts.md)). Written by `uv run capabilities withdraw`, never by hand:
+
+```bash
+uv run capabilities withdraw ore Galena --reason "The page is about lead smelting." --report 12
+uv run capabilities withdraw reference smelt-copper --citation "Craddock, P. T. (1995). …" --reason "…" --report 12
+```
+
+The first removes an agent's row from the ore crosswalk (the mineral goes back to the queue); the second removes a reference an agent added to the route, or, if an agent quoted a person's reference, the quote and `proposed_by` (and the URL, if the agent brought it). A person's own fact is corrected by editing it: the command refuses one. Open the change as a pull request; "Closes #12" closes the report.
+
+| Column | Meaning |
+|---|---|
+| `withdrawn_on` | The date |
+| `kind` | `ore_row`, `reference` (an agent's whole reference) or `quote` (an agent's quote on a person's reference) |
+| `subject` | The mineral, as MRDS names it, or the route |
+| `citation`, `url`, `quote` | What the fact said |
+| `run` | The agent run that proposed it |
+| `reason` | What was wrong with it |
+| `report` | The GitHub issue that reported it, if one did |
+
+`validate` refuses a withdrawn quote back on the same mineral or route, and agents don't propose it again. Citing the same work for another passage is fine.
+
+### Reports
+
+Anyone can report a fact from the app: "Report a problem" on a node, line, route or reference opens a GitHub issue on the report form, with the fact filled in ([ADR 0050](adr/0050-report-withdraw-and-recheck-agent-facts.md)). Open issues labelled `report` are downloaded like any upstream dataset (`cd pipeline && uv run dg launch --assets 'upstream/github_reports'`) and are the first kind in the curation queue, `reported`. Read the report, then withdraw the fact (an agent's) or correct it (a person's), or close the issue if it doesn't hold.
 
 ### Where values come from
 

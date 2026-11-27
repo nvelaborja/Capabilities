@@ -3,6 +3,7 @@ import { NodeChip } from "../chips/NodeChip";
 import { BoundedList } from "./BoundedList";
 import { Mark } from "./Mark";
 import { References } from "./References";
+import { ReportLink } from "./ReportLink";
 import { ROLE_TAGS, routeVerdict } from "./marks";
 
 /** The status border for a requirement's chip: where the selection puts it. */
@@ -51,8 +52,11 @@ function RouteItem({ route, open, statusOf, onDrill }: { route: RouteRow; open: 
         {route.techniques.length > 0 && <p className="route-fact">Know-how: {route.techniques.map((t) => t.label).join(", ")}</p>}
         <details className="route-sources">
           <summary>Sources ({route.references.length})</summary>
-          <References references={route.references} />
+          <References references={route.references} owner={route} />
         </details>
+        <p className="route-fact">
+          <ReportLink text="Report a problem with this way" fact={route.id} kind="route" label={route.label} />
+        </p>
       </details>
     </li>
   );

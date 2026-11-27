@@ -6,7 +6,7 @@ The project itself is free for non-commercial use: the code under the [PolyForm 
 
 ## Datasets
 
-The upstream datasets the graph is built from ([ADR 0034](docs/adr/0034-build-the-graph-from-upstream-datasets-and-a-curated-layer.md)). USGS MRDS (since 2026-11-22), Wikidata, Pleiades, OpenAlex and Crossref (since 2026-11-24) are ingested; the others are not yet, and each row says what it will be used for. Licenses were checked on 2026-11-20. Before a new dataset is ingested, it gets a row here. A cold backup of each ingested dataset is kept in [`snapshots/`](snapshots/README.md) under the dataset's own license ([ADR 0044](docs/adr/0044-require-every-upstream-dataset-with-cold-backups-in-git.md)).
+The upstream datasets the graph is built from ([ADR 0034](docs/adr/0034-build-the-graph-from-upstream-datasets-and-a-curated-layer.md)). USGS MRDS (since 2026-11-22), Wikidata, Pleiades, OpenAlex and Crossref (since 2026-11-24), and the project's own report issues (since 2026-11-26) are ingested; the others are not yet, and each row says what it will be used for. Licenses were checked on 2026-11-20. Before a new dataset is ingested, it gets a row here. A cold backup of each ingested dataset is kept in [`snapshots/`](snapshots/README.md) under the dataset's own license ([ADR 0044](docs/adr/0044-require-every-upstream-dataset-with-cold-backups-in-git.md)).
 
 | Dataset | Used for | License | Credit |
 |---|---|---|---|
@@ -17,6 +17,7 @@ The upstream datasets the graph is built from ([ADR 0034](docs/adr/0034-build-th
 | [Seshat: Global History Databank](https://seshat-db.com/) | Comparing the reasoner with what past societies had | CC BY-NC-SA | Seshat: Global History Databank. TODO: add the exact attribution line Seshat asks for when the data is ingested |
 | [OpenAlex](https://openalex.org/) | Checking that cited works exist, and finding free copies to read ([ADR 0047](docs/adr/0047-check-citations-against-openalex-and-crossref.md)) | CC0 1.0 | OurResearch. Snapshot of the works found for each citation, retrieved 2026-11-24, kept in `snapshots/reference_candidates/` |
 | [Crossref](https://www.crossref.org/) | Checking that cited works exist, and that their DOIs lead to them ([ADR 0047](docs/adr/0047-check-citations-against-openalex-and-crossref.md)) | Bibliographic metadata: no restrictions. Abstracts are copyrighted, so we don't store them | Crossref and its members. Snapshot of the works found for each citation, retrieved 2026-11-24, kept in `snapshots/reference_candidates/` |
+| [The project's report issues on GitHub](https://github.com/nvelaborja/Capabilities/issues?q=label%3Areport) | Readers' reports of wrong facts, listed first in the curation queue ([ADR 0050](docs/adr/0050-report-withdraw-and-recheck-agent-facts.md)) | Written by their reporters, under GitHub's Terms of Service. Only each issue's number, link, title and date, and the fields the app filled in, are kept; never the reporter or what they wrote | The reporters. Snapshot of the open issues labelled `report`, retrieved 2026-11-26 (none yet), kept in `snapshots/github_reports/` |
 
 Not used: [Mindat](https://www.mindat.org/). Its terms forbid copying its data into another product.
 

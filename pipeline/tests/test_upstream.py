@@ -180,10 +180,10 @@ class TestEveryDatasetIsRequired:
     def test_with_nothing_downloaded_the_cold_backups_are_used(self, built_dir):
         # built_dir (conftest) never downloads anything, like CI and a fresh clone.
         manifest = json.loads((graph_dir(built_dir) / MANIFEST_FILE).read_text())
+        from capabilities_pipeline.upstream import DATASETS
+
         assert {name: snapshot["copy"] for name, snapshot in manifest["upstream"].items()} == {
-            "mrds_deposits": "backup", "pleiades_places": "backup", "reference_candidates": "backup",
-            "wikidata_items": "backup", "wikidata_quantities": "backup",
-        }
+            dataset.name: "backup" for dataset in DATASETS}
         assert manifest["tables"][OCCURRENCES_FILE] > 0
 
     def test_a_build_with_no_copy_of_a_dataset_stops_and_says_how_to_get_one(self, data_copy, tmp_path):

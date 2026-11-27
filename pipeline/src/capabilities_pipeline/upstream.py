@@ -12,6 +12,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
+import re
 import tempfile
 import urllib.error
 import urllib.parse
@@ -145,6 +146,58 @@ class ReferenceCandidates(Dataset):
         }
 
 
+# The fields of the report form (.github/ISSUE_TEMPLATE/report.yml), by the heading GitHub gives each in the issue.
+REPORT_FIELDS = {"Fact": "fact", "Kind": "kind", "Reference": "reference", "Agent run": "run"}
+REPORT_WRITTEN = "What is wrong"  # the first field the reader writes, after all of the app's
+REPORT_PAGES = 10  # of 100 issues each: far more open reports than anyone would leave unread
+
+
+@dataclass(frozen=True)
+class GitHubReports(Dataset):
+    """The repository's open issues labelled `report`: what readers reported from the app's detail pane (ADR 0050).
+    Only what the queue needs is kept: the issue, its title, and the fields the app filled in. Not who reported it, nor
+    what they wrote, which stay on GitHub."""
+
+    def download(self, url: str, scratch: Path, root: Path) -> tuple[Path, Path, dict]:
+        rows = []
+        for page in range(1, REPORT_PAGES + 1):
+            query = urllib.parse.urlencode({"labels": "report", "state": "open", "per_page": 100, "page": page})
+            request = urllib.request.Request(f"{url}?{query}", headers={
+                "User-Agent": USER_AGENT, "Accept": "application/vnd.github+json"})
+            with urllib.request.urlopen(request, timeout=TIMEOUT_S) as response:
+                issues = json.load(response)
+            # The issues API lists pull requests too; a report is an issue.
+            rows += [report_row(issue) for issue in issues if "pull_request" not in issue]
+            if len(issues) < 100:
+                break
+        download = scratch / "reports.csv"
+        with download.open("w", newline="", encoding="utf-8") as file:
+            writer = csv.DictWriter(file, fieldnames=self.columns, lineterminator="\n")
+            writer.writeheader()
+            writer.writerows(rows)
+        return download, download, {"label": "report", "state": "open"}
+
+
+def report_row(issue: dict) -> dict:
+    fields = report_fields(issue.get("body") or "")
+    return {"number": str(issue["number"]), "url": issue["html_url"], "title": issue["title"],
+            "created_at": issue["created_at"], **{column: fields.get(column, "") for column in REPORT_FIELDS.values()}}
+
+
+def report_fields(body: str) -> dict[str, str]:
+    """The form's fields from an issue's body, which GitHub writes as `### <label>` followed by the answer, or by
+    "_No response_" for one left empty. Only the fields before what the reader writes are read: a "### Fact" they type
+    there mustn't replace the fact the app filled in."""
+    fields = {}
+    for heading, answer in re.findall(r"^### (.+?)\s*\n(.*?)(?=^### |\Z)", body, re.MULTILINE | re.DOTALL):
+        if heading.strip() == REPORT_WRITTEN:
+            break
+        column = REPORT_FIELDS.get(heading.strip())
+        if column and (value := answer.strip()) != "_No response_":
+            fields[column] = value
+    return fields
+
+
 MRDS = ZipDataset(
     name="mrds_deposits",
     url="https://mrdata.usgs.gov/mrds/mrds-csv.zip",
@@ -193,7 +246,14 @@ REFERENCES = ReferenceCandidates(
     columns=REFERENCE_COLUMNS,
 )
 
-DATASETS = (MRDS, WIKIDATA, WIKIDATA_ITEMS, PLEIADES, REFERENCES)
+REPORTS = GitHubReports(
+    name="github_reports",
+    url="https://api.github.com/repos/nvelaborja/Capabilities/issues",
+    license="The project's own issue tracker; only issue numbers, titles and the fields the app filled in are kept",
+    columns=("number", "url", "title", "created_at", *REPORT_FIELDS.values()),
+)
+
+DATASETS = (MRDS, WIKIDATA, WIKIDATA_ITEMS, PLEIADES, REFERENCES, REPORTS)
 
 
 def fetch(dataset: Dataset, build_dir: Path, url: str | None = None, root: Path | None = None) -> dict:
