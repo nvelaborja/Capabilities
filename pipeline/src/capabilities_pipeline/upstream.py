@@ -148,6 +148,7 @@ class ReferenceCandidates(Dataset):
 
 # The fields of the report form (.github/ISSUE_TEMPLATE/report.yml), by the heading GitHub gives each in the issue.
 REPORT_FIELDS = {"Fact": "fact", "Kind": "kind", "Reference": "reference", "Agent run": "run"}
+REPORT_WRITTEN = "What is wrong"  # the first field the reader writes, after all of the app's
 REPORT_PAGES = 10  # of 100 issues each: far more open reports than anyone would leave unread
 
 
@@ -185,9 +186,12 @@ def report_row(issue: dict) -> dict:
 
 def report_fields(body: str) -> dict[str, str]:
     """The form's fields from an issue's body, which GitHub writes as `### <label>` followed by the answer, or by
-    "_No response_" for one left empty."""
+    "_No response_" for one left empty. Only the fields before what the reader writes are read: a "### Fact" they type
+    there mustn't replace the fact the app filled in."""
     fields = {}
     for heading, answer in re.findall(r"^### (.+?)\s*\n(.*?)(?=^### |\Z)", body, re.MULTILINE | re.DOTALL):
+        if heading.strip() == REPORT_WRITTEN:
+            break
         column = REPORT_FIELDS.get(heading.strip())
         if column and (value := answer.strip()) != "_No response_":
             fields[column] = value

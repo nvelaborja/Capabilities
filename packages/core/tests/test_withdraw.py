@@ -68,13 +68,14 @@ def _route(root) -> dict:
     return yaml.safe_load((root / "data" / "routes" / "twist-test-cord.yaml").read_text(encoding="utf-8"))
 
 
-def _with_agents_ore_row(root, mineral="Testite") -> None:
+def _with_agents_ore_row(root, mineral="Testite", mined_like="") -> None:
     path = root / "data" / "crosswalks" / "ore_minerals.csv"
     with path.open(newline="", encoding="utf-8") as file:
         reader = csv.DictReader(file)
         columns, rows = reader.fieldnames, list(reader)
     rows.append({column: "" for column in columns} | {
-        "mrds_ore": mineral, "class": "none", "citation": AGENTS, "url": "https://example.org/rope",
+        "mrds_ore": mineral, "class": "none", "citation": AGENTS, "mined_like": mined_like,
+        "id": mineral.lower() if mined_like else "", "url": "https://example.org/rope",
         "supports": "Not smelted for copper.", "quote": ORE_QUOTE, "proposed_by": ORE_RUN})
     with path.open("w", newline="", encoding="utf-8") as file:
         writer = csv.DictWriter(file, fieldnames=columns, lineterminator="\n")
@@ -121,6 +122,37 @@ class TestWithdrawingARoutesReference:
             withdraw_reference(cord, route, citation, "Wrong.")
         assert (cord / "data" / "routes" / "twist-test-cord.yaml").read_text(encoding="utf-8") == before
         assert withdrawals(cord) == []
+
+    def test_a_routes_only_reference_is_refused_since_every_route_cites_one(self, cord):
+        path = cord / "data" / "routes" / "twist-test-cord.yaml"
+        route = _route(cord)
+        route["references"] = [route["references"][1]]
+        path.write_text(yaml.safe_dump(route, sort_keys=False), encoding="utf-8")
+        before = path.read_text(encoding="utf-8")
+        with pytest.raises(WithdrawError, match="its only one.*add another reference"):
+            withdraw_reference(cord, "twist-test-cord", AGENTS, "Wrong.")
+        assert path.read_text(encoding="utf-8") == before and withdrawals(cord) == []
+
+    def test_a_reference_that_cant_be_edited_as_text_is_refused_with_what_to_do(self, cord):
+        # given: the person's quoted reference written as one flow mapping, which the editor won't rewrite
+        path = cord / "data" / "routes" / "twist-test-cord.yaml"
+        route = _route(cord)
+        lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+        start = lines.index(f'  - citation: "{PERSON}"\n')
+        flow = "  - " + json.dumps(route["references"][0]) + "\n"
+        path.write_text("".join(lines[:start] + [flow] + lines[start + 6:]), encoding="utf-8")
+        assert _route(cord) == route
+        with pytest.raises(WithdrawError, match="edit the file by hand"):
+            withdraw_reference(cord, "twist-test-cord", PERSON, "Wrong.")
+        assert withdrawals(cord) == []
+
+    def test_a_copied_mining_route_is_withdrawn_from_the_route_it_was_copied_from(self, cord, capsys):
+        _with_agents_ore_row(cord, mined_like="twist-test-cord")
+        assert main(["--root", str(cord), "withdraw", "reference", "mine-testite", "--citation", AGENTS,
+                     "--reason", "Wrong."]) == 0
+        assert AGENTS not in [r["citation"] for r in _route(cord)["references"]]
+        assert withdrawals(cord)[0]["subject"] == "twist-test-cord"
+        assert "mine-testite is copied from twist-test-cord" in capsys.readouterr().out
 
     def test_without_the_runs_summary_it_cant_tell_what_to_remove(self, cord):
         (cord / "data" / "agent_runs" / f"{RUN}.json").unlink()

@@ -204,6 +204,9 @@ def cmd_withdraw(args, root: Path) -> int:
     what = {"ore_row": "the ore crosswalk's row for", "reference": "the reference an agent added to",
             "quote": "the quote an agent added to a reference of"}[withdrawal.kind]
     print(f"Withdrew {what} {withdrawal.subject} (run {withdrawal.run}), recorded in data/withdrawals.csv.")
+    if args.kind != "ore" and args.route != withdrawal.subject:
+        print(f"{args.route} is copied from {withdrawal.subject}, so the fact is off {withdrawal.subject} and every "
+              "copy of it.")
     closes = f' Its body can say "Closes #{withdrawal.report}".' if withdrawal.report else ""
     print(f"Run `uv run capabilities validate`, then open a pull request with the change.{closes}")
     return 0

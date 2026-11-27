@@ -20,7 +20,7 @@ from pathlib import Path
 import yaml
 
 from . import yaml_edit
-from .graph import ORE_CROSSWALK, load_documents
+from .graph import ORE_CROSSWALK, load_documents, ore_crosswalk_rows
 
 WITHDRAWALS = Path("data") / "withdrawals.csv"
 AGENT_RUNS = Path("data") / "agent_runs"
@@ -72,24 +72,34 @@ def withdraw_ore_row(root: Path, mineral: str, reason: str, report: str = "", on
 def withdraw_reference(root: Path, route_id: str, citation: str, reason: str, report: str = "",
                        on: date | None = None) -> Withdrawal:
     """Take what an agent added to a route's reference citing `citation` out of the route's file: the whole reference
-    if the agent added it, or the quote (and the URL it brought) if a person's reference was quoted."""
+    if the agent added it, or the quote (and the URL it brought) if a person's reference was quoted. A mining route copied for an ore mineral has no file of its own: the
+    fact is taken off the route it was copied from, and so off every copy."""
+    route_id = route_of(root, route_id)
     path = _route_path(root, route_id)
     text = path.read_text(encoding="utf-8")
     try:
         index = yaml_edit.reference_citing(text, citation)
     except yaml_edit.EditError as error:
         raise WithdrawError(f"{route_id}: {error}") from error
-    reference = yaml.safe_load(text)["references"][index]
+    references = yaml.safe_load(text)["references"]
+    reference = references[index]
     run = reference.get("proposed_by")
     if not run:
         raise WithdrawError(f"{route_id}'s reference to {citation!r} wasn't proposed by an agent: correct it by "
                             f"editing {path.relative_to(root)}")
     change = change_in_run(root, run, route_id, reference["citation"])
-    if change["reference"] is None:
-        kind, edited = "reference", yaml_edit.remove_reference(text, index)
-    else:
-        added = ("quote", "proposed_by") + (("url",) if change.get("adds_url") else ())
-        kind, edited = "quote", yaml_edit.remove_fields(text, index, added)
+    if change["reference"] is None and len(references) == 1:
+        raise WithdrawError(f"{route_id}'s reference to {citation!r} is its only one, and every route cites one: add "
+                            f"another reference to {path.relative_to(root)} first")
+    try:
+        if change["reference"] is None:
+            kind, edited = "reference", yaml_edit.remove_reference(text, index)
+        else:
+            added = ("quote", "proposed_by") + (("url",) if change.get("adds_url") else ())
+            kind, edited = "quote", yaml_edit.remove_fields(text, index, added)
+    except yaml_edit.EditError as error:
+        raise WithdrawError(f"{route_id}: can't take it out of {path.relative_to(root)} as text ({error}): edit the "
+                            "file by hand") from error
     path.write_text(edited, encoding="utf-8")
     return _record(root, Withdrawal(_day(on), kind, route_id, reference["citation"], reference.get("url", ""),
                                     reference.get("quote", ""), run, reason, report))
@@ -110,6 +120,17 @@ def withdrawn_quotes(root: Path) -> set[tuple[str, str]]:
 
 def quote_key(subject: str, quote: str) -> tuple[str, str]:
     return subject.strip().casefold(), " ".join(quote.split()).casefold()
+
+
+def route_of(root: Path, route_id: str) -> str:
+    """The route whose file holds `route_id`'s references: itself, or for a mining route copied for an ore mineral
+    (`mine-<mineral>`, ADR 0045), the route the mineral's crosswalk row says it is mined like."""
+    if route_id.startswith("mine-"):
+        mineral = route_id.removeprefix("mine-")
+        for row in ore_crosswalk_rows(root):
+            if row.get("id") == mineral and row.get("mined_like"):
+                return row["mined_like"]
+    return route_id
 
 
 def _route_path(root: Path, route_id: str) -> Path:

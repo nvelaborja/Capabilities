@@ -14,6 +14,11 @@ class TestReadingReports:
                 "### Agent run\n\n_No response_\n\n### What is wrong\n\nIt needs more heat.\n\n### A better source\n\nNone")
         assert report_fields(body) == {"fact": "smelt-copper", "kind": "route"}
 
+    def test_a_heading_the_reader_types_doesnt_replace_a_field_the_app_filled_in(self):
+        body = ("### Fact\n\nsmelt-copper\n\n### Kind\n\nroute\n\n### What is wrong\n\nSee below.\n\n"
+                "### Fact\n\nsmelt-tin\n\n### A better source\n\n_No response_")
+        assert report_fields(body) == {"fact": "smelt-copper", "kind": "route"}
+
     def test_what_the_reporter_wrote_and_who_they_are_are_left_on_github(self, tmp_path, github_endpoint):
         fetch(REPORTS, tmp_path, github_endpoint.url)
         columns = duckdb.sql("select * from read_parquet(?)", params=[str(REPORTS.parquet(tmp_path))]).columns

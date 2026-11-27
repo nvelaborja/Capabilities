@@ -13,6 +13,7 @@ import shutil
 import stat
 import subprocess
 import sys
+import urllib.error
 from dataclasses import replace
 from pathlib import Path
 
@@ -808,11 +809,13 @@ def _repository(repo_root: Path, directory: Path) -> Path:
     return repo
 
 
-def _fake_gh(directory: Path) -> Path:
+def _fake_gh(directory: Path, open_issues: list[dict] = ()) -> Path:
+    """A stand-in for gh that records its arguments; `issue list` answers with `open_issues`."""
     gh = directory / "gh"
+    (directory / "gh-issues.json").write_text(json.dumps(list(open_issues)), encoding="utf-8")
     gh.write_text(f'#!/bin/sh\nprintf "%s\\n" "$@" >> "{directory / "gh-calls.txt"}"\n'
                   'if [ "$1" = "pr" ]; then echo "https://github.com/example/capabilities/pull/99"; fi\n'
-                  'if [ "$1 $2" = "issue list" ]; then echo "[]"; fi\n'
+                  f'if [ "$1 $2" = "issue list" ]; then cat "{directory / "gh-issues.json"}"; fi\n'
                   'if [ "$1 $2" = "issue create" ]; then echo "https://github.com/example/capabilities/issues/7"; fi\n')
     gh.chmod(gh.stat().st_mode | stat.S_IEXEC)
     return gh
@@ -1522,6 +1525,97 @@ class TestRecheckingMergedFacts:
                                        "run": RECHECKED_RUN}
         assert [fact["reported"] for fact in summary["facts"] if fact["outcome"] == "fails"] == [
             "https://github.com/example/capabilities/issues/7"]
+
+    def test_a_fact_the_reviewer_couldnt_be_asked_about_is_listed_not_reported(self, merged_root, fake_claude,
+                                                                                tmp_path):
+        # given: the reviewer runs out of turns on the first fact that passes code's checks
+        fake_claude.script(reviewer=[{"error": "max_turns"}, answer(ACCEPT)])
+        summary = recheck_run(merged_root, fake_claude, gh=_fake_gh(tmp_path), reviewer=True, report_failures=True)
+        failed = [fact for fact in summary["facts"] if fact["outcome"] == "failed"]
+        assert len(failed) == 1 and failed[0]["reported"] is None
+        assert summary["not_rechecked"] == [failed[0]["fact"]]
+        # then: only the fact whose page changed is reported
+        assert (tmp_path / "gh-calls.txt").read_text().count("issue\ncreate") == 1
+
+    def test_a_site_that_doesnt_answer_leaves_the_fact_unchecked_not_wrong(self, merged_root, tmp_path):
+        from capabilities_pipeline.agents.recheck import RecheckSettings, recheck
+
+        class WikidataDown(FakeWeb):
+            def wikidata_item(self, item):
+                raise urllib.error.URLError("timed out")
+
+        # given: Wikidata is down, and the changed page's site doesn't answer
+        web = WikidataDown(pages=RECHECK_PAGES | {CHANGED_URL: Page(CHANGED_URL, "unreachable: timed out")})
+        gh = _fake_gh(tmp_path)
+        summary = recheck(merged_root, RecheckSettings(runs=(RECHECKED_RUN, RECHECKED_ORE_RUN), report_failures=True,
+                                                       gh_command=str(gh)),
+                          web=web, on_progress=lambda m: None, audit_dir=merged_root / "audit")
+        outcomes = {fact["fact"]: fact["outcome"] for fact in summary["facts"]}
+        assert outcomes["Covellite's ore row"] == "unreachable"
+        assert outcomes[f"{TWIST}'s reference to {CORD_CITATION}"] == "unreachable"
+        assert set(summary["not_rechecked"]) == {"Covellite's ore row", f"{TWIST}'s reference to {CORD_CITATION}"}
+        assert "issue\ncreate" not in (tmp_path / "gh-calls.txt").read_text()
+
+    def test_a_quote_still_holds_after_a_person_verifies_its_reference(self, merged_root):
+        path = merged_root / "data" / "routes" / f"{TWIST}.yaml"
+        # given: a person has read the site report the agent quoted, and verified it
+        verified = MERGED_TWIST.replace(f"""    quote: "{SITE_SENTENCE}"
+    status: unverified""", f"""    quote: "{SITE_SENTENCE}"
+    status: verified""")
+        assert verified != MERGED_TWIST
+        path.write_text(verified, encoding="utf-8")
+        outcomes = {fact["fact"]: fact["outcome"] for fact in recheck_run(merged_root)["facts"]}
+        assert outcomes[f"the quote on {TWIST}'s reference to {SITE_REPORT}"] == "holds"
+
+    @pytest.mark.parametrize("open_report, reported", [
+        pytest.param({"fact": TWIST, "kind": "reference", "reference": CORD_CITATION}, False,
+                     id="a reader's report on the same reference"),
+        pytest.param({"fact": TWIST, "kind": "reference", "reference": SITE_REPORT}, True,
+                     id="a report on another of the route's references"),
+        pytest.param({"fact": "another-route", "kind": "reference", "reference": CORD_CITATION}, True,
+                     id="a report on another route"),
+    ])
+    def test_a_fact_an_open_report_already_names_isnt_reported_again(self, merged_root, tmp_path, open_report,
+                                                                      reported):
+        fields = "".join(f"### {heading}\n\n{open_report.get(key) or '_No response_'}\n\n" for heading, key in (
+            ("Fact", "fact"), ("Kind", "kind"), ("Reference", "reference"), ("Agent run", "run")))
+        body = fields + "### What is wrong\n\nThe page was rewritten.\n\n### A better source\n\n_No response_\n"
+        summary = recheck_run(merged_root, gh=_fake_gh(tmp_path, [{"title": "Report: twisting", "body": body}]),
+                              report_failures=True)
+        assert ("issue\ncreate" in (tmp_path / "gh-calls.txt").read_text()) == reported
+        if not reported:
+            assert [f["reported"] for f in summary["facts"] if f["outcome"] == "fails"] == ["already reported"]
+
+    def test_an_earlier_rechecks_open_report_isnt_repeated(self, merged_root, tmp_path):
+        first, second = tmp_path / "first", tmp_path / "second"
+        first.mkdir(), second.mkdir()
+        recheck_run(merged_root, gh=_fake_gh(first), report_failures=True)
+        calls = (first / "gh-calls.txt").read_text()
+        title = calls.split("--title\n", 1)[1].split("\n", 1)[0]
+        body = calls.split("--body\n", 1)[1]
+        recheck_run(merged_root, gh=_fake_gh(second, [{"title": title, "body": body}]), report_failures=True)
+        assert "issue\ncreate" not in (second / "gh-calls.txt").read_text()
+
+    def test_a_recheck_that_breaks_still_records_its_end_and_summary(self, merged_root, monkeypatch):
+        from capabilities_pipeline.agents import recheck as module
+
+        def broken(*args, **kwargs):
+            raise RuntimeError("a bug")
+
+        monkeypatch.setattr(module, "_recheck", broken)
+        with pytest.raises(RuntimeError):
+            recheck_run(merged_root)
+        assert audit_rows(merged_root / "audit", "select stopped_because from run_ends") == [("RuntimeError: a bug",)]
+        assert len(list((merged_root / "audit" / "rechecks").glob("*.json"))) == 1
+
+    def test_everything_about_a_fact_is_logged_under_its_items_name(self, merged_root, fake_claude):
+        fake_claude.script(reviewer=[answer(ACCEPT)] * 2)
+        recheck_run(merged_root, fake_claude, reviewer=True)
+        audit = merged_root / "audit"
+        checked = {row[0] for row in audit_rows(audit, "select item from checks")}
+        assert checked == {row[0] for row in audit_rows(audit, "select item from outcomes")}
+        assert {row[0] for row in audit_rows(audit, "select item from calls")} <= checked
+        assert "Covellite" in checked and TWIST in checked
 
     def test_the_recheck_is_in_the_audit_log_like_a_run(self, merged_root):
         summary = recheck_run(merged_root)

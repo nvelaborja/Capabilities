@@ -335,7 +335,10 @@ def _merged(route: Route, index: int, reference: dict, change: dict) -> Merged:
         fact = f"{route.name}'s reference to {reference['citation']}"
     else:
         added = {"quote", "proposed_by"} | ({"url"} if change.get("adds_url") else set())
-        references[index] = {key: value for key, value in reference.items() if key not in added}
+        # It was unverified when the agent quoted it (the proposal's checks say so): a person who has since read the
+        # work and verified it mustn't make the agent's quote fail its re-check.
+        references[index] = {key: value for key, value in reference.items() if key not in added} | {
+            "status": "unverified"}
         proposal = RouteProposal("propose", index, reference["citation"], reference.get("url", ""), reference["quote"],
                                  reference.get("supports", ""), adds_url=bool(change.get("adds_url")))
         fact = f"the quote on {route.name}'s reference to {reference['citation']}"

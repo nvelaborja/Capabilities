@@ -171,7 +171,8 @@ def check(candidate: Candidate, proposal: Proposal, context: Context, web: Libra
     except NETWORK_ERRORS as error:
         # Wikidata is down, not the proposal wrong: say so, and let the proposer try again.
         item = None
-        checks.append(Check("wikidata_item_is_the_mineral", False, f"Wikidata couldn't be reached: {error}"))
+        checks.append(Check("wikidata_item_is_the_mineral", False, f"Wikidata couldn't be reached: {error}",
+                            unreachable=True))
     else:
         checks += _item_checks(candidate, proposal, item, context)
     if proposal.ore_class != "none":

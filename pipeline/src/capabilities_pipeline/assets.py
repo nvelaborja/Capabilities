@@ -300,6 +300,7 @@ def definitions(root: Path, build_dir: Path) -> Definitions:
                                                           downloads.crossref_url, downloads.wikidata_site_url),
                                 on_progress=context.log.info)
         context.add_output_metadata({"recheck": summary["recheck"], "outcomes": summary["outcomes"],
+                                     "not_rechecked": summary["not_rechecked"],
                                      "stopped_because": summary["stopped_because"] or ""})
         return summary
 
