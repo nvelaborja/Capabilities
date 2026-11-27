@@ -1,6 +1,6 @@
 # 0051. Write dates as signed years, and date workings from Pleiades' periods and curated dates
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-26
 
 ## Context
