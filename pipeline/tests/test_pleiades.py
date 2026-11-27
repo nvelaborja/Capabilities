@@ -113,6 +113,14 @@ class TestWhatAPlaceSays:
         assert agrokipia["state"] == "worked"
 
 
+def period_turtle(key: str, label: str | None = None, note: str | None = None) -> str:
+    """One period as Pleiades writes it, with the label and scope note given as Turtle strings."""
+    lines = [f"<https://pleiades.stoa.org/vocabularies/{key}> a <http://www.w3.org/2004/02/skos/core#Concept>"]
+    lines += [f"    skos:prefLabel {label}@en"] if label is not None else []
+    lines += [f"    skos:scopeNote {note}@en"] if note is not None else []
+    return ";\n".join(lines) + " .\n\n"
+
+
 class TestPeriods:
     def test_each_period_is_kept_with_the_years_its_note_gives(self, tmp_path, pleiades_periods_ttl):
         from capabilities_pipeline.upstream import PLEIADES_PERIODS, fetch
@@ -138,14 +146,38 @@ class TestPeriods:
 
     @pytest.mark.parametrize("turtle", [
         "",
-        "<https://pleiades.stoa.org/vocabularies/roman> a <http://www.w3.org/2004/02/skos/core#Concept>;\n"
-        "    skos:scopeNote \"[[-30, 300]]\"@en .\n",
-    ], ids=["no periods", "a period without a label"])
+        period_turtle("roman", note='"[[-30, 300]]"'),
+        period_turtle("roman", label='""', note='"[[-30, 300]]"'),
+        period_turtle("roman", label='"Roman"', note='"""Roman.\n[[-30, 300]]"""'),
+        period_turtle("archaic", label='"Archaic"', note='"[[-750, -550]]"')
+        + 'pv:roman a skos:Concept;\n    skos:prefLabel "Roman"@en .\n',
+    ], ids=["no periods", "a period without a label", "an empty label", "a note in triple quotes",
+            "a period written another way"])
     def test_a_changed_format_is_an_error_not_a_period_left_out(self, turtle):
         from capabilities_pipeline.upstream import period_rows
 
         with pytest.raises(ValueError, match="format changed"):
             period_rows(turtle)
+
+    @pytest.mark.parametrize(("years", "error"), [
+        ("[[300, -30]]", "runs backwards"),
+        ("[[0, 100]]", "year 0"),
+    ], ids=["backwards", "year zero"])
+    def test_years_that_are_not_signed_years_running_forward_fail_the_download(self, years, error):
+        from capabilities_pipeline.upstream import period_rows
+
+        # given: a note whose years no period could have; the download fails, so the copy the build has stays newest
+        with pytest.raises(ValueError, match=error):
+            period_rows(period_turtle("roman", label='"Roman"', note=f'"{years}"'))
+
+    def test_the_vocabulary_itself_is_not_a_period(self):
+        from capabilities_pipeline.upstream import period_rows
+
+        turtle = period_turtle("roman", label='"Roman"', note='"[[-30, 300]]"') + (
+            "<https://pleiades.stoa.org/vocabularies/> a <http://www.w3.org/2004/02/skos/core#ConceptScheme>;\n"
+            '    dcterms:title "Time Periods" .\n'
+        )
+        assert [(row["key"], row["scope_note"]) for row in period_rows(turtle)] == [("roman", "[[-30, 300]]")]
 
 
 class TestWorkedBy:
@@ -173,6 +205,13 @@ class TestWorkedBy:
         agrokipia = occurrences_of(build_dir, "Agrokipia")["copper-ore"]
         assert agrokipia["worked_by_year"] == int(retrieved[:4])
         assert agrokipia["worked_by_note"].startswith("Modern")
+        # then: the period's own end is kept, so the map doesn't say it had ended by then
+        assert agrokipia["worked_by_period_end"] == 2100
+
+    def test_a_period_that_had_ended_is_its_own_end(self, upstream_built_dir):
+        agrokipia = occurrences_of(upstream_built_dir, "Agrokipia")["copper-ore"]
+        assert agrokipia["worked_by_period_end"] == agrokipia["worked_by_year"] == -550
+        assert agrokipia["upstream_worked_by_note"] is None
 
 
 class TestCuratedDates:
@@ -182,6 +221,7 @@ class TestCuratedDates:
         agrokipia = occurrences_of(tmp_path / "build", "Agrokipia")["copper-ore"]
         assert (agrokipia["worked_by_year"], agrokipia["worked_by_basis"]) == (-1200, "curated")
         assert (agrokipia["worked_by_date"], agrokipia["upstream_worked_by_year"]) == ("agrokipia-worked", -550)
+        assert agrokipia["upstream_worked_by_note"].startswith("Archaic")
         assert agrokipia["worked_by_note"].startswith("Test only.")
         assert agrokipia["worked_by_references"][0]["citation"].startswith("Test, A. (2026)")
 

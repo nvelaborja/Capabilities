@@ -305,8 +305,13 @@ export interface PlaceProperties {
   worked_by_note: string | null;
   /** A curated date's references: a list from the API, a JSON string once MapLibre has handled the feature. */
   worked_by_references: WorkingDateReference[] | string | null;
-  /** What the dataset said, when a curated date replaces it. */
+  /** The end of the period that dated it: later than worked_by_year when the period hadn't ended when the data was
+   * taken (Modern, to 2100). */
+  worked_by_period_end: number | null;
+  /** What the dataset said, when a curated date replaces it: its year, and the note it came with (for Pleiades, the
+   * period it was the end of). */
   upstream_worked_by_year: number | null;
+  upstream_worked_by_note: string | null;
   state: OccurrenceState;
   /** Pleiades: the years it is attested from and to (negative is BC), and the named periods (ADR 0046). */
   attested_from: number | null;

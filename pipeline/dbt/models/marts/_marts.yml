@@ -100,6 +100,18 @@ models:
           - not_null:
               config:
                 where: "worked_by_year is not null"
+      - name: worked_by_period_end
+        description: >
+          The end of the period that dated a Pleiades place. Later than worked_by_year when the period hadn't ended
+          when the places snapshot was taken (Modern, to 2100), and its end was taken as that year (ADR 0051).
+        data_tests:
+          - not_null:
+              config:
+                where: "worked_by_basis = 'period'"
+      - name: upstream_worked_by_note
+        description: >
+          With a curated date, the note the dataset's year came with (for Pleiades, the period it was the end of), kept
+          beside upstream_worked_by_year.
       - name: provenance
         data_tests: [not_null]
   - name: reference_checks

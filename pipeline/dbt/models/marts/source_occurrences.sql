@@ -49,7 +49,12 @@ period_ends as (
         arg_min(
             periods.label,
             {'end': least(periods.to_year, year(pleiades_snapshot.retrieved_at at time zone 'UTC')), 'label': periods.label}
-        ) as period_label
+        ) as period_label,
+        -- The period's own end, which is later than the year when the period hadn't ended when the snapshot was taken.
+        arg_min(
+            periods.to_year,
+            {'end': least(periods.to_year, year(pleiades_snapshot.retrieved_at at time zone 'UTC')), 'label': periods.label}
+        ) as period_end
     from (select record_id, unnest(periods) as period from workings) as attested
     join {{ ref('stg_pleiades__periods') }} as periods on periods.key = attested.period
     cross join pleiades_snapshot
@@ -116,6 +121,7 @@ select
     case when first_production_qualifier is distinct from 'after' then first_production_year end as worked_by_year,
     case when worked_by_year is not null then 'first production' end as worked_by_basis,
     null as worked_by_note,
+    null::integer as worked_by_period_end,
     case when worked_by_year is not null then 'worked' else 'present' end as state,
     null::integer as attested_from,
     null::integer as attested_to,
@@ -158,6 +164,7 @@ select
     period_ends.worked_by_year,
     case when period_ends.worked_by_year is not null then 'period' end as worked_by_basis,
     period_ends.period_label as worked_by_note,
+    period_ends.period_end as worked_by_period_end,
     'worked' as state,
     attested_from,
     attested_to,
@@ -197,6 +204,7 @@ select
         case when dates.id is not null then 'worked' else upstream.state end as state
     ),
     case when dates.id is not null then upstream.worked_by_year end as upstream_worked_by_year,
+    case when dates.id is not null then upstream.worked_by_note end as upstream_worked_by_note,
     dates.id as worked_by_date,
     dates."references"::varchar as worked_by_references
 from upstream

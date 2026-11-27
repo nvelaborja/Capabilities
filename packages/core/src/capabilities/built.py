@@ -177,8 +177,8 @@ def load_reference_checks(build_dir: Path) -> dict[str, dict]:
 OCCURRENCE_COLUMNS = (
     "id", "source_id", "dataset", "record_id", "name", "longitude", "latitude", "country", "admin_area",
     "development_status", "deposit_type", "worked_by_year", "worked_by_basis", "worked_by_note", "worked_by_date",
-    "worked_by_references", "upstream_worked_by_year", "state", "attested_from", "attested_to", "periods",
-    "approximate", "matched_on", "url",
+    "worked_by_references", "worked_by_period_end", "upstream_worked_by_year", "upstream_worked_by_note", "state",
+    "attested_from", "attested_to", "periods", "approximate", "matched_on", "url",
 )
 
 

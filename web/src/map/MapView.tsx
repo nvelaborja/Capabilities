@@ -11,6 +11,7 @@ import type { OccurrencesResponse, PlaceProperties } from "../api/types";
 import { retrievedOn } from "../lib/dates";
 import type { Theme } from "../state/theme";
 import {
+  attestedText,
   bounds,
   classLevelText,
   datingText,
@@ -314,6 +315,8 @@ function placeContent(place: PlaceProperties, places: OccurrencesResponse): HTML
   add("span", stateText({ ...place, worked_by_year: place.worked_by_year ?? null }), `map-popup-state map-popup-${place.state}`);
   const dating = datingText(place);
   if (dating) add("span", dating, "map-popup-detail");
+  const attested = attestedText(place);
+  if (attested) add("span", attested, "map-popup-detail");
   const periods = periodsText(place.periods);
   if (periods) add("span", periods, "map-popup-detail");
   if (place.approximate) add("span", "Approximate location: Pleiades gives only a rough area", "map-popup-detail");

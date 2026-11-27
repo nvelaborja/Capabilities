@@ -42,7 +42,7 @@ export function stateText(
   if (place.state === "worked" && place.worked_by_year !== null) return `Known to have been worked by ${yearText(place.worked_by_year)}`;
   // Pleiades: worked when it is attested, which may be modern only. Such a place still shows the material was there.
   if (place.state === "worked" && place.attested_from != null && place.attested_to != null) {
-    return `Worked: attested ${yearText(place.attested_from)} – ${untilText(place.attested_to, new Date().getFullYear())}`;
+    return `Worked: attested ${attestedRange(place.attested_from, place.attested_to)}`;
   }
   if (place.state === "worked") return "Worked, with no recorded dates";
   return "Present, with no known working date";
@@ -56,14 +56,50 @@ export function yearText(year: number): string {
 
 /** Why a place is known to have been worked by its year; null when it has no year. Never by colour alone (ADR 0019). */
 export function datingText(
-  place: Pick<PlaceProperties, "worked_by_basis" | "worked_by_note" | "worked_by_references" | "upstream_worked_by_year">,
+  place: Pick<
+    PlaceProperties,
+    | "worked_by_year"
+    | "worked_by_basis"
+    | "worked_by_note"
+    | "worked_by_references"
+    | "worked_by_period_end"
+    | "upstream_worked_by_year"
+    | "upstream_worked_by_note"
+  >,
 ): string | null {
   if (place.worked_by_basis === "first production") return "From its first production, as MRDS records it";
-  if (place.worked_by_basis === "period") return `Attested in ${place.worked_by_note ?? "a period"}, which had ended by then`;
+  if (place.worked_by_basis === "period") return periodDatingText(place);
   if (place.worked_by_basis !== "curated") return null;
   const cited = workingDateReferences(place.worked_by_references).map((reference) => reference.citation);
-  const replaced = place.upstream_worked_by_year != null ? ` The dataset says ${yearText(place.upstream_worked_by_year)}.` : "";
-  return `Curated date: ${place.worked_by_note ?? ""}${cited.length ? ` (${cited.join("; ")})` : ""}.${replaced}`;
+  // A reason is written as a sentence; its full stop goes after the citations instead.
+  const reason = (place.worked_by_note ?? "").replace(/\.$/, "");
+  return `Curated date: ${reason}${cited.length ? ` (${cited.join("; ")})` : ""}.${upstreamText(place)}`;
+}
+
+/** A period that hadn't ended when the data was taken (Modern, to 2100) dates a place by that year, not by its end. */
+function periodDatingText(place: Pick<PlaceProperties, "worked_by_year" | "worked_by_note" | "worked_by_period_end">): string {
+  const period = place.worked_by_note ?? "a period";
+  const running = place.worked_by_period_end != null && place.worked_by_year != null && place.worked_by_period_end > place.worked_by_year;
+  return running ? `Attested in ${period}, which hadn't ended when the data was taken` : `Attested in ${period}, which had ended by then`;
+}
+
+/** What the dataset said, when a curated date replaces it, with the period its year came from. */
+function upstreamText(place: Pick<PlaceProperties, "upstream_worked_by_year" | "upstream_worked_by_note">): string {
+  if (place.upstream_worked_by_year == null) return "";
+  const from = place.upstream_worked_by_note ? `, from ${place.upstream_worked_by_note}` : "";
+  return ` The dataset says ${yearText(place.upstream_worked_by_year)}${from}.`;
+}
+
+/** The years a Pleiades place is attested, beside its year; null without either, since the state then gives the range. */
+export function attestedText(
+  place: Pick<PlaceProperties, "worked_by_year"> & Partial<Pick<PlaceProperties, "attested_from" | "attested_to">>,
+): string | null {
+  if (place.worked_by_year == null || place.attested_from == null || place.attested_to == null) return null;
+  return `Attested ${attestedRange(place.attested_from, place.attested_to)}`;
+}
+
+function attestedRange(from: number, to: number): string {
+  return `${yearText(from)} – ${untilText(to, new Date().getFullYear())}`;
 }
 
 function workingDateReferences(references: PlaceProperties["worked_by_references"]): WorkingDateReference[] {
