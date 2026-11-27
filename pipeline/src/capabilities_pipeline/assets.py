@@ -42,7 +42,8 @@ from .agents.curate import Settings
 from .agents.recheck import RecheckSettings, recheck as recheck_facts
 from .agents.run import run_agents
 from .build import DBT_PROJECT, dbt_environment, dbt_target_path, load_inputs, write_manifest
-from .upstream import MRDS, PLEIADES, REFERENCES, REPORTS, WIKIDATA, WIKIDATA_ITEMS, Dataset, fetch_or_fall_back
+from .upstream import (MRDS, PLEIADES, PLEIADES_PERIODS, REFERENCES, REPORTS, WIKIDATA, WIKIDATA_ITEMS, Dataset,
+                       fetch_or_fall_back)
 
 
 class UpstreamDownloads(ConfigurableResource):
@@ -51,6 +52,7 @@ class UpstreamDownloads(ConfigurableResource):
     mrds_url: str = MRDS.url
     wikidata_url: str = WIKIDATA.url
     pleiades_url: str = PLEIADES.url
+    pleiades_periods_url: str = PLEIADES_PERIODS.url
     openalex_url: str = REFERENCES.url
     crossref_url: str = REFERENCES.crossref_url
     github_reports_url: str = REPORTS.url
@@ -150,6 +152,15 @@ def definitions(root: Path, build_dir: Path) -> Definitions:
         return download(context, PLEIADES, downloads.pleiades_url)
 
     @asset(
+        key=AssetKey(["upstream", PLEIADES_PERIODS.name]),
+        group_name="upstream",
+        description="A snapshot of Pleiades' vocabulary of time periods (Turtle), read into each period's key, label and "
+        "years. The end of a place's earliest period dates when a mine or quarry was worked by (ADR 0051).",
+    )
+    def pleiades_periods_snapshot(context: AssetExecutionContext, downloads: UpstreamDownloads) -> MaterializeResult:
+        return download(context, PLEIADES_PERIODS, downloads.pleiades_periods_url)
+
+    @asset(
         key=AssetKey(["upstream", REFERENCES.name]),
         group_name="upstream",
         description="What OpenAlex and Crossref hold for each work the curated layer cites (a few candidates each, by "
@@ -190,6 +201,7 @@ def definitions(root: Path, build_dir: Path) -> Definitions:
         WIKIDATA.name: "The Wikidata quantities snapshot, loaded into DuckDB as text.",
         WIKIDATA_ITEMS.name: "The Wikidata items snapshot (labels, descriptions, formulas), loaded into DuckDB as text.",
         PLEIADES.name: "The Pleiades places snapshot, loaded into DuckDB as text.",
+        PLEIADES_PERIODS.name: "The Pleiades time periods snapshot, loaded into DuckDB as text.",
         REFERENCES.name: "What OpenAlex and Crossref hold for the works we cite, and our links' statuses, as text.",
         REPORTS.name: "The open reports from GitHub issues, as text.",
         "pleiades_sources": "The hand-kept crosswalk of rules matching Pleiades mines and quarries to our sources and ore "
@@ -202,10 +214,11 @@ def definitions(root: Path, build_dir: Path) -> Definitions:
         WIKIDATA.name: [wikidata_snapshot],
         WIKIDATA_ITEMS.name: [wikidata_items_snapshot],
         PLEIADES.name: [pleiades_snapshot],
+        PLEIADES_PERIODS.name: [pleiades_periods_snapshot],
         REFERENCES.name: [reference_candidates_snapshot],
         REPORTS.name: [github_reports_snapshot],
         "upstream_snapshots": [mrds_snapshot, wikidata_snapshot, wikidata_items_snapshot, pleiades_snapshot,
-                               reference_candidates_snapshot, github_reports_snapshot],
+                               pleiades_periods_snapshot, reference_candidates_snapshot, github_reports_snapshot],
     }
 
     @multi_asset(
@@ -234,7 +247,7 @@ def definitions(root: Path, build_dir: Path) -> Definitions:
         yield MaterializeResult(
             asset_key=raw["pleiades_sources"], metadata={"rules": loaded["crosswalks"]["pleiades_sources"]}
         )
-        for dataset in (MRDS, WIKIDATA, WIKIDATA_ITEMS, PLEIADES, REFERENCES, REPORTS):
+        for dataset in (MRDS, WIKIDATA, WIKIDATA_ITEMS, PLEIADES, PLEIADES_PERIODS, REFERENCES, REPORTS):
             snapshot = loaded["upstream"][dataset.name]
             yield MaterializeResult(asset_key=raw[dataset.name], metadata={"rows": snapshot["rows"], "copy": snapshot["copy"]})
         yield MaterializeResult(asset_key=raw["upstream_snapshots"], metadata={"datasets": len(loaded["upstream"])})
@@ -310,8 +323,8 @@ def definitions(root: Path, build_dir: Path) -> Definitions:
         recheck()
 
     return Definitions(
-        assets=[mrds_snapshot, wikidata_snapshot, wikidata_items_snapshot, pleiades_snapshot, reference_candidates_snapshot,
-                github_reports_snapshot, raw_tables, graph_models, graph_manifest],
+        assets=[mrds_snapshot, wikidata_snapshot, wikidata_items_snapshot, pleiades_snapshot, pleiades_periods_snapshot,
+                reference_candidates_snapshot, github_reports_snapshot, raw_tables, graph_models, graph_manifest],
         jobs=[agent_curation, agent_recheck],
         resources={"dbt": DbtCliResource(project_dir=project), "downloads": UpstreamDownloads()},
     )

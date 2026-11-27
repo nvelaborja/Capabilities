@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:capabilities:schema:date",
+  "title": "Working date",
+  "description": "The year an upstream record (a mine, quarry or deposit) is known to have been worked by, from a cited work (ADR 0051). Used instead of the year its dataset gives, which the app shows beside it; upstream sources are never edited.",
+  "type": "object",
+  "required": ["id", "kind", "occurrence", "worked_by", "reason", "references"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "$ref": "urn:capabilities:schema:defs#/$defs/id" },
+    "kind": { "const": "date" },
+    "occurrence": {
+      "description": "The upstream record: its dataset and its id there (MRDS's dep_id, or the number in a Pleiades place's address).",
+      "type": "object",
+      "required": ["dataset", "record"],
+      "additionalProperties": false,
+      "properties": {
+        "dataset": { "enum": ["mrds", "pleiades"] },
+        "record": { "type": "string", "pattern": "^[0-9]+$" }
+      }
+    },
+    "worked_by": { "$ref": "urn:capabilities:schema:defs#/$defs/year", "description": "The year it is known to have been worked by: worked then or earlier." },
+    "reason": { "description": "What the work says that dates it, in a sentence.", "type": "string", "minLength": 1 },
+    "references": { "$ref": "urn:capabilities:schema:defs#/$defs/references", "minItems": 1 },
+    "notes": { "type": "string" }
+  }
+}

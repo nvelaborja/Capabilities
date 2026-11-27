@@ -13,6 +13,7 @@ import type { Theme } from "../state/theme";
 import {
   bounds,
   classLevelText,
+  datingText,
   emptyReason,
   periodsText,
   placesUnder,
@@ -311,6 +312,8 @@ function placeContent(place: PlaceProperties, places: OccurrencesResponse): HTML
   // Pleiades names no country or region; its places are located by the point alone.
   if (place.dataset !== "pleiades" || place.country || place.admin_area) add("span", whereText(place), "map-popup-where");
   add("span", stateText({ ...place, worked_by_year: place.worked_by_year ?? null }), `map-popup-state map-popup-${place.state}`);
+  const dating = datingText(place);
+  if (dating) add("span", dating, "map-popup-detail");
   const periods = periodsText(place.periods);
   if (periods) add("span", periods, "map-popup-detail");
   if (place.approximate) add("span", "Approximate location: Pleiades gives only a rough area", "map-popup-detail");

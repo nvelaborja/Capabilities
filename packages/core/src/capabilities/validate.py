@@ -106,6 +106,7 @@ class _Checker:
         for job_id, job in self.g.jobs.items():
             self.check_job(job_id, job)
         self.check_overrides()
+        self.check_dates()
         self.check_gaps()
         return self.issues
 
@@ -259,6 +260,15 @@ class _Checker:
             if (thing, quantity) in overridden:
                 self.error(where, f"{thing}.{quantity} is already overridden by {overridden[thing, quantity]!r}")
             overridden[thing, quantity] = override_id
+
+    def check_dates(self) -> None:
+        """Whether the record is an occurrence needs the build (a dbt test warns); here, one date per record."""
+        dated: dict[tuple[str, str], str] = {}
+        for date_id, date in self.g.dates.items():
+            record = (date["occurrence"]["dataset"], date["occurrence"]["record"])
+            if record in dated:
+                self.error(f"date {date_id}", f"{record[0]} record {record[1]} is already dated by {dated[record]!r}")
+            dated[record] = date_id
 
     def check_gaps(self) -> None:
         outputs = {output["thing"] for route in self.g.routes.values() for output in route.get("outputs", [])}

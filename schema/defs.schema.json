@@ -34,6 +34,11 @@
       "propertyNames": { "$ref": "#/$defs/quantityId" },
       "additionalProperties": { "$ref": "#/$defs/quantityValue" }
     },
+    "year": {
+      "description": "A signed year (ADR 0051): negative is BCE, positive CE, and there is no year 0 (1 BCE is followed by 1 CE).",
+      "type": "integer",
+      "not": { "const": 0 }
+    },
     "basis": {
       "description": "How a number was obtained. measured = from an experiment or survey; derived = calculated from measured values; estimated = expert or contributor estimate; unknown = no data yet.",
       "enum": ["measured", "derived", "estimated", "unknown"]

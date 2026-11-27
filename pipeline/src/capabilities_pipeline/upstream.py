@@ -146,6 +146,61 @@ class ReferenceCandidates(Dataset):
         }
 
 
+@dataclass(frozen=True)
+class PleiadesPeriods(Dataset):
+    """Pleiades' vocabulary of time periods, published as Turtle (ADR 0051): each period's key (what a place's
+    `timePeriodsKeys` names), label and scope note, and the years the note gives as `[[from, to]]`. A period whose note
+    gives no years keeps empty years: they are left unknown, not worked out from its name."""
+
+    def download(self, url: str, scratch: Path, root: Path) -> tuple[Path, Path, dict]:
+        download = scratch / "time-periods.ttl"
+        headers = save(urllib.request.Request(url, headers={"User-Agent": USER_AGENT}), download)
+        rows = period_rows(download.read_text(encoding="utf-8"))
+        converted = scratch / "periods.csv"
+        with converted.open("w", newline="", encoding="utf-8") as file:
+            writer = csv.DictWriter(file, fieldnames=self.columns, lineterminator="\n")
+            writer.writeheader()
+            writer.writerows(rows)
+        undated = sorted(row["key"] for row in rows if not row["from_year"])
+        return download, converted, {"last_modified": headers.get("Last-Modified"), "undated": undated}
+
+
+PERIOD_SUBJECT = re.compile(r"^<https://pleiades\.stoa\.org/vocabularies/([^>/]+)> a <[^>]*#Concept>", re.MULTILINE)
+# A Turtle string, with the escapes Turtle allows; Pleiades writes labels and notes as plain quoted strings.
+PERIOD_TEXT = r'"((?:[^"\\\n]|\\.)*)"'
+# The years a scope note gives, `[[from, to]]`. One note is missing its last bracket ("[[1, 1000]"), so the second is optional.
+PERIOD_YEARS = re.compile(r"\[\[\s*(-?\d+)\s*,\s*(-?\d+)\s*\]\]?")
+
+
+def period_rows(turtle: str) -> list[dict]:
+    """One row per period in Pleiades' time-periods Turtle. Every concept must come out with a label: if the format
+    changes so that one doesn't, that is an error to fix in this parser, not a period to leave out."""
+    starts = [(match.start(), match.group(1)) for match in PERIOD_SUBJECT.finditer(turtle)]
+    if not starts:
+        raise ValueError("pleiades_periods: no periods found; the Turtle's format changed")
+    rows = []
+    for (start, key), (end, _) in zip(starts, [*starts[1:], (len(turtle), "")]):
+        block = turtle[start:end]
+        label = re.search(r"skos:prefLabel " + PERIOD_TEXT, block)
+        if not label:
+            raise ValueError(f"pleiades_periods: period {key} has no label; the Turtle's format changed")
+        note = re.search(r"skos:scopeNote " + PERIOD_TEXT, block)
+        note_text = turtle_unescape(note.group(1)) if note else ""
+        years = PERIOD_YEARS.search(note_text)
+        rows.append({
+            "key": key,
+            "label": turtle_unescape(label.group(1)),
+            "scope_note": note_text,
+            "from_year": years.group(1) if years else "",
+            "to_year": years.group(2) if years else "",
+        })
+    return rows
+
+
+def turtle_unescape(text: str) -> str:
+    return re.sub(r"\\(.)", lambda match: {"n": "\n", "t": "\t"}.get(match.group(1), match.group(1)), text)
+
+
 # The fields of the report form (.github/ISSUE_TEMPLATE/report.yml), by the heading GitHub gives each in the issue.
 REPORT_FIELDS = {"Fact": "fact", "Kind": "kind", "Reference": "reference", "Agent run": "run"}
 REPORT_WRITTEN = "What is wrong"  # the first field the reader writes, after all of the app's
@@ -238,6 +293,13 @@ PLEIADES = GzipCsvDataset(
     ),
 )
 
+PLEIADES_PERIODS = PleiadesPeriods(
+    name="pleiades_periods",
+    url="https://atlantides.org/downloads/pleiades/rdf/time-periods.ttl",
+    license="CC BY 3.0 (Pleiades: a gazetteer of past places, https://pleiades.stoa.org)",
+    columns=("key", "label", "scope_note", "from_year", "to_year"),
+)
+
 REFERENCES = ReferenceCandidates(
     name="reference_candidates",
     url="https://api.openalex.org",
@@ -253,7 +315,7 @@ REPORTS = GitHubReports(
     columns=("number", "url", "title", "created_at", *REPORT_FIELDS.values()),
 )
 
-DATASETS = (MRDS, WIKIDATA, WIKIDATA_ITEMS, PLEIADES, REFERENCES, REPORTS)
+DATASETS = (MRDS, WIKIDATA, WIKIDATA_ITEMS, PLEIADES, PLEIADES_PERIODS, REFERENCES, REPORTS)
 
 
 def fetch(dataset: Dataset, build_dir: Path, url: str | None = None, root: Path | None = None) -> dict:

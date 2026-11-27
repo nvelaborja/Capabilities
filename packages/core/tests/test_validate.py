@@ -119,6 +119,40 @@ class TestBrokenData:
         write_override(data_copy)
         assert [str(i) for i in validate(data_copy) if i.severity == "error"] == []
 
+
+class TestWorkingDates:
+    def test_a_well_formed_date_is_valid(self, data_copy, write_date):
+        write_date(data_copy)
+        assert [str(i) for i in validate(data_copy) if i.severity == "error"] == []
+
+    def test_there_is_no_year_zero(self, data_copy, write_date):
+        # given: signed years (ADR 0051), where 1 BCE is followed by 1 CE
+        write_date(data_copy, worked_by=0)
+        messages = [i.message for i in validate(data_copy) if i.severity == "error"]
+        assert any("schema: worked_by" in message for message in messages), messages
+
+    def test_a_record_can_be_dated_only_once(self, data_copy, write_date):
+        write_date(data_copy)
+        write_date(data_copy, id="agrokipia-worked-again", worked_by=-1100)
+        messages = [i.message for i in validate(data_copy) if i.severity == "error"]
+        assert any(message.startswith("pleiades record 707452 is already dated by") for message in messages), messages
+
+    @pytest.mark.parametrize("cut, expected", [
+        ("reason:", "'reason' is a required property"),
+        ("references:", "'references' is a required property"),
+    ])
+    def test_a_date_must_give_a_reason_and_a_reference(self, data_copy, write_date, cut, expected):
+        path = write_date(data_copy)
+        text = path.read_text()
+        path.write_text(text.split(cut)[0], encoding="utf-8")
+        messages = [i.message for i in validate(data_copy) if i.severity == "error"]
+        assert any(expected in message for message in messages), messages
+
+    def test_a_date_names_a_dataset_we_take_places_from(self, data_copy, write_date):
+        write_date(data_copy, dataset="wikidata")
+        messages = [i.message for i in validate(data_copy) if i.severity == "error"]
+        assert any("schema: occurrence/dataset" in message for message in messages), messages
+
     def test_warns_about_a_source_nothing_is_extracted_from(self, data_copy):
         # given: a source that no route uses
         (data_copy / "data/things/sources/lonely-outcrop.yaml").write_text("id: lonely-outcrop\nkind: source\nlabel: X\navailability: regional\n")

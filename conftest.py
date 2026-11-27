@@ -97,6 +97,18 @@ def pleiades_gz(tmp_path_factory) -> str:
     return archive.as_uri()
 
 
+# Twenty-six real Pleiades periods (CC BY 3.0), from the dump of 2026-11-22: every period the places above name, plus a
+# note missing its last bracket (1st millennium CE), a century whose note gives no years (fifth BCE), and Modern, which
+# ends in 2100.
+PLEIADES_PERIODS_SAMPLE = REPO_ROOT / "pipeline" / "tests" / "fixtures" / "pleiades-periods-sample.ttl"
+
+
+@pytest.fixture(scope="session")
+def pleiades_periods_ttl() -> str:
+    """The Pleiades periods sample, as a file:// URL."""
+    return PLEIADES_PERIODS_SAMPLE.as_uri()
+
+
 @pytest.fixture(scope="session")
 def sample_rows():
     """Returns the sample's rows, as dictionaries, to change before zipping."""
@@ -313,18 +325,19 @@ def fetch_references(scholarly_endpoint):
 
 
 @pytest.fixture(scope="session")
-def upstream_built_dir(tmp_path_factory, mrds_zip, wikidata_endpoint, pleiades_gz, fetch_references,
-                       github_endpoint) -> Path:
+def upstream_built_dir(tmp_path_factory, mrds_zip, wikidata_endpoint, pleiades_gz, pleiades_periods_ttl,
+                       fetch_references, github_endpoint) -> Path:
     """The repository's graph built once with snapshots of the MRDS and Wikidata samples, so it has source occurrences
     and upstream quantity values."""
     from capabilities.built import run_build
-    from capabilities_pipeline.upstream import MRDS, PLEIADES, REPORTS, WIKIDATA, WIKIDATA_ITEMS, fetch
+    from capabilities_pipeline.upstream import MRDS, PLEIADES, PLEIADES_PERIODS, REPORTS, WIKIDATA, WIKIDATA_ITEMS, fetch
 
     build_dir = tmp_path_factory.mktemp("upstream-build")
     fetch(MRDS, build_dir, mrds_zip(tmp_path_factory.mktemp("mrds-download")))
     fetch(WIKIDATA, build_dir, wikidata_endpoint.url, root=REPO_ROOT)
     fetch(WIKIDATA_ITEMS, build_dir, wikidata_endpoint.url, root=REPO_ROOT)
     fetch(PLEIADES, build_dir, pleiades_gz)
+    fetch(PLEIADES_PERIODS, build_dir, pleiades_periods_ttl)
     fetch_references(build_dir)
     fetch(REPORTS, build_dir, github_endpoint.url)
     run_build(REPO_ROOT, build_dir)
@@ -364,6 +377,32 @@ def write_override():
         path = root / "data" / "overrides" / f"{id}.yaml"
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(GRANITE_OVERRIDE.format(id=id, thing=thing, replaces=replaces), encoding="utf-8")
+        return path
+
+    return write
+
+
+WORKING_DATE = """id: {id}
+kind: date
+occurrence: {{ dataset: {dataset}, record: "{record}" }}
+worked_by: {worked_by}
+reason: Test only. A dated find from the working, as a curated date would cite one.
+references:
+  - citation: "Test, A. (2026). A work cited only by the test suite."
+    supports: The working's date.
+    status: unverified
+"""
+
+
+@pytest.fixture
+def write_date():
+    """Writes a curated working date (ADR 0051) into a copy of the data: by default, that Agrokipia's copper mine
+    (Pleiades 707452) was worked by 1200 BCE."""
+    def write(root: Path, id: str = "agrokipia-worked", dataset: str = "pleiades", record: str = "707452",
+              worked_by: int = -1200) -> Path:
+        path = root / "data" / "dates" / f"{id}.yaml"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(WORKING_DATE.format(id=id, dataset=dataset, record=record, worked_by=worked_by), encoding="utf-8")
         return path
 
     return write

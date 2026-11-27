@@ -1,4 +1,4 @@
-import type { OccurrencesResponse, PlaceProperties, SourceSummary } from "../api/types";
+import type { OccurrencesResponse, PlaceProperties, SourceSummary, WorkingDateReference } from "../api/types";
 
 /** Whether a node can be shown on the map: a source, or a material taken from one (ADR 0032). */
 export function canMap(kind: string, origin?: string | null): boolean {
@@ -39,7 +39,7 @@ export function emptyReason(places: OccurrencesResponse): string | null {
 export function stateText(
   place: Pick<PlaceProperties, "state" | "worked_by_year"> & Partial<Pick<PlaceProperties, "attested_from" | "attested_to">>,
 ): string {
-  if (place.state === "worked" && place.worked_by_year !== null) return `Known to have been worked by ${place.worked_by_year}`;
+  if (place.state === "worked" && place.worked_by_year !== null) return `Known to have been worked by ${yearText(place.worked_by_year)}`;
   // Pleiades: worked when it is attested, which may be modern only. Such a place still shows the material was there.
   if (place.state === "worked" && place.attested_from != null && place.attested_to != null) {
     return `Worked: attested ${yearText(place.attested_from)} – ${untilText(place.attested_to, new Date().getFullYear())}`;
@@ -48,9 +48,32 @@ export function stateText(
   return "Present, with no known working date";
 }
 
-/** A year as historians write it: 330 BC, AD 640. Negative years are BC; there is no year zero. */
+/** A year as historians write it: 330 BC, AD 640, 1860. Negative years are BC; there is no year zero (ADR 0051). */
 export function yearText(year: number): string {
-  return year < 0 ? `${-year} BC` : `AD ${year}`;
+  if (year < 0) return `${-year} BC`;
+  return year < 1000 ? `AD ${year}` : `${year}`;
+}
+
+/** Why a place is known to have been worked by its year; null when it has no year. Never by colour alone (ADR 0019). */
+export function datingText(
+  place: Pick<PlaceProperties, "worked_by_basis" | "worked_by_note" | "worked_by_references" | "upstream_worked_by_year">,
+): string | null {
+  if (place.worked_by_basis === "first production") return "From its first production, as MRDS records it";
+  if (place.worked_by_basis === "period") return `Attested in ${place.worked_by_note ?? "a period"}, which had ended by then`;
+  if (place.worked_by_basis !== "curated") return null;
+  const cited = workingDateReferences(place.worked_by_references).map((reference) => reference.citation);
+  const replaced = place.upstream_worked_by_year != null ? ` The dataset says ${yearText(place.upstream_worked_by_year)}.` : "";
+  return `Curated date: ${place.worked_by_note ?? ""}${cited.length ? ` (${cited.join("; ")})` : ""}.${replaced}`;
+}
+
+function workingDateReferences(references: PlaceProperties["worked_by_references"]): WorkingDateReference[] {
+  if (typeof references !== "string") return references ?? [];
+  try {
+    const parsed: unknown = JSON.parse(references);
+    return Array.isArray(parsed) ? (parsed as WorkingDateReference[]) : [];
+  } catch {
+    return [];
+  }
 }
 
 /** The end of an attested range: "the present" for Pleiades' modern periods, which end in years still to come (2100). */

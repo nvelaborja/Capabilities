@@ -56,3 +56,4 @@ Each file records one significant design decision: the context, what we decided,
 | [0048](0048-run-agents-through-claude-code-on-a-claude-subscription.md) | Find sources in code, and ask Claude Code on a Claude subscription only to judge them; start with ore candidates | Accepted |
 | [0049](0049-have-agents-quote-sources-for-unverified-routes.md) | Have agents quote sources for routes whose references are all unverified | Accepted |
 | [0050](0050-report-withdraw-and-recheck-agent-facts.md) | Report facts as GitHub issues, withdraw agents' facts into a file, and re-check them only when an admin asks | Accepted |
+| [0051](0051-write-dates-as-signed-years-and-date-workings-from-periods-and-curated-dates.md) | Write dates as signed years, and date workings from Pleiades' periods and curated dates | Proposed |

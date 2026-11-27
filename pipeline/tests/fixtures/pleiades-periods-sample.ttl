@@ -1,0 +1,177 @@
+# Pleiades RDF Dump
+# Contents: Pleiades Vocabulary 'time-periods'
+# Date: 2026/11/22 06:47:28.364312 US/Eastern
+# License: http://creativecommons.org/licenses/by/3.0/us/
+# Credits: https://pleiades.stoa.org/credits
+# Triple count: (a sample of 26 periods from this dump)
+
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+<https://pleiades.stoa.org/vocabularies/1st-millennium-ce> a <http://www.w3.org/2004/02/skos/core#Concept>;
+    owl:sameAs <http://pleiades.stoa.org/vocabularies/1st-millennium-ce>;
+    skos:inScheme <https://pleiades.stoa.org/vocabularies/>;
+    skos:prefLabel "1st Millennium CE (1-1000 CE)"@en;
+    skos:scopeNote "The First Millennium CE as defined by https://en.wikipedia.org/wiki/1st_millennium [[1, 1000]"@en .
+
+<https://pleiades.stoa.org/vocabularies/achaemenid-middle-east> a <http://www.w3.org/2004/02/skos/core#Concept>;
+    owl:sameAs <http://pleiades.stoa.org/vocabularies/achaemenid-middle-east>;
+    skos:inScheme <https://pleiades.stoa.org/vocabularies/>;
+    skos:prefLabel "Achaemenid Middle East (540–330 BC)"@en;
+    skos:scopeNote "ME [[-540, -330]]"@en .
+
+<https://pleiades.stoa.org/vocabularies/archaic> a <http://www.w3.org/2004/02/skos/core#Concept>;
+    owl:sameAs <http://n2t.net/ark:/99152/p03wskdnwd4>,
+        <http://pleiades.stoa.org/vocabularies/archaic>;
+    skos:inScheme <https://pleiades.stoa.org/vocabularies/>;
+    skos:prefLabel "Archaic (Greco-Roman; 750-550 BCE/BC)"@en;
+    skos:scopeNote "The Archaic period in Greek and Roman history. For the purposes of Pleiades, this period is seen to begin in the year 750 and end in the year 550 before the birth of Christ. [[-750, -550]]"@en .
+
+<https://pleiades.stoa.org/vocabularies/caliphate-umayyad-middle-east> a <http://www.w3.org/2004/02/skos/core#Concept>;
+    owl:sameAs <http://n2t.net/ark:/99152/p03wskdj3g6>,
+        <http://pleiades.stoa.org/vocabularies/caliphate-umayyad-middle-east>;
+    skos:inScheme <https://pleiades.stoa.org/vocabularies/>;
+    skos:prefLabel "Caliphate-Umayyad Middle East (AD 632–750)"@en;
+    skos:scopeNote "Early Islamic, Rashidun-Umayyad [starts with death of Muhammed who only controlled Arabia] [[632,750]]"@en .
+
+<https://pleiades.stoa.org/vocabularies/classical> a <http://www.w3.org/2004/02/skos/core#Concept>;
+    owl:sameAs <http://n2t.net/ark:/99152/p03wskd389m>,
+        <http://pleiades.stoa.org/vocabularies/classical>;
+    skos:inScheme <https://pleiades.stoa.org/vocabularies/>;
+    skos:prefLabel "Classical (Greco-Roman; 550 BC-330 BC)"@en;
+    skos:scopeNote "The Classical period in Greek and Roman history. For the purposes of Pleiades, this period is said to begin in the year 550 and end in the year 330 before the birth of Christ. [[-550, -330]]"@en .
+
+<https://pleiades.stoa.org/vocabularies/early-bronze-age-iran> a <http://www.w3.org/2004/02/skos/core#Concept>;
+    owl:sameAs <http://pleiades.stoa.org/vocabularies/early-bronze-age-iran>;
+    skos:inScheme <https://pleiades.stoa.org/vocabularies/>;
+    skos:prefLabel "Early Bronze Age Iran (2500–2000 BC)"@en;
+    skos:scopeNote "Jiroft [[-2500,-2000]]"@en .
+
+<https://pleiades.stoa.org/vocabularies/early-geometric> a <http://www.w3.org/2004/02/skos/core#Concept>;
+    owl:sameAs <http://n2t.net/ark:/99152/p03wskdr3vd>,
+        <http://pleiades.stoa.org/vocabularies/early-geometric>;
+    skos:inScheme <https://pleiades.stoa.org/vocabularies/>;
+    skos:prefLabel "Early Geometric (Greek; 900-850 BC)"@en;
+    skos:scopeNote "The Early Geometric period in ancient Greece, from 900-850 before the birth of Christ"@en .
+
+<https://pleiades.stoa.org/vocabularies/early-iron-age-iran> a <http://www.w3.org/2004/02/skos/core#Concept>;
+    owl:sameAs <http://pleiades.stoa.org/vocabularies/early-iron-age-iran>;
+    skos:inScheme <https://pleiades.stoa.org/vocabularies/>;
+    skos:prefLabel "Early Iron Age Iran (1000–650 BC)"@en;
+    skos:scopeNote "Pre-Classical Antiquity [[-1000,-650]]"@en .
+
+<https://pleiades.stoa.org/vocabularies/fifth-bce> a <http://www.w3.org/2004/02/skos/core#Concept>;
+    owl:sameAs <http://pleiades.stoa.org/vocabularies/fifth-bce>;
+    skos:inScheme <https://pleiades.stoa.org/vocabularies/>;
+    skos:prefLabel "fifth century before the common era"@en .
+
+<https://pleiades.stoa.org/vocabularies/hellenistic-republican> a <http://www.w3.org/2004/02/skos/core#Concept>;
+    owl:sameAs <http://n2t.net/ark:/99152/p03wskd55sw>,
+        <http://pleiades.stoa.org/vocabularies/hellenistic-republican>;
+    skos:inScheme <https://pleiades.stoa.org/vocabularies/>;
+    skos:prefLabel "Hellenistic Greek, Roman Republic (330 BC-30 BC)"@en;
+    skos:scopeNote "The Hellenistic period in Greek history and the middle-to-late Republican period in Roman history. For the purposes of Pleiades, this period is said to begin in the year 330 and end in the year 30 before the birth of Christ. [[-330, -30]]"@en .
+
+<https://pleiades.stoa.org/vocabularies/late-antique> a <http://www.w3.org/2004/02/skos/core#Concept>;
+    owl:sameAs <http://n2t.net/ark:/99152/p03wskd6psm>,
+        <http://pleiades.stoa.org/vocabularies/late-antique>;
+    skos:inScheme <https://pleiades.stoa.org/vocabularies/>;
+    skos:prefLabel "Late Antique (AD 300-AD 640)"@en;
+    skos:scopeNote "The Late Antique period in Greek and Roman history. For the purposes of Pleiades, this period is said to begin in the year 300 and to end in the year 640 after the birth of Christ. [[300, 640]]"@en .
+
+<https://pleiades.stoa.org/vocabularies/late-antiquity-in-central-asia> a <http://www.w3.org/2004/02/skos/core#Concept>;
+    owl:sameAs <http://pleiades.stoa.org/vocabularies/late-antiquity-in-central-asia>;
+    skos:inScheme <https://pleiades.stoa.org/vocabularies/>;
+    skos:prefLabel "Late Antiquity in Central Asia (250-550 CE)"@en;
+    skos:scopeNote "Period as defined by Sören Stark [[250, 550]]"@en .
+
+<https://pleiades.stoa.org/vocabularies/late-bronze-age-iran> a <http://www.w3.org/2004/02/skos/core#Concept>;
+    owl:sameAs <http://pleiades.stoa.org/vocabularies/late-bronze-age-iran>;
+    skos:inScheme <https://pleiades.stoa.org/vocabularies/>;
+    skos:prefLabel "Late Bronze Age Iran (1500–1000 BC)"@en;
+    skos:scopeNote "Iran [[-1500,-1000]]"@en .
+
+<https://pleiades.stoa.org/vocabularies/late-period-egypt> a <http://www.w3.org/2004/02/skos/core#Concept>;
+    owl:sameAs <http://n2t.net/ark:/99152/p03wskd47fw>,
+        <http://pleiades.stoa.org/vocabularies/late-period-egypt>;
+    skos:inScheme <https://pleiades.stoa.org/vocabularies/>;
+    skos:prefLabel "Late Period Egypt (664-332)"@en;
+    skos:scopeNote "The Late Period in Egypt, following the chronology of the UCLA Encyclopedia of Egyptology (compiled by Thomas Schneider): http://www.uee.ucla.edu/contributors/chronology.htm. [[-664, -332]]"@en .
+
+<https://pleiades.stoa.org/vocabularies/macedonian-egypt> a <http://www.w3.org/2004/02/skos/core#Concept>;
+    owl:sameAs <http://n2t.net/ark:/99152/p03wskdxnwr>,
+        <http://pleiades.stoa.org/vocabularies/macedonian-egypt>;
+    skos:inScheme <https://pleiades.stoa.org/vocabularies/>;
+    skos:prefLabel "Macedonian Egypt (332-304 BCE/BC)"@en;
+    skos:scopeNote "The Macedonian period in Egypt, following the chronology of the UCLA Encyclopedia of Egyptology (compiled by Thomas Schneider): http://www.uee.ucla.edu/contributors/chronology.htm. [[-332, -304]]"@en .
+
+<https://pleiades.stoa.org/vocabularies/middle-bronze-age-iran> a <http://www.w3.org/2004/02/skos/core#Concept>;
+    owl:sameAs <http://n2t.net/ark:/99152/p03wskdwdtr>,
+        <http://pleiades.stoa.org/vocabularies/middle-bronze-age-iran>;
+    skos:inScheme <https://pleiades.stoa.org/vocabularies/>;
+    skos:prefLabel "Middle Bronze Age Iran (2000–1500 BC)"@en;
+    skos:scopeNote "Iran [[-2000,-1500]]"@en .
+
+<https://pleiades.stoa.org/vocabularies/modern> a <http://www.w3.org/2004/02/skos/core#Concept>;
+    owl:sameAs <http://n2t.net/ark:/99152/p03wskdgh6j>,
+        <http://pleiades.stoa.org/vocabularies/modern>;
+    skos:inScheme <https://pleiades.stoa.org/vocabularies/>;
+    skos:prefLabel "Modern (AD 1700-Present)"@en;
+    skos:scopeNote "Our present, modern era. [[1700, 2100]]"@en .
+
+<https://pleiades.stoa.org/vocabularies/neo-assyrian-babylonian-middle-east> a <http://www.w3.org/2004/02/skos/core#Concept>;
+    owl:sameAs <http://n2t.net/ark:/99152/p03wskdxgnx>,
+        <http://pleiades.stoa.org/vocabularies/neo-assyrian-babylonian-middle-east>;
+    skos:inScheme <https://pleiades.stoa.org/vocabularies/>;
+    skos:prefLabel "Neo-Assyrian/Babylonian Middle East (720–540 BC)"@en;
+    skos:scopeNote "ME [[-720,-540]]"@en .
+
+<https://pleiades.stoa.org/vocabularies/neolithic-british> a <http://www.w3.org/2004/02/skos/core#Concept>;
+    owl:sameAs <http://pleiades.stoa.org/vocabularies/neolithic-british>;
+    skos:inScheme <https://pleiades.stoa.org/vocabularies/>;
+    skos:prefLabel "Neolithic Period (British Isles; 4,000-2,500 BC)"@en;
+    skos:scopeNote "The Neolithic period in the British Isles, after Wikipedia, Neolithic British Isles, http://en.wikipedia.org/wiki/Neolithic_British_Isles. [[-4000, -2500]]"@en .
+
+<https://pleiades.stoa.org/vocabularies/new-kingdom-egypt> a <http://www.w3.org/2004/02/skos/core#Concept>;
+    owl:sameAs <http://n2t.net/ark:/99152/p03wskddb3j>,
+        <http://pleiades.stoa.org/vocabularies/new-kingdom-egypt>;
+    skos:inScheme <https://pleiades.stoa.org/vocabularies/>;
+    skos:prefLabel "New Kingdom Egypt (1548-1086)"@en;
+    skos:scopeNote "The New Kingdom period in Egypt, following the chronology of the UCLA Encyclopedia of Egyptology (compiled by Thomas Schneider): http://www.uee.ucla.edu/contributors/chronology.htm. [[-1548, -1086]]"@en .
+
+<https://pleiades.stoa.org/vocabularies/ptolemaic-egypt> a <http://www.w3.org/2004/02/skos/core#Concept>;
+    owl:sameAs <http://n2t.net/ark:/99152/p03wskd95m9>,
+        <http://pleiades.stoa.org/vocabularies/ptolemaic-egypt>;
+    skos:inScheme <https://pleiades.stoa.org/vocabularies/>;
+    skos:prefLabel "Ptolemaic Egypt (304-30 BCE/BC)"@en;
+    skos:scopeNote "The Ptolemaic period in Egypt, following the chronology of the UCLA Encyclopedia of Egyptology (compiled by Thomas Schneider): http://www.uee.ucla.edu/contributors/chronology.htm. [[-304, -30]]"@en .
+
+<https://pleiades.stoa.org/vocabularies/roman> a <http://www.w3.org/2004/02/skos/core#Concept>;
+    owl:sameAs <http://n2t.net/ark:/99152/p03wskdxnzf>,
+        <http://pleiades.stoa.org/vocabularies/roman>;
+    skos:inScheme <https://pleiades.stoa.org/vocabularies/>;
+    skos:prefLabel "Roman, early Empire (30 BC-AD 300)"@en;
+    skos:scopeNote "The Roman period (i.e., the early Roman Empire) in Greek and Roman history. For the purposes of Pleiades, this period is said to begin in the year 30 before the birth of Christ and to end in the year 300 after the birth of Christ. [[-30, 300]]"@en .
+
+<https://pleiades.stoa.org/vocabularies/sixteenth-ce> a <http://www.w3.org/2004/02/skos/core#Concept>;
+    owl:sameAs <http://pleiades.stoa.org/vocabularies/sixteenth-ce>;
+    skos:inScheme <https://pleiades.stoa.org/vocabularies/>;
+    skos:prefLabel "sixteenth century of the common era"@en .
+
+<https://pleiades.stoa.org/vocabularies/third-intermediate-period-egypt> a <http://www.w3.org/2004/02/skos/core#Concept>;
+    owl:sameAs <http://n2t.net/ark:/99152/p03wskdmzfr>,
+        <http://pleiades.stoa.org/vocabularies/third-intermediate-period-egypt>;
+    skos:inScheme <https://pleiades.stoa.org/vocabularies/>;
+    skos:prefLabel "Third Intermediate Period Egypt (1086-664)"@en;
+    skos:scopeNote "The Third Intermediate period in Egypt, following the chronology of the UCLA Encyclopedia of Egyptology (compiled by Thomas Schneider): http://www.uee.ucla.edu/contributors/chronology.htm. [[-1086, -664]]"@en .
+
+<https://pleiades.stoa.org/vocabularies/thirteenth-ce> a <http://www.w3.org/2004/02/skos/core#Concept>;
+    owl:sameAs <http://pleiades.stoa.org/vocabularies/thirteenth-ce>;
+    skos:inScheme <https://pleiades.stoa.org/vocabularies/>;
+    skos:prefLabel "thirteenth century of the common era"@en .
+
+<https://pleiades.stoa.org/vocabularies/twelfth-ce> a <http://www.w3.org/2004/02/skos/core#Concept>;
+    owl:sameAs <http://pleiades.stoa.org/vocabularies/twelfth-ce>;
+    skos:inScheme <https://pleiades.stoa.org/vocabularies/>;
+    skos:prefLabel "twelfth century of the common era"@en .
