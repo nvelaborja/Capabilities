@@ -1,5 +1,6 @@
 import json
 
+import duckdb
 import pytest
 from dagster import AssetKey, materialize
 
@@ -46,6 +47,12 @@ PROFILE_PLACES = AssetKey("stg_curated__profile_places")
 PROFILE_AREAS = AssetKey("profile_areas")
 PROFILE_OCCURRENCES = AssetKey("profile_occurrences")
 PROFILE_SOURCES = AssetKey("profile_sources")
+SESHAT_SNAPSHOT = AssetKey(["upstream", "seshat_codings"])
+SESHAT_RAW = AssetKey(["raw", "seshat_codings"])
+SESHAT_STAGING = AssetKey("stg_seshat__codings")
+SESHAT_VARIABLES = AssetKey(["raw", "seshat_variables"])
+HISTORY = AssetKey("history_codings")
+BACKTEST = AssetKey("backtest")
 
 
 @pytest.fixture
@@ -70,7 +77,7 @@ class TestDefinitions:
         assert graph.get(STAGING).parent_keys == {RAW}
         assert graph.get(NODES).parent_keys == {STAGING, FACTS, ORE_NODES}
         assert graph.get(MANIFEST).parent_keys == {
-            NODES, FACTS, OCCURRENCES, QUEUE, CHECKS, PROFILE_AREAS, PROFILE_OCCURRENCES, PROFILE_SOURCES}
+            NODES, FACTS, OCCURRENCES, QUEUE, CHECKS, PROFILE_AREAS, PROFILE_OCCURRENCES, PROFILE_SOURCES, HISTORY}
         assert graph.get(REFERENCES_RAW).parent_keys == {REFERENCES_SNAPSHOT}
 
     def test_the_lineage_runs_from_the_mrds_download_and_the_crosswalk_to_the_occurrences(self, dagster_build):
@@ -104,6 +111,14 @@ class TestDefinitions:
         assert graph.get(PROFILE_OCCURRENCES).parent_keys == {PROFILE_AREAS, OCCURRENCES}
         assert {PROFILE_OCCURRENCES, OCCURRENCES, NODES} <= graph.get(PROFILE_SOURCES).parent_keys
         assert {PROFILE_OCCURRENCES, PROFILE_SOURCES} <= graph.get(QUEUE).parent_keys
+
+    def test_the_lineage_runs_from_the_seshat_download_through_generated_profiles_to_the_comparison(self, dagster_build):
+        graph = asset_graph(dagster_build[0])
+        assert graph.get(SESHAT_RAW).parent_keys == {SESHAT_SNAPSHOT}
+        assert graph.get(SESHAT_STAGING).parent_keys == {SESHAT_RAW}
+        assert SESHAT_STAGING in graph.get(PROFILE_AREAS).parent_keys
+        assert {PROFILE_AREAS, SESHAT_STAGING, SESHAT_VARIABLES} <= graph.get(HISTORY).parent_keys
+        assert graph.get(BACKTEST).parent_keys == {MANIFEST}
 
     def test_the_lineage_runs_from_the_wikidata_download_and_its_crosswalk_to_the_facts(self, dagster_build):
         graph = asset_graph(dagster_build[0])
@@ -147,7 +162,7 @@ class TestDefinitions:
 class TestMaterializing:
     def test_materializing_everything_downloads_every_dataset_and_builds_a_current_graph(
         self, dagster_build, repo_root, tmp_path, mrds_zip, wikidata_endpoint, pleiades_gz, pleiades_periods_ttl,
-        cliopatria_release, scholarly_endpoint, lookups_offline,
+        cliopatria_release, seshat_endpoint, scholarly_endpoint, lookups_offline,
     ):
         from capabilities_pipeline.assets import UpstreamDownloads
 
@@ -156,6 +171,7 @@ class TestMaterializing:
             mrds_url=mrds_zip(tmp_path / "download"), wikidata_url=wikidata_endpoint.url, pleiades_url=pleiades_gz,
             pleiades_periods_url=pleiades_periods_ttl, openalex_url=scholarly_endpoint.openalex_url, crossref_url=scholarly_endpoint.crossref_url,
             cliopatria_url=cliopatria_release.url, cliopatria_archive=cliopatria_release.dataset.archive,
+            seshat_url=seshat_endpoint.url, seshat_pause_s=0,
         )
         with lookups_offline():
             result = materialize(list(defs.assets), resources={**defs.resources, "downloads": downloads})
@@ -175,7 +191,10 @@ class TestMaterializing:
         assert manifest["upstream"]["pleiades_places"]["rows"] == 13
         assert manifest["upstream"]["pleiades_periods"]["rows"] == 26
         assert (manifest["upstream"]["cliopatria_polities"]["rows"], manifest["upstream"]["cliopatria_polities"]["release"]) == (5, "v0.2.2")
-        assert manifest["tables"]["profile_areas.parquet"] == sum("place" in profile for profile in curated.profiles.values())
+        origins = dict(duckdb.sql("select origin, count(*) from read_parquet(?) where id is not null group by origin",
+                                  params=[str(graph_dir(build_dir) / "profile_areas.parquet")]).fetchall())
+        assert origins["curated"] == sum("place" in profile for profile in curated.profiles.values())
+        assert manifest["tables"]["profile_areas.parquet"] == sum(origins.values())
         assert manifest["upstream"]["mrds_deposits"]["rows"] == 14
         assert manifest["upstream"]["wikidata_quantities"]["rows"] == 4
         materialized = {event.asset_key for event in result.get_asset_materialization_events()}
@@ -185,6 +204,11 @@ class TestMaterializing:
         assert {PLEIADES_SNAPSHOT, PLEIADES_RAW, PLEIADES_RULES, PLEIADES_STAGING} <= materialized
         assert {PERIODS_SNAPSHOT, PERIODS_RAW, PERIODS_STAGING} <= materialized
         assert {CLIOPATRIA_SNAPSHOT, CLIOPATRIA_RAW, CLIOPATRIA_STAGING, PROFILE_AREAS, PROFILE_SOURCES} <= materialized
+        assert {SESHAT_SNAPSHOT, SESHAT_RAW, SESHAT_STAGING, HISTORY, BACKTEST} <= materialized
+        backtest = next(event for event in result.get_asset_materialization_events() if event.asset_key == BACKTEST)
+        summary = json.loads((graph_dir(build_dir) / "backtest.json").read_text())
+        assert backtest.materialization.metadata["polities"].value == summary["polities"] > 0
+        assert summary["fingerprint"] == manifest["fingerprint"]
         # The run says which Cliopatria release it downloaded, and from where (ADR 0052).
         cliopatria = next(event for event in result.get_asset_materialization_events() if event.asset_key == CLIOPATRIA_SNAPSHOT)
         metadata = cliopatria.materialization.metadata

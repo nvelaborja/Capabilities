@@ -1,4 +1,5 @@
 import json
+import shutil
 
 import pytest
 
@@ -37,6 +38,18 @@ class TestCli:
         result = json.loads(capsys.readouterr().out)
         assert result["place"]["cliopatria"] == "Middle Kingdom of Egypt"
         assert result["from_map"] == []  # nothing inside was worked by 1650 BCE, in the samples
+
+    def test_backtest_compares_the_graph_with_history(self, repo_root, upstream_built_dir, tmp_path, capsys):
+        # A copy: the comparison writes beside the graph.
+        build_dir = tmp_path / "build"
+        shutil.copytree(upstream_built_dir, build_dir)
+        assert main(["--root", str(repo_root), "--build-dir", str(build_dir), "backtest", "--polity", "Saite"]) == 0
+        out = capsys.readouterr().out
+        assert "Compared 2 polities with Seshat (10 comparisons)" in out
+        assert "Egypt - Saite Period, 664 BC to 525 BC; had from the map: granite-outcrop" in out
+        # Its copper mines don't say which ore, so with every place mapped there only tin is missing for bronze.
+        bronze = next(line for line in out.splitlines() if "wf/bronzes" in line)
+        assert "Tin" in bronze and "Copper" not in bronze
 
     def test_deselect_removes_profile_items(self, repo_root, built_dir, capsys):
         main(["--root", str(repo_root), "--build-dir", str(built_dir), "explore", "--profile", "middle-kingdom-egypt", "--deselect", "copper-saw", "--json"])

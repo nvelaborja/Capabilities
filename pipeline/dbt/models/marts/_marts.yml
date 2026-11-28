@@ -118,14 +118,37 @@ models:
   - name: profile_areas
     description: >
       Each profile's area (build/graph/profile_areas.parquet, ADR 0052): the union of its Cliopatria entity's polygons
-      in the rows whose years overlap the profile's, with the years those rows cover, the Cliopatria release, and the
+      in the rows whose years overlap the profile's (for a profile generated for a Seshat polity, the rows that give
+      its Seshat id, ADR 0053), with the years those rows cover, the Cliopatria release, and the
       area as GeoJSON for the map.
     columns:
       - name: id
-        description: The profile's id.
+        description: The profile's id; a generated one's is seshat-<the Seshat polity> (ADR 0053).
         data_tests: [unique, not_null]
+      - name: origin
+        description: curated (a profile in data/profiles with a place), or seshat (generated for a polity Seshat codes).
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [curated, seshat]
       - name: geojson
         data_tests: [not_null]
+  - name: history_codings
+    description: >
+      What Seshat says each generated profile's polity had (build/graph/history_codings.parquet, ADR 0053): one row
+      per polity and compared variable, present if coded present in any of its years, else absent if coded absent,
+      else unknown; with Seshat's tags, whether it is disputed, and the codings' record ids. CC BY-SA 4.0, kept in the
+      build only.
+    columns:
+      - name: id
+        data_tests: [unique, not_null]
+      - name: history
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [present, absent, unknown]
   - name: profile_occurrences
     description: >
       The occurrences inside each profile's area (build/graph/profile_occurrences.parquet, ADR 0052), and whether each

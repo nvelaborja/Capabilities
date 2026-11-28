@@ -17,7 +17,9 @@ from .built import (
     QUEUE_FILE,
     build_dir_for,
     current_graph,
+    graph_dir,
     load_queue,
+    run_backtest,
     run_backup,
     run_build,
 )
@@ -77,6 +79,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     cmd = commands.add_parser("build", help="Build the graph the app reads, from the curated layer, with dbt.")
     cmd.set_defaults(handler=cmd_build)
+
+    cmd = commands.add_parser(
+        "backtest", help="Compare the graph with history: what Seshat records polities had, against what the graph "
+        "reaches from the sources worked in their areas (ADR 0053).")
+    cmd.add_argument("--polity", help="Show the comparisons of polities whose name contains this, e.g. 'Middle Kingdom'.")
+    cmd.add_argument("--limit", type=int, default=10, help="Gaps to show (default 10; 0 for all).")
+    cmd.set_defaults(handler=cmd_backtest)
 
     cmd = commands.add_parser("queue", help="The curation queue: the gaps the last build found, most valuable first.")
     cmd.add_argument("--kind", help="Only this kind, such as ore_candidate or route_unverified.")
@@ -165,6 +174,45 @@ def cmd_queue(args, root: Path) -> int:
         if args.limit and len(items) > args.limit:
             print(f"  … and {len(items) - args.limit} more (--kind {kind} --limit 0 for all)")
     return 0
+
+
+OUTCOME_WORDS = {
+    "agree": "agree",
+    "history_yes_graph_no": "Seshat records it, the graph can't reach it",
+    "graph_yes_history_no": "the graph reaches it, Seshat doesn't record it",
+    "unknown": "unknown (Seshat doesn't know, or the graph's answer is maybe)",
+}
+
+
+def cmd_backtest(args, root: Path) -> int:
+    from .history import load_gaps, load_results
+
+    build_dir = build_dir_for(root, args.build_dir)
+    summary = run_backtest(root, build_dir)
+    print(f"Compared {summary['polities']} polities with Seshat ({summary['comparisons']} comparisons):")
+    for outcome, count in summary["outcomes"].items():
+        print(f"  {count:5}  {OUTCOME_WORDS.get(outcome, outcome)}")
+    rows = load_results(graph_dir(build_dir))
+    if args.polity:
+        print_polities([row for row in rows if args.polity.lower() in (row["label"] or "").lower()])
+        return 0
+    gaps = load_gaps(graph_dir(build_dir))
+    print(f"\nWhat history shows that the graph can't reach ({len(gaps)} gaps, the most polities first):")
+    for gap in gaps[: args.limit or None]:
+        print(f"  {gap['label']}, in {gap['polities']} polities ({gap['cause']}): {gap['reason']}")
+    print("\nSeshat's data is CC BY-SA 4.0: these results stay in the build, never in data/.")
+    return 0
+
+
+def print_polities(rows: list[dict]) -> None:
+    if not rows:
+        print("\nNo polity matches.")
+    for label in sorted({row["label"] for row in rows}):
+        mine = [row for row in rows if row["label"] == label]
+        first, last = mine[0]["from_year"], mine[0]["to_year"]
+        print(f"\n{label}, {year_text(first)} to {year_text(last)}; had from the map: {', '.join(mine[0]['had']) or 'nothing'}")
+        for row in mine:
+            print(f"  {row['variable']:22} Seshat {row['history']:8} graph {row['graph']:6} {row['outcome']}: {row['reason']}")
 
 
 def cmd_backup(args, root: Path) -> int:

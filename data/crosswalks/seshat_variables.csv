@@ -1,0 +1,6 @@
+variable,compares,thing,notes
+wf/coppers,thing,copper,"Seshat's military use of copper. Present means the polity had copper metal. Absent means only that it isn't recorded in military use, not that the polity had no copper."
+wf/bronzes,thing,tin-bronze,"Seshat's military use of bronze. Seshat doesn't say which bronze: arsenical bronze, which the graph doesn't model, counts too, so a polity with only arsenical bronze can show as a disagreement."
+wf/irons,thing,bloom-iron,"Seshat's military use of iron. Bloom (wrought) iron is the graph's only iron metal; cast iron isn't modelled."
+wf/steels,thing,steel,"Seshat's military use of steel. The graph's unhardened steel, which hardened steel is made from."
+sc/mines-or-quarries,worked_source,,"Seshat's social complexity variable: mines or quarries. Compared with whether the polity's area has a mapped place of any source worked by its last year (ADR 0052)."

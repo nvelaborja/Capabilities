@@ -148,7 +148,7 @@ The profile's area is the union of the entity's polygons in every Cliopatria row
 
 ### Crosswalk (`data/crosswalks/*.csv`)
 
-A hand-kept table that matches records in an upstream dataset to our ids ([ADR 0034](adr/0034-build-the-graph-from-upstream-datasets-and-a-curated-layer.md)). It is CSV rather than YAML because it is a table, and the build loads it as written. There are three:
+A hand-kept table that matches records in an upstream dataset to our ids ([ADR 0034](adr/0034-build-the-graph-from-upstream-datasets-and-a-curated-layer.md)). It is CSV rather than YAML because it is a table, and the build loads it as written. There are five:
 
 `mrds_sources.csv` matches USGS MRDS deposits to source kinds, which places each source on the map ([ADR 0041](adr/0041-place-sources-with-mrds-deposits-through-a-crosswalk.md)):
 
@@ -225,6 +225,17 @@ copper-ore,mine,copper,"A copper mine: which ore isn't recorded, so the place be
 ```
 
 Matching needn't be perfect: where a material was found matters least to the app's questions. Suppress a wrong match (dataset `pleiades`); unmatched mines and quarries are the last kind in the curation queue.
+
+`seshat_variables.csv` says which of Seshat's variables the graph is compared with, and what each means in the graph ([ADR 0053](adr/0053-compare-the-graph-with-seshats-codings-of-polities-in-the-build-only.md)). The download asks Seshat for these variables only. One row per variable:
+
+| Column | Meaning |
+|---|---|
+| `variable` | Seshat's API path for it (`wf/bronzes`) |
+| `compares` | `thing` (can the graph reach the thing from the polity's sources?) or `worked_source` (does the map give the polity's area a place worked by then?) |
+| `thing` | For `thing`, what Seshat's variable means in the graph (`tin-bronze`) |
+| `notes` | Why, and where the two differ (Seshat's metals are military use; its bronze may be arsenical) |
+
+The crosswalk is ours; Seshat's codings, and everything compared with them, stay in the build: they are CC BY-SA 4.0, and never enter `data/`.
 
 ### Override (`data/overrides/*.yaml`)
 

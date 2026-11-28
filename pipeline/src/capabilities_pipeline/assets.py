@@ -9,10 +9,13 @@ materializing everything.
 """
 
 # No `from __future__ import annotations`: Dagster inspects the `context` annotation at definition time.
+import json
 from dataclasses import replace
 from pathlib import Path
 
-from capabilities.built import CHECKS_FILE, FACTS_FILE, NODES_FILE, OCCURRENCES_FILE, QUEUE_FILE, graph_dir
+from capabilities.built import (CHECKS_FILE, FACTS_FILE, MANIFEST_FILE, NODES_FILE, OCCURRENCES_FILE, QUEUE_FILE,
+                                graph_dir, load_built)
+from capabilities.history import write_backtest
 from dagster import (
     AssetExecutionContext,
     AssetKey,
@@ -42,8 +45,8 @@ from .agents.curate import Settings
 from .agents.recheck import RecheckSettings, recheck as recheck_facts
 from .agents.run import run_agents
 from .build import DBT_PROJECT, dbt_environment, dbt_target_path, load_inputs, write_manifest
-from .upstream import (CLIOPATRIA, MRDS, PLEIADES, PLEIADES_PERIODS, REFERENCES, REPORTS, WIKIDATA, WIKIDATA_ITEMS,
-                       Dataset, fetch_or_fall_back)
+from .upstream import (CLIOPATRIA, MRDS, PLEIADES, PLEIADES_PERIODS, REFERENCES, REPORTS, SESHAT, WIKIDATA,
+                       WIKIDATA_ITEMS, Dataset, fetch_or_fall_back)
 
 
 class UpstreamDownloads(ConfigurableResource):
@@ -55,6 +58,8 @@ class UpstreamDownloads(ConfigurableResource):
     pleiades_periods_url: str = PLEIADES_PERIODS.url
     cliopatria_url: str = CLIOPATRIA.url  # the latest release
     cliopatria_archive: str = CLIOPATRIA.archive  # the zip at a release's tag
+    seshat_url: str = SESHAT.url  # the API's root; using it accepts Seshat's user agreement (ADR 0053)
+    seshat_pause_s: float = SESHAT.pause_s  # between pages; tests' stand-in needs none
     openalex_url: str = REFERENCES.url
     crossref_url: str = REFERENCES.crossref_url
     github_reports_url: str = REPORTS.url
@@ -173,6 +178,16 @@ def definitions(root: Path, build_dir: Path) -> Definitions:
         return download(context, replace(CLIOPATRIA, archive=downloads.cliopatria_archive), downloads.cliopatria_url)
 
     @asset(
+        key=AssetKey(["upstream", SESHAT.name]),
+        group_name="upstream",
+        description="A snapshot of Seshat's codings of the variables data/crosswalks/seshat_variables.csv names (military "
+        "use of copper, bronze, iron and steel; mines or quarries), from its public API. CC BY-SA 4.0: it is compared "
+        "with the graph in the build, and nothing derived from it enters data/ (ADR 0053).",
+    )
+    def seshat_snapshot(context: AssetExecutionContext, downloads: UpstreamDownloads) -> MaterializeResult:
+        return download(context, replace(SESHAT, pause_s=downloads.seshat_pause_s), downloads.seshat_url)
+
+    @asset(
         key=AssetKey(["upstream", REFERENCES.name]),
         group_name="upstream",
         description="What OpenAlex and Crossref hold for each work the curated layer cites (a few candidates each, by "
@@ -217,6 +232,9 @@ def definitions(root: Path, build_dir: Path) -> Definitions:
         PLEIADES.name: "The Pleiades places snapshot, loaded into DuckDB as text.",
         PLEIADES_PERIODS.name: "The Pleiades time periods snapshot, loaded into DuckDB as text.",
         CLIOPATRIA.name: "The Cliopatria snapshot, loaded into DuckDB: properties as text, polygons as WKB.",
+        SESHAT.name: "The Seshat codings snapshot, loaded into DuckDB as text.",
+        "seshat_variables": "The hand-kept crosswalk from Seshat's variables to what the graph says about them "
+        "(data/crosswalks).",
         REFERENCES.name: "What OpenAlex and Crossref hold for the works we cite, and our links' statuses, as text.",
         REPORTS.name: "The open reports from GitHub issues, as text.",
         "pleiades_sources": "The hand-kept crosswalk of rules matching Pleiades mines and quarries to our sources and ore "
@@ -231,11 +249,12 @@ def definitions(root: Path, build_dir: Path) -> Definitions:
         PLEIADES.name: [pleiades_snapshot],
         PLEIADES_PERIODS.name: [pleiades_periods_snapshot],
         CLIOPATRIA.name: [cliopatria_snapshot],
+        SESHAT.name: [seshat_snapshot],
         REFERENCES.name: [reference_candidates_snapshot],
         REPORTS.name: [github_reports_snapshot],
         "upstream_snapshots": [mrds_snapshot, wikidata_snapshot, wikidata_items_snapshot, pleiades_snapshot,
-                               pleiades_periods_snapshot, cliopatria_snapshot, reference_candidates_snapshot,
-                               github_reports_snapshot],
+                               pleiades_periods_snapshot, cliopatria_snapshot, seshat_snapshot,
+                               reference_candidates_snapshot, github_reports_snapshot],
     }
 
     @multi_asset(
@@ -264,7 +283,11 @@ def definitions(root: Path, build_dir: Path) -> Definitions:
         yield MaterializeResult(
             asset_key=raw["pleiades_sources"], metadata={"rules": loaded["crosswalks"]["pleiades_sources"]}
         )
-        for dataset in (MRDS, WIKIDATA, WIKIDATA_ITEMS, PLEIADES, PLEIADES_PERIODS, CLIOPATRIA, REFERENCES, REPORTS):
+        yield MaterializeResult(
+            asset_key=raw["seshat_variables"], metadata={"variables": loaded["crosswalks"]["seshat_variables"]}
+        )
+        for dataset in (MRDS, WIKIDATA, WIKIDATA_ITEMS, PLEIADES, PLEIADES_PERIODS, CLIOPATRIA, SESHAT, REFERENCES,
+                        REPORTS):
             snapshot = loaded["upstream"][dataset.name]
             yield MaterializeResult(asset_key=raw[dataset.name], metadata={"rows": snapshot["rows"], "copy": snapshot["copy"]})
         yield MaterializeResult(asset_key=raw["upstream_snapshots"], metadata={"datasets": len(loaded["upstream"])})
@@ -272,7 +295,7 @@ def definitions(root: Path, build_dir: Path) -> Definitions:
     @asset(
         deps=[get_asset_key_for_model([graph_models], name) for name in (
             "graph_nodes", "graph_facts", "source_occurrences", "curation_queue", "reference_checks", "profile_areas",
-            "profile_occurrences", "profile_sources")],
+            "profile_occurrences", "profile_sources", "history_codings")],
         group_name="marts",
         description="graph/manifest.json: what the built graph was made from. The app reads only a build whose "
         "manifest matches its inputs (ADR 0038).",
@@ -290,6 +313,22 @@ def definitions(root: Path, build_dir: Path) -> Definitions:
                 "path": str(graph_dir(build_dir)),
             }
         )
+
+    @asset(
+        key=AssetKey("backtest"),
+        deps=[graph_manifest],
+        group_name="marts",
+        description="The comparison with history (ADR 0053): the reasoner run for each polity Seshat codes, from the "
+        "sources worked in its area by its last year, against what Seshat records it had. Writes "
+        "graph/backtest_results.parquet, graph_gaps.parquet and backtest.json, in the build only (CC BY-SA 4.0).",
+    )
+    def backtest() -> MaterializeResult:
+        manifest = json.loads((graph_dir(build_dir) / MANIFEST_FILE).read_text(encoding="utf-8"))
+        summary = write_backtest(load_built(root, build_dir), graph_dir(build_dir), manifest["fingerprint"])
+        return MaterializeResult(metadata={
+            "polities": summary["polities"], "comparisons": summary["comparisons"], "gaps": summary["gaps"],
+            **{outcome: count for outcome, count in summary["outcomes"].items()},
+        })
 
     @op(description="Agents work through the top of the curation queue for one task: ore crosswalk rows for ore "
         "candidates, or quoted sources for routes whose references are all unverified. Code and a reviewer agent check "
@@ -343,8 +382,8 @@ def definitions(root: Path, build_dir: Path) -> Definitions:
 
     return Definitions(
         assets=[mrds_snapshot, wikidata_snapshot, wikidata_items_snapshot, pleiades_snapshot, pleiades_periods_snapshot,
-                cliopatria_snapshot, reference_candidates_snapshot, github_reports_snapshot, raw_tables, graph_models,
-                graph_manifest],
+                cliopatria_snapshot, seshat_snapshot, reference_candidates_snapshot, github_reports_snapshot, raw_tables,
+                graph_models, graph_manifest, backtest],
         jobs=[agent_curation, agent_recheck],
         resources={"dbt": DbtCliResource(project_dir=project), "downloads": UpstreamDownloads()},
     )

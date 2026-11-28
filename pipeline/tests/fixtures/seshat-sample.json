@@ -1,0 +1,202 @@
+{
+ "wf/coppers": [
+  {
+   "id": 44,
+   "polity": {
+    "id": 519,
+    "name": "eg_middle_k",
+    "long_name": "Egypt - Middle Kingdom",
+    "start_year": -2016,
+    "end_year": -1700
+   },
+   "year_from": null,
+   "year_to": null,
+   "tag": "TRS",
+   "is_disputed": false,
+   "is_uncertain": false,
+   "name": "Copper",
+   "copper": "present",
+   "comment": null,
+   "description": " copper used in bronze. Evidence for bronze arrowheads and spearheads. Bronze arrowheads used may have been imported from Middle East. Production not common in Middle Kingdom. §REF§(<a class=\"external free\" href=\"http://www.reshafim.org.il/ad/egypt/weapons/index.html\" rel=\"nofollow\">http://www.reshafim.org.il/ad/egypt/weapons/index.html</a>)§REF§ Spearheads were made of copper.§REF§(Fields 2007, 4)§REF§ Spearheads and arrowheads initially flintstone and bone, then replaced by bronze. §REF§(Gnirs 2001)§REF§"
+  },
+  {
+   "id": 54,
+   "polity": {
+    "id": 203,
+    "name": "eg_saite",
+    "long_name": "Egypt - Saite Period",
+    "start_year": -664,
+    "end_year": -525
+   },
+   "year_from": null,
+   "year_to": null,
+   "tag": "TRS",
+   "is_disputed": false,
+   "is_uncertain": false,
+   "name": "Copper",
+   "copper": "present",
+   "comment": null,
+   "description": " bronze is made with copper. Greek mercenaries possessed \"elaborate bronze armor\" §REF§(Fischer-Bovet 2014, 16)§REF§"
+  }
+ ],
+ "wf/bronzes": [
+  {
+   "id": 44,
+   "polity": {
+    "id": 519,
+    "name": "eg_middle_k",
+    "long_name": "Egypt - Middle Kingdom",
+    "start_year": -2016,
+    "end_year": -1700
+   },
+   "year_from": null,
+   "year_to": null,
+   "tag": "TRS",
+   "is_disputed": false,
+   "is_uncertain": false,
+   "name": "Bronze",
+   "bronze": "present",
+   "comment": null,
+   "description": " Evidence for bronze arrowheads and spearheads. Bronze arrowheads used may have been imported from Middle East. Production not common in Middle Kingdom. §REF§(<a class=\"external free\" href=\"http://www.reshafim.org.il/ad/egypt/weapons/index.html\" rel=\"nofollow\">http://www.reshafim.org.il/ad/egypt/weapons/index.html</a>)§REF§ Spearheads were made of copper.§REF§(Fields 2007, 4)§REF§ Spearheads and arrowheads initially flintstone and bone, then replaced by bronze. §REF§(Gnirs 2001)§REF§"
+  },
+  {
+   "id": 55,
+   "polity": {
+    "id": 203,
+    "name": "eg_saite",
+    "long_name": "Egypt - Saite Period",
+    "start_year": -664,
+    "end_year": -525
+   },
+   "year_from": null,
+   "year_to": null,
+   "tag": "TRS",
+   "is_disputed": false,
+   "is_uncertain": false,
+   "name": "Bronze",
+   "bronze": "present",
+   "comment": null,
+   "description": " <i>based on Cairan armour, which was probably the most advanced at the time§REF§(Manning 2015, Personal Communication)§REF§</i> Greek mercenaries possessed \"elaborate bronze armor\" §REF§(Fischer-Bovet 2014, 16)§REF§"
+  }
+ ],
+ "wf/irons": [
+  {
+   "id": 44,
+   "polity": {
+    "id": 519,
+    "name": "eg_middle_k",
+    "long_name": "Egypt - Middle Kingdom",
+    "start_year": -2016,
+    "end_year": -1700
+   },
+   "year_from": null,
+   "year_to": null,
+   "tag": "TRS",
+   "is_disputed": false,
+   "is_uncertain": false,
+   "name": "Iron",
+   "iron": "absent",
+   "comment": null,
+   "description": null
+  },
+  {
+   "id": 55,
+   "polity": {
+    "id": 203,
+    "name": "eg_saite",
+    "long_name": "Egypt - Saite Period",
+    "start_year": -664,
+    "end_year": -525
+   },
+   "year_from": null,
+   "year_to": null,
+   "tag": "TRS",
+   "is_disputed": false,
+   "is_uncertain": false,
+   "name": "Iron",
+   "iron": "present",
+   "comment": null,
+   "description": " \"iron armor and weapons of a non-Egyptian type found in Egypt attest the work of Greek blacksmiths specialized in making and fixing weapons in the military settlements of Daphnae and Migdol.§REF§(Fischer-Bovet 2014, 20-21)§REF§ Even by the time the Achaemenid Empire conquered Egypt in 525 BCE, Egyptian relied on copper-alloy weapons. §REF§(Ogden 2000, 168) Jack Ogden. Metals. Paul T Nicholson. Ian Shaw. eds. 2000. Ancient Egyptian Materials and Technology. Cambridge University Press. Cambridge.§REF§ However, the first iron weapons may well have been used much earlier and by foreign mercenaries during the Saite Period."
+  }
+ ],
+ "wf/steels": [
+  {
+   "id": 46,
+   "polity": {
+    "id": 519,
+    "name": "eg_middle_k",
+    "long_name": "Egypt - Middle Kingdom",
+    "start_year": -2016,
+    "end_year": -1700
+   },
+   "year_from": null,
+   "year_to": null,
+   "tag": "TRS",
+   "is_disputed": false,
+   "is_uncertain": false,
+   "name": "Steel",
+   "steel": "absent",
+   "comment": null,
+   "description": null
+  },
+  {
+   "id": 57,
+   "polity": {
+    "id": 203,
+    "name": "eg_saite",
+    "long_name": "Egypt - Saite Period",
+    "start_year": -664,
+    "end_year": -525
+   },
+   "year_from": null,
+   "year_to": null,
+   "tag": "IFR",
+   "is_disputed": false,
+   "is_uncertain": false,
+   "name": "Steel",
+   "steel": "absent",
+   "comment": null,
+   "description": " No reference found to steel armour or weapons."
+  }
+ ],
+ "sc/mines-or-quarries": [
+  {
+   "id": 36,
+   "polity": {
+    "id": 519,
+    "name": "eg_middle_k",
+    "long_name": "Egypt - Middle Kingdom",
+    "start_year": -2016,
+    "end_year": -1700
+   },
+   "year_from": null,
+   "year_to": null,
+   "tag": "TRS",
+   "is_disputed": false,
+   "is_uncertain": false,
+   "name": "Mines_or_quarry",
+   "mines_or_quarry": "present",
+   "comment": null,
+   "description": null
+  },
+  {
+   "id": 47,
+   "polity": {
+    "id": 203,
+    "name": "eg_saite",
+    "long_name": "Egypt - Saite Period",
+    "start_year": -664,
+    "end_year": -525
+   },
+   "year_from": null,
+   "year_to": null,
+   "tag": "TRS",
+   "is_disputed": false,
+   "is_uncertain": false,
+   "name": "Mines_or_quarry",
+   "mines_or_quarry": "present",
+   "comment": null,
+   "description": null
+  }
+ ]
+}

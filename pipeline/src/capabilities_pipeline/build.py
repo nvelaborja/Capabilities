@@ -17,6 +17,7 @@ from capabilities.built import (
     CHECKS_FILE,
     FACTS_FILE,
     FORMAT_VERSION,
+    HISTORY_FILE,
     MANIFEST_FILE,
     NODES_FILE,
     OCCURRENCES_FILE,
@@ -63,7 +64,7 @@ def write_manifest(root: Path, build_dir: Path) -> dict:
         "tables": {
             name: row_count(graph_dir(build_dir) / name)
             for name in (NODES_FILE, FACTS_FILE, OCCURRENCES_FILE, QUEUE_FILE, CHECKS_FILE, PROFILE_AREAS_FILE,
-                         PROFILE_OCCURRENCES_FILE, PROFILE_SOURCES_FILE)
+                         PROFILE_OCCURRENCES_FILE, PROFILE_SOURCES_FILE, HISTORY_FILE)
         },
         "upstream": loaded_snapshots(build_dir),
     }

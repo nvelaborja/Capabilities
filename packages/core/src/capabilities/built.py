@@ -21,7 +21,7 @@ from pathlib import Path
 from .graph import Graph, LoadError
 
 # Bump when the artifact's shape changes, so older builds are rebuilt rather than misread.
-FORMAT_VERSION = 6
+FORMAT_VERSION = 7
 NODES_FILE = "graph_nodes.parquet"
 FACTS_FILE = "graph_facts.parquet"
 QUEUE_FILE = "curation_queue.parquet"
@@ -30,6 +30,7 @@ CHECKS_FILE = "reference_checks.parquet"
 PROFILE_AREAS_FILE = "profile_areas.parquet"
 PROFILE_SOURCES_FILE = "profile_sources.parquet"
 PROFILE_OCCURRENCES_FILE = "profile_occurrences.parquet"
+HISTORY_FILE = "history_codings.parquet"
 MANIFEST_FILE = "manifest.json"
 SNAPSHOT_FILE = "snapshot.json"
 # Cold backups of every upstream dataset, kept in git, so the graph builds offline or when a download fails (ADR 0044).
@@ -142,7 +143,9 @@ def load_profile_places(build_dir: Path) -> dict[str, dict]:
         return {}
     places = {}
     for row in duckdb.sql(
-        f"select {', '.join(AREA_COLUMNS)} from read_parquet(?) where id is not null order by id", params=[str(areas)]
+        # Only curated profiles: the ones generated for Seshat's polities are for the comparison with history (ADR 0053).
+        f"select {', '.join(AREA_COLUMNS)} from read_parquet(?) where id is not null and origin = 'curated' order by id",
+        params=[str(areas)],
     ).fetchall():
         area = dict(zip(AREA_COLUMNS, row))
         places[area["id"]] = {**area, "geojson": json.loads(area["geojson"]), "sources": []}
@@ -151,7 +154,8 @@ def load_profile_places(build_dir: Path) -> dict[str, dict]:
         params=[str(sources)],
     ).fetchall():
         source = dict(zip(SOURCE_COLUMNS, row))
-        places[source.pop("profile_id")]["sources"].append(source)
+        if (place := places.get(source.pop("profile_id"))) is not None:
+            place["sources"].append(source)
     return places
 
 
@@ -164,7 +168,10 @@ def load_profile_occurrences(build_dir: Path) -> dict[str, dict[str, bool]]:
         return {}
     inside: dict[str, dict[str, bool]] = {}
     for profile_id, occurrence_id, worked in duckdb.sql(
-        "select profile_id, occurrence_id, worked_by_then from read_parquet(?) where id is not null", params=[str(path)]
+        # Only curated profiles': the generated ones' are for the comparison with history, never served (ADR 0053).
+        "select profile_id, occurrence_id, worked_by_then from read_parquet(?) where id is not null and profile_id in "
+        "(select id from read_parquet(?) where origin = 'curated')",
+        params=[str(path), str(graph_dir(build_dir) / PROFILE_AREAS_FILE)],
     ).fetchall():
         inside.setdefault(profile_id, {})[occurrence_id] = worked
     return inside
@@ -270,11 +277,44 @@ def load_queue(build_dir: Path) -> list[dict]:
     if not path.is_file():
         return []
     rows = duckdb.sql(
-        f"select {', '.join(QUEUE_COLUMNS)} from read_parquet(?) where id is not null "
-        "order by kind <> 'reported', kind = 'unmatched_place', kind, priority desc nulls last, subject",
-        params=[str(path)],
+        f"select {', '.join(QUEUE_COLUMNS)} from read_parquet(?) where id is not null", params=[str(path)]
     ).fetchall()
-    return [dict(zip(QUEUE_COLUMNS, row)) for row in rows]
+    items = [dict(zip(QUEUE_COLUMNS, row)) for row in rows] + history_gap_items(build_dir)
+    # Reports first, unmatched places last, the rest by kind, most valuable first within each (ADR 0045, ADR 0050).
+    return sorted(items, key=lambda item: (
+        item["kind"] != "reported", item["kind"] == "unmatched_place", item["kind"],
+        item["priority"] is None, -(item["priority"] or 0), item["subject"],
+    ))
+
+
+def run_backtest(root: Path, build_dir: Path) -> dict:
+    """Compare the current graph with history (ADR 0053), rebuilding first if the inputs changed. Returns the summary."""
+    from .history import write_backtest
+
+    graph = current_graph(root, build_dir)
+    return write_backtest(graph, graph_dir(build_dir), (read_manifest(build_dir) or {}).get("fingerprint"))
+
+
+def history_gap_items(build_dir: Path) -> list[dict]:
+    """The comparison's gaps as queue items (ADR 0053), when it compared the graph as built now; none otherwise."""
+    from .history import load_gaps, load_summary
+
+    summary, manifest = load_summary(graph_dir(build_dir)), read_manifest(build_dir)
+    if not summary or not manifest or summary.get("fingerprint") != manifest.get("fingerprint"):
+        return []
+    return [
+        {
+            "id": f"history_gap/{gap['id']}",
+            "kind": "history_gap",
+            "subject": gap["id"],
+            "label": gap["label"],
+            "detail": f"Seshat records it in {gap['polities']} polit{'y' if gap['polities'] == 1 else 'ies'} "
+            f"({', '.join(gap['examples'][:3])}{', …' if gap['polities'] > 3 else ''}) whose areas the graph can't "
+            f"reach it from: {gap['reason']}. Missing data, trade, or a wrong route: find which.",
+            "priority": gap["polities"],
+        }
+        for gap in load_gaps(graph_dir(build_dir))
+    ]
 
 
 def run_backup(root: Path, build_dir: Path) -> dict[str, dict | None]:
