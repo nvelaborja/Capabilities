@@ -4,7 +4,8 @@
 -- says nothing about one, and is left out.
 with codings as (
     select * from {{ source('raw', 'seshat_codings') }}
-    where polity_name <> ''
+    -- Empty in the CSV, which DuckDB reads as null.
+    where polity_name is not null and polity_name <> ''
 )
 
 select

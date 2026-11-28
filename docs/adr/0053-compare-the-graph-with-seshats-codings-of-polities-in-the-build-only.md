@@ -47,13 +47,13 @@ The metal variables are military use: absent means not used in war, not that the
 | `graph_yes_history_no` | the graph reaches it, Seshat records it absent. The weaker disagreement, since Seshat's metals are military use |
 | `unknown` | Seshat doesn't know, or the graph's answer is maybe |
 
-Every "no" names what stopped it. That is the raw ingredients one of which would be enough (one step away, [0027](0027-count-one-step-away-as-one-raw-ingredient.md)), or else the needs every route shares that aren't met. It also gives a cause, from the strongest evidence down:
+Every "no" gives a cause: the least it takes, widening what the polity had, to reach it.
 
-- **`ore_unrecorded`**: a mine of an ore class was worked in the area by then, and one of the class's ores would do. Which ore isn't recorded, so it can't be had ([0046](0046-place-ancient-mines-and-quarries-from-pleiades.md)).
-- **`undated`**: sources, or ore-class mines, mapped in the area would do, but none is known to have been worked by then. A dated working would settle it.
-- **`absent`**: not even those would. The area lacks a source, or the graph a route.
+- **`ore_unrecorded`**: the sources of the ore classes with a mine worked in the area by then would do. Which ore isn't recorded, so it can't be had ([0046](0046-place-ancient-mines-and-quarries-from-pleiades.md)). It names the classes.
+- **`undated`**: every place mapped in the area, worked by then or not, would do. A dated working would settle it. It names the places a date is needed for, and any worked ore-class mine needed as well (copper from one, tin from an undated place).
+- **`absent`**: not even every place mapped there would. The area lacks a source, or the graph a route. It names what is still missing with every place mapped there, so what the area lacks, not what is there undated: the raw ingredients one of which would be enough (one step away, [0027](0027-count-one-step-away-as-one-raw-ingredient.md)), or else the needs every route shares that aren't met.
 
-**Gaps** (`graph_gaps`) group what history shows and the graph can't reach. An absent gap is grouped by what stops it, since that is what to fix. An undated or unrecorded gap is grouped by the thing alone, since the fix is the same wherever it is. The results, gaps and a summary are written beside the graph (`backtest_results.parquet`, `graph_gaps.parquet`, `backtest.json`), with the fingerprint of the build they compared. While that matches the current build, each gap is a `history_gap` item in the curation queue.
+**Gaps** (`graph_gaps`) group what history shows and the graph can't reach. An absent gap is grouped by what is missing, since that is what to fix (its id keeps a short digest of the list). An undated or unrecorded gap is grouped by the thing alone, since the fix is the same wherever it is. The results, gaps and a summary are written beside the graph (`backtest_results.parquet`, `graph_gaps.parquet`, `backtest.json`), with the fingerprint of the build they compared. While that matches the current build, each gap is a `history_gap` item in the curation queue.
 
 ## Consequences
 
@@ -61,12 +61,14 @@ Every "no" names what stopped it. That is the raw ingredients one of which would
   - 260 agree and 408 are unknown.
   - In 667, Seshat records what the graph can't reach: 313 with the source absent, 214 undated, 140 with the ore unrecorded.
   - In 5, the graph reaches what Seshat records absent.
-- The 13 gaps, by size: tin bronze in 151 polities (every route needs copper and a tin ore, and tin is rarely in a polity's own area, which fits its having been traded); bloom iron undated in 83, copper undated in 64, steel undated in 63; copper absent in 53; and the unrecorded ores (iron 42, copper 42, steel 39, tin 17).
+- The 13 gaps, by size: tin bronze where only tin is missing in 98 polities (tin-bearing gravel would do; tin is rarely in a polity's own area, which fits its having been traded), and where copper is missing too in 57; bloom iron undated in 83, copper undated in 64, steel undated in 63; copper absent in 53; and the unrecorded ores (iron 42, copper 42, steel 39, tin 17).
 - Ten polities were read in full, with every disagreement naming what caused it. They were the Middle Kingdom and Saite Period of Egypt, the New Kingdom's Thutmosid period, the Achaemenid Empire, the Roman Principate, the Western Han, Classical Angkor, Anglo-Saxon England I, the Inca and the Kingdom of Hawaiʻi.
   - Reading them found the relation-row error above: before the fix, Hawaiʻi had the British Empire's mines.
 - Most disagreements are the map's, not the routes'. Few places are dated before modern times, and ancient mines often don't say which ore. Date research ([0051](0051-write-dates-as-signed-years-and-date-workings-from-periods-and-curated-dates.md)) and ore attributions would move many of them to agree. The comparison measures the map as much as the graph.
 - Seshat's terms can change, and they may start requiring tokens. A token would go in `pipeline/.env`, never in git. The backup keeps builds working offline meanwhile.
 - The comparison is strict: a source had must be worked by the polity's last year inside its own area. Trade and distance aren't modelled, which is why bronze nearly never agrees.
+- A polity's area is what Cliopatria gives its Seshat id, colonies and occupied lands included. Cliopatria puts the id on composite rows ("(Kingdom of England)", the kingdom with its colonies), and 31 of the 268 areas take such rows in. England Tudor-Stuart has iron only from a magnetite mine in New Jersey (its English mines don't say which ore), the Late Bourbon kingdom of France has Egypt's limestone quarries, and the Shuar's area gives them Ecuador's copper mines, one of the 5 cases where the graph reaches what Seshat records absent. That is Cliopatria's attribution, kept as the dataset gives it.
+- "Worked by then" is any time before the polity's last year ([0052](0052-give-profiles-a-cliopatria-place-and-years-and-find-their-sources-on-the-map.md)), so mines or quarries counts workings long before the polity: Anglo-Saxon England had mines partly because Grimes Graves' flint was mined in the Neolithic.
 
 ## Alternatives considered
 
@@ -76,4 +78,5 @@ Every "no" names what stopped it. That is the raw ingredients one of which would
 - **Count maybes as had in the comparison.** It would agree more often by assuming what isn't known ([0036](0036-place-sources-and-profiles-in-space-and-time.md)). Instead each "no" says whether the places there would have done (undated), which is the same information without the claim.
 - **Let any member of a worked ore class count as had.** That claims an ore no one recorded. It is reported as the cause instead.
 - **Use every Cliopatria row carrying the id**, relations included. That gave Hawaiʻi the British Empire's borders.
+- **Leave out composite rows**, so a polity's area is its own territory without colonies. Some areas would shrink where the parts don't carry the id themselves, and it would set aside Cliopatria's own attribution. A later ADR can choose it if colonies' mines prove misleading.
 - **Run the comparison in `capabilities build`.** It takes about ten seconds and isn't needed to answer questions. As a separate asset and command, the build stays quick, and stale results drop out of the queue.

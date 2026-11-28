@@ -413,13 +413,15 @@ After the build, the `backtest` asset, or `uv run capabilities backtest`, compar
 
 **`backtest_results.parquet`**: one row per polity and variable, with what `history_codings` says, `graph` (`yes`, `maybe` or `no`), `outcome` (`agree`, `history_yes_graph_no`, `graph_yes_history_no`, or `unknown` when Seshat doesn't know or the graph says maybe), the sources `had`, and for a no, `missing`, `reason` and `cause`:
 
-- `ore_unrecorded`: a mine of an ore class was worked there by then, and one of its ores would do; which ore isn't recorded, so it can't be had.
-- `undated`: sources, or ore-class mines, mapped there would do, but none is known to be worked by then.
-- `absent`: not even those would; `missing` is the raw ingredients one of which would be enough (one step away), else the needs every route shares that aren't met.
+The cause is the least it takes, widening what the polity had, to reach it:
 
-**`graph_gaps.parquet`**: what history shows and the graph can't reach, grouped by thing and cause (and, for absent, by what is missing), with how many polities and ten examples. **`backtest.json`**: when it ran, the fingerprint of the build it compared, and the counts. While that fingerprint is the manifest's, `load_queue` adds each gap as a `history_gap` item.
+- `ore_unrecorded`: with the sources of the ore classes that have a mine worked there by then; which ore isn't recorded, so it can't be had. `missing` names the classes.
+- `undated`: with every place mapped there, worked by then or not; `missing` names the places a date is needed for (and the reason, any worked ore-class mine needed as well).
+- `absent`: not even with every place mapped there. `missing` is what is still missing then, so it names what the area lacks, not what is there undated: the raw ingredients one of which would be enough (one step away), else the needs every route shares that aren't met.
 
-With the snapshots of 2026-11-27: 268 polities, 1,340 comparisons; 260 agree, 667 Seshat yes and graph no (313 absent, 214 undated, 140 ore unrecorded), 5 graph yes and Seshat no, 408 unknown; 13 gaps, tin bronze in 151 polities first (every route needs copper and a tin ore). It takes about ten seconds. Everything here is CC BY-SA 4.0 and stays in the build.
+**`graph_gaps.parquet`**: what history shows and the graph can't reach, grouped by thing and cause (and, for absent, by what is missing; the id keeps a short digest of it, and `missing` the list), with how many polities and ten examples. **`backtest.json`**: when it ran, the fingerprint of the build it compared, and the counts. While that fingerprint is the manifest's, `load_queue` adds each gap as a `history_gap` item.
+
+With the snapshots of 2026-11-27: 268 polities, 1,340 comparisons; 260 agree, 667 Seshat yes and graph no (313 absent, 214 undated, 140 ore unrecorded), 5 graph yes and Seshat no, 408 unknown; 13 gaps, tin bronze first: in 98 polities only tin is missing (tin-bearing gravel would do), in 57 copper too. It takes about ten seconds. Everything here is CC BY-SA 4.0 and stays in the build.
 
 ## Orchestration (Dagster)
 

@@ -27,7 +27,8 @@ select
         when bool_or(codings.value = 'absent') then 'absent'
         else 'unknown'
     end as history,
-    -- How sure Seshat is of the codings that decided it: confident (TRS), suspected (SSP), inferred (IFR), undecided (UND).
+    -- How sure Seshat is of the polity's codings of the variable, all of them, not only those that decided it: confident
+    -- (TRS), suspected (SSP), inferred (IFR), undecided (UND).
     list_sort(list(distinct codings.tag) filter (where codings.tag is not null)) as tags,
     coalesce(bool_or(codings.is_disputed), false) as disputed,
     list_sort(list(codings.record_id) filter (where codings.record_id is not null)) as records

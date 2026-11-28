@@ -47,7 +47,9 @@ class TestCli:
         out = capsys.readouterr().out
         assert "Compared 2 polities with Seshat (10 comparisons)" in out
         assert "Egypt - Saite Period, 664 BC to 525 BC; had from the map: granite-outcrop" in out
-        assert "every route needs Copper, Tin ore" in out
+        # Its copper mines don't say which ore, so with every place mapped there only tin is missing for bronze.
+        bronze = next(line for line in out.splitlines() if "wf/bronzes" in line)
+        assert "Tin" in bronze and "Copper" not in bronze
 
     def test_deselect_removes_profile_items(self, repo_root, built_dir, capsys):
         main(["--root", str(repo_root), "--build-dir", str(built_dir), "explore", "--profile", "middle-kingdom-egypt", "--deselect", "copper-saw", "--json"])

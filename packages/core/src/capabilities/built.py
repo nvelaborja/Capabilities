@@ -168,7 +168,10 @@ def load_profile_occurrences(build_dir: Path) -> dict[str, dict[str, bool]]:
         return {}
     inside: dict[str, dict[str, bool]] = {}
     for profile_id, occurrence_id, worked in duckdb.sql(
-        "select profile_id, occurrence_id, worked_by_then from read_parquet(?) where id is not null", params=[str(path)]
+        # Only curated profiles': the generated ones' are for the comparison with history, never served (ADR 0053).
+        "select profile_id, occurrence_id, worked_by_then from read_parquet(?) where id is not null and profile_id in "
+        "(select id from read_parquet(?) where origin = 'curated')",
+        params=[str(path), str(graph_dir(build_dir) / PROFILE_AREAS_FILE)],
     ).fetchall():
         inside.setdefault(profile_id, {})[occurrence_id] = worked
     return inside

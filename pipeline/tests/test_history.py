@@ -12,7 +12,7 @@ from pathlib import Path
 import duckdb
 import pytest
 
-from capabilities.built import graph_dir, load_profile_places, load_queue, run_backtest
+from capabilities.built import graph_dir, load_profile_occurrences, load_profile_places, load_queue, run_backtest
 from capabilities.history import Polity, compare_with_history, load_gaps, load_results, outcome
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -120,6 +120,9 @@ class TestGeneratedProfiles:
 
     def test_generated_profiles_stay_out_of_the_apps_profiles(self, upstream_built_dir):
         assert set(load_profile_places(upstream_built_dir)) == {"middle-kingdom-egypt"}
+        # Nor does the server hold their occurrences: they would only take memory.
+        assert set(load_profile_occurrences(upstream_built_dir)) <= {"middle-kingdom-egypt"}
+        assert any(row["profile_id"].startswith("seshat-") for row in table(upstream_built_dir, "profile_occurrences.parquet"))
 
     def test_a_polity_had_what_seshat_codes_present_in_any_of_its_years(self, upstream_built_dir):
         history = {(row["seshat_polity"], row["variable"]): row for row in table(upstream_built_dir, "history_codings.parquet")}
@@ -143,9 +146,10 @@ class TestComparison:
         assert copper["had"] == ["granite-outcrop"] and copper["outcome"] == "history_yes_graph_no"
         assert (copper["cause"], copper["missing"]) == ("ore_unrecorded", ["copper-ore", "copper-sulphide-ore"])
 
-    def test_bronze_needs_both_its_metals(self, compared):
+    def test_bronze_names_only_what_is_missing_with_every_place_there(self, compared):
+        # given: the Saite Period's area has copper mines (of an ore class) but nothing with tin
         bronze = result(compared, "eg_saite", "wf/bronzes")
-        assert bronze["missing"] == ["copper", "tin-ore"] and bronze["reason"] == "every route needs Copper, Tin ore"
+        assert bronze["cause"] == "absent" and "copper" not in bronze["missing"] and "Tin" in bronze["reason"]
 
     def test_neither_recorded_nor_reached_agrees(self, compared):
         assert result(compared, "eg_saite", "wf/steels")["outcome"] == "agree"
@@ -158,9 +162,12 @@ class TestComparison:
 
     def test_gaps_group_what_history_shows_and_the_graph_cant_reach(self, compared):
         gaps = {gap["id"]: gap for gap in load_gaps(graph_dir(compared))}
-        bronze = gaps["tin-bronze/absent/copper+tin-ore"]
+        saite = result(compared, "eg_saite", "wf/bronzes")
+        bronze = next(gap for gap in gaps.values() if (gap["thing"], gap["cause"], gap["missing"]) ==
+                      ("tin-bronze", "absent", saite["missing"]))
         assert bronze["polities"] == len([row for row in load_results(graph_dir(compared))
-                                          if row["thing"] == "tin-bronze" and row["outcome"] == "history_yes_graph_no"])
+                                          if row["thing"] == "tin-bronze" and row["outcome"] == "history_yes_graph_no"
+                                          and row["missing"] == saite["missing"]])
         assert "Egypt - Saite Period" in bronze["examples"]
 
     def test_the_gaps_join_the_queue_while_the_comparison_is_of_the_current_build(self, compared):
@@ -188,8 +195,8 @@ class TestCauses:
                 "compares": "thing", "thing": thing, "history": history, "tags": ["TRS"], "disputed": False,
                 "records": ["1"]}
 
-    def compare(self, graph, polity: Polity, history: str) -> dict:
-        return compare_with_history(graph, {polity.id: polity}, [self.coding(history)])[0]
+    def compare(self, graph, polity: Polity, history: str, thing: str = "copper") -> dict:
+        return compare_with_history(graph, {polity.id: polity}, [self.coding(history, thing)])[0]
 
     def test_a_source_there_but_not_dated_is_a_date_to_find(self, graph):
         row = self.compare(graph, self.polity(present=["malachite-deposit"]), "present")
@@ -208,6 +215,21 @@ class TestCauses:
     def test_nothing_there_is_a_source_absent(self, graph):
         row = self.compare(graph, self.polity(present=["granite-outcrop"]), "present")
         assert row["cause"] == "absent" and "malachite-deposit" in row["missing"]
+
+    def test_with_nothing_there_for_either_metal_bronze_needs_both(self, graph):
+        row = self.compare(graph, self.polity(present=["granite-outcrop"]), "present", "tin-bronze")
+        assert (row["cause"], row["missing"]) == ("absent", ["copper", "tin-ore"])
+
+    def test_an_absent_cause_names_only_what_no_place_there_gives(self, graph):
+        # given: copper mines there, not known to be worked by then, and nothing with tin: the tin is what is absent
+        row = self.compare(graph, self.polity(classes_there=["copper-ore"]), "present", "tin-bronze")
+        assert row["cause"] == "absent" and "copper" not in row["missing"]
+
+    def test_a_worked_ore_class_and_an_undated_source_together_are_a_date_to_find(self, graph):
+        # given: copper from a worked mine that doesn't say which ore, tin only from a place not known worked by then
+        row = self.compare(graph, self.polity(present=["tin-gravel"], classes_worked=["copper-ore"]), "present",
+                           "tin-bronze")
+        assert (row["cause"], row["missing"]) == ("undated", ["tin-gravel"]) and "copper ore" in row["reason"]
 
     def test_a_source_worked_by_then_reaches_the_metal(self, graph):
         assert self.compare(graph, self.polity(had=["malachite-deposit"]), "present")["outcome"] == "agree"

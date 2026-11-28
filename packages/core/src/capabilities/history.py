@@ -17,6 +17,7 @@ Seshat's data is CC BY-SA 4.0: the comparison is written to the build only, neve
 
 from __future__ import annotations
 
+import hashlib
 import json
 from collections import defaultdict
 from dataclasses import dataclass
@@ -91,10 +92,9 @@ def load_codings(graph_dir: Path) -> list[dict]:
 
 def compare_with_history(graph: Graph, polities: dict[str, Polity], codings: list[dict]) -> list[dict]:
     """One row per polity and variable: what Seshat says, what the graph says, and how they compare."""
-    explored = {profile_id: explore(graph, Selection(polity.had)) for profile_id, polity in polities.items()}
+    reach = Reach(graph)
+    explored = {profile_id: reach.explore(polity.had) for profile_id, polity in polities.items()}
     rows = []
-    # Only where the graph says no: would the places there, undated, have been enough? Then a date would settle it.
-    if_present: dict[str, ExploreResult] = {}
     for coding in codings:
         polity = polities.get(coding["profile_id"])
         if polity is None:
@@ -105,9 +105,7 @@ def compare_with_history(graph: Graph, polities: dict[str, Polity], codings: lis
             answer, missing, reason = thing_answer(graph, explored[polity.id], coding["thing"])
         cause = "absent" if answer == "no" else None
         if answer == "no" and coding["compares"] == "thing":
-            if polity.id not in if_present:
-                if_present[polity.id] = explore(graph, Selection(polity.present))
-            cause, missing, reason = no_cause(graph, polity, if_present[polity.id], coding["thing"], missing, reason)
+            cause, missing, reason = no_cause(reach, polity, coding["thing"])
         rows.append({
             **coding,
             "label": polity.label,
@@ -124,42 +122,70 @@ def compare_with_history(graph: Graph, polities: dict[str, Polity], codings: lis
     return rows
 
 
-def no_cause(graph: Graph, polity: Polity, if_present: ExploreResult, thing: str, missing: list[str],
-             reason: str) -> tuple[str, list[str], str]:
-    """Why the graph says no, in the order the evidence is strongest:
+class Reach:
+    """The reasoner's answers for sets of sources, remembered: polities share source kinds, so the same sets recur."""
 
-    ore_unrecorded  a mine of an ore class was worked in the area by then, and one of the class's ores would do: which
-                    ore isn't recorded, so it can't be selected (ADR 0046, ADR 0052)
-    undated         sources or ore-class mines mapped in the area would do, none known to be worked by then: a date
-                    would settle it
-    absent          not even those would: the area lacks a source, or the graph a route
+    def __init__(self, graph: Graph):
+        self.graph = graph
+        self.results: dict[frozenset[str], ExploreResult] = {}
+
+    def explore(self, sources: frozenset[str]) -> ExploreResult:
+        if sources not in self.results:
+            self.results[sources] = explore(self.graph, Selection(sources))
+        return self.results[sources]
+
+    def reaches(self, sources: frozenset[str], thing: str) -> bool:
+        return reached(self.explore(sources), thing)
+
+    def expand(self, ids) -> frozenset[str]:
+        """Sources, with each ore class as the sources of its minerals: what a mine of the class could have been."""
+        return frozenset(source for i in ids for source in (
+            class_sources(self.graph, i) if self.graph.kind(i) == "category" else (i,)))
+
+    def needed(self, base: frozenset[str], candidates: list[str], thing: str) -> list[str]:
+        """Of the candidates that, with the base, reach the thing: those it can't do without (copper and tin for bronze),
+        or, when none is, those that would do on their own (any copper deposit)."""
+        essential = [c for c in candidates
+                     if not self.reaches(base | self.expand(other for other in candidates if other != c), thing)]
+        return essential or [c for c in candidates if self.reaches(base | self.expand([c]), thing)] or candidates
+
+
+def reached(result: ExploreResult, thing: str) -> bool:
+    return thing in result.selected.things or result.reach.status.get(thing, Tri.NO) != Tri.NO
+
+
+def no_cause(reach: Reach, polity: Polity, thing: str) -> tuple[str, list[str], str]:
+    """Why the graph says no: the least it takes, widening what the polity had, to reach the thing.
+
+    ore_unrecorded  the sources of ore classes with a mine worked in the area by then: which ore isn't recorded, so it
+                    can't be selected (ADR 0046, ADR 0052)
+    undated         every place mapped there, worked by then or not: a dated working would settle it (and, if a worked
+                    mine of an ore class is needed too, which ore it yielded)
+    absent          not even those: the area lacks a source, or the graph a route. What is named is what is still
+                    missing with every place mapped there, not only those worked by then.
     """
+    graph = reach.graph
     worked_classes = sorted(c for c in polity.worked - polity.had if graph.kind(c) == "category")
-    could_be = frozenset(source for c in worked_classes for source in class_sources(graph, c))
-    # Together, since a thing can need two ores (copper and tin for bronze). Named: the classes it can't do without,
-    # or, when none is (copper ore or copper sulphide ore would do), those that would do on their own.
-    classes = []
-    if worked_classes and reaches(graph, polity.had | could_be, thing):
-        classes = [c for c in worked_classes
-                   if not reaches(graph, polity.had | (could_be - class_sources(graph, c)), thing)] or [
-            c for c in worked_classes if reaches(graph, polity.had | class_sources(graph, c), thing)]
-    if classes:
+    undated_classes = sorted(c for c in polity.found - polity.worked if graph.kind(c) == "category")
+    undated = sorted(polity.present - polity.had) + undated_classes
+    with_ores = polity.had | reach.expand(worked_classes)
+    everything = with_ores | reach.expand(undated)
+    if not reach.reaches(everything, thing):
+        _, missing, reason = thing_answer(graph, reach.explore(everything), thing)
+        return "absent", missing, reason
+    if worked_classes and reach.reaches(with_ores, thing):
+        classes = reach.needed(polity.had, worked_classes, thing)
         return "ore_unrecorded", classes, ("a mine of " + ", ".join(graph.label(c).lower() for c in classes)
                                            + " was worked there by then, but which ore isn't recorded")
-    reached = thing in if_present.selected.things or if_present.reach.status.get(thing, Tri.NO) != Tri.NO
-    if not reached:
-        # Mines of an ore class there, none known to be worked by then (Serabit el-Khadim in the Middle Kingdom).
-        undated_classes = sorted(c for c in polity.found - polity.worked if graph.kind(c) == "category")
-        could_be = frozenset(source for c in undated_classes for source in class_sources(graph, c))
-        if undated_classes and reaches(graph, polity.present | could_be, thing):
-            return "undated", undated_classes, ("mines of " + ", ".join(graph.label(c).lower() for c in undated_classes)
-                                                + " are there, none known to be worked by then; a dated working would"
-                                                " settle it")
-        return "absent", missing, reason
-    undated = sorted(source for source in polity.present - polity.had if source in missing) or sorted(
-        polity.present - polity.had)
-    return "undated", undated, ("there, but none known to be worked by then: " + ", ".join(graph.label(s) for s in undated)
-                                + "; a dated working would settle it")
+    dates = reach.needed(with_ores, undated, thing)
+    # A worked ore-class mine the thing needs as well (copper from one, tin from an undated place).
+    ores = [c for c in worked_classes if not reach.reaches(
+        polity.had | reach.expand(other for other in worked_classes if other != c) | reach.expand(undated), thing)]
+    reason = ("there, but none known to be worked by then: " + ", ".join(graph.label(s) for s in dates)
+              + "; a dated working would settle it")
+    if ores:
+        reason += " (and which ore a worked mine of " + ", ".join(graph.label(c).lower() for c in ores) + " yielded)"
+    return "undated", dates, reason
 
 
 def thing_answer(graph: Graph, result: ExploreResult, thing: str) -> tuple[str, list[str], str]:
@@ -182,12 +208,8 @@ def thing_answer(graph: Graph, result: ExploreResult, thing: str) -> tuple[str, 
 def unmet_needs(graph: Graph, result: ExploreResult, thing: str) -> list[str]:
     """What every route to the thing needs, things and kinds of thing, that the polity's sources don't reach."""
     needs = Backward(graph).of_thing(thing)
-
-    def reached(thing_id: str) -> bool:
-        return thing_id in result.selected.things or result.reach.status.get(thing_id, Tri.NO) != Tri.NO
-
-    things = [t for t in needs.things if not reached(t)]
-    categories = [c for c in needs.categories if not any(reached(member) for member in graph.members(c))]
+    things = [t for t in needs.things if not reached(result, t)]
+    categories = [c for c in needs.categories if not any(reached(result, member) for member in graph.members(c))]
     return sorted(things + categories)
 
 
@@ -196,9 +218,6 @@ def class_sources(graph: Graph, category: str) -> frozenset[str]:
     return frozenset(source for member in graph.members(category) for source in graph.sources_of(member))
 
 
-def reaches(graph: Graph, sources: frozenset[str], thing: str) -> bool:
-    result = explore(graph, Selection(sources))
-    return thing in result.selected.things or result.reach.status.get(thing, Tri.NO) != Tri.NO
 
 
 def worked_source_answer(graph: Graph, polity: Polity) -> tuple[str, list[str], str]:
@@ -241,7 +260,8 @@ def gap(graph: Graph, thing: str, cause: str, missing: tuple[str, ...], group: l
     else:
         sources, reason = list(missing), group[0]["reason"]
     return {
-        "id": f"{thing}/{cause}" + (f"/{'+'.join(missing)}" if missing else ""),
+        # What is missing can be ten deposit kinds: the id keeps a short digest of it, and `missing` the list.
+        "id": f"{thing}/{cause}" + (f"/{hashlib.sha1('+'.join(missing).encode()).hexdigest()[:8]}" if missing else ""),
         "thing": thing,
         "label": graph.label(thing),
         "cause": cause,
