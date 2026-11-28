@@ -1,6 +1,6 @@
 # 0053. Compare the graph with Seshat's codings of polities, in the build only
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-27
 
 ## Context
